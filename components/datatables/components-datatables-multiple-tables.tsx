@@ -44,7 +44,7 @@ const ComponentsDatatablesMultipleTables = () => {
 
             const bhikkuData = result?.data?.data || [];
             const cleaned = bhikkuData.map(
-                ({ br_id, br_is_deleted, br_version_number, br_upasampada_serial_no, ...rest }) => rest
+                ({ br_id, br_is_deleted, br_version_number, br_upasampada_serial_no, ...rest }: any) => rest
             );
 
             const sorted = sortBy(cleaned, sortStatus.columnAccessor);
