@@ -151,8 +151,8 @@ const Header = () => {
                 <div className="relative flex w-full items-center bg-white px-5 py-2.5 dark:bg-black">
                     <div className="horizontal-logo flex items-center justify-between ltr:mr-2 rtl:ml-2 lg:hidden">
                         <Link href="/" className="main-logo flex shrink-0 items-center">
-                            <img className="inline w-8 ltr:-ml-1 rtl:-mr-1" src="/assets/images/logo.svg" alt="logo" />
-                            <span className="hidden align-middle text-2xl  font-semibold  transition-all duration-300 ltr:ml-1.5 rtl:mr-1.5 dark:text-white-light md:inline">dba-frontend</span>
+                            <img className="inline w-8 ltr:-ml-1 rtl:-mr-1" src="/assets/images/logo.png" alt="logo" />
+                            <span className="hidden align-middle text-2xl  font-semibold  transition-all duration-300 ltr:ml-1.5 rtl:mr-1.5 dark:text-white-light md:inline">DBA</span>
                         </Link>
                         <button
                             type="button"
@@ -320,7 +320,7 @@ const Header = () => {
                                     ) : (
                                         <li className="mb-5" onClick={(e) => e.stopPropagation()}>
                                             <button type="button" className="!grid min-h-[200px] place-content-center text-lg hover:!bg-transparent">
-                                                <div className="mx-auto mb-4 rounded-full text-primary ring-4 ring-primary/30">
+                                                <div className="mx-auto mb-4 rounded-full text-white ring-4 ring-primary/30">
                                                     <IconInfoCircle fill={true} className="h-10 w-10" />
                                                 </div>
                                                 No data available.
@@ -967,7 +967,7 @@ const Header = () => {
                                 <Link href="/widgets">{t('widgets')}</Link>
                             </li>
                             <li>
-                                <Link href="#" target="_blank">
+                                <Link href="https://DBA.sbthemes.com" target="_blank">
                                     {t('documentation')}
                                 </Link>
                             </li>
