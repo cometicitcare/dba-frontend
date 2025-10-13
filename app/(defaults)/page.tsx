@@ -15,6 +15,7 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { BarChart } from 'lucide-react'; // add this import
 
 // ---------- Interfaces ----------
 interface SubItem {
@@ -108,6 +109,16 @@ const DBADashboard: React.FC = () => {
         { icon: Trash2, label: 'Cleanup', action: 'cleanup-admin', route: '/admin/cleanup' },
       ],
     },
+    {
+  id: 'analytics',
+  name: 'Analytics',
+  icon: BarChart, // now related to analytics
+  color: 'from-teal-400 to-cyan-500',
+  subItems: [
+    { icon: Eye, label: 'View analytics', action: 'view-analytics', route: '/analytics' },
+   
+  ],
+}
   ];
 
   const getSubItemPosition = (index: number, total: number): Position => {
