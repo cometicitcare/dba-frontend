@@ -6,8 +6,8 @@ import { Nunito } from 'next/font/google';
 
 export const metadata: Metadata = {
     title: {
-        template: '%s | DBA - Multipurpose Tailwind Dashboard Template',
-        default: 'DBA - Multipurpose Tailwind Dashboard Template',
+        template: '%s | Department of Buddhist Affairs - HRMS',
+        default: 'Department of Buddhist Affairs - HRMS',
     },
 };
 const nunito = Nunito({

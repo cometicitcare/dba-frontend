@@ -45,7 +45,7 @@ const CoverPasswordReset = () => {
                             </div>
                             <ComponentsAuthResetPasswordForm />
                         </div>
-                        <p className="absolute bottom-6 w-full text-center dark:text-white">© {new Date().getFullYear()}.DBA All Rights Reserved.</p>
+                        <p className="absolute bottom-6 w-full text-center dark:text-white">© {new Date().getFullYear()}.Department of Buddhist Affairs - HRMS All Rights Reserved.</p>
                     </div>
                 </div>
             </div>

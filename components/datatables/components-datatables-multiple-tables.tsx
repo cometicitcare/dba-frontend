@@ -15,7 +15,7 @@ const ComponentsDatatablesMultipleTables = () => {
     const [recordsData, setRecordsData] = useState<any[]>([]);
     const [totalRecords, setTotalRecords] = useState(0);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(5);
+    const [pageSize, setPageSize] = useState(10);
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'br_regn',
         direction: 'asc',
@@ -162,7 +162,7 @@ const ComponentsDatatablesMultipleTables = () => {
                     recordsPerPage={pageSize}
                     page={page}
                     onPageChange={setPage}
-                    recordsPerPageOptions={[5, 10, 20, 30, 50, 100]}
+                    recordsPerPageOptions={[10, 20, 30, 50, 100]}
                     onRecordsPerPageChange={(size) => {
                         setPage(1);
                         setPageSize(size);
