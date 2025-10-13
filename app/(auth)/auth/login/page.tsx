@@ -17,9 +17,9 @@ const LoginClient = () => {
                             {/* add the logo */}
                             <div className="flex justify-center mb-6">
                                 <img
-                                    src="/assets/images/gov_logo.png"
+                                    src="/assets/images/BD-Logo-BL.png"
                                     alt="Department of Buddhist Affairs Logo"
-                                    className="w-[150px] h-auto"
+                                    className="w-[350px] h-auto"
                                 />
                             </div>
                             <h1 className="text-4xl font-extrabold text-white mb-6 leading-snug" >
@@ -33,8 +33,8 @@ const LoginClient = () => {
 
                     <div className="relative flex w-full flex-col items-center justify-center gap-6 px-4 pb-16 pt-6 sm:px-6 lg:max-w-[667px]">
                         <div className="flex w-full max-w-[440px] items-center gap-2 lg:absolute lg:end-6 lg:top-6 lg:max-w-full">
-                            <Link href="/" className="block w-8 lg:hidden">
-                                <img src="/assets/images/logo.png" alt="Logo" className="mx-auto w-10" />
+                            <Link href="/" className="block lg:hidden">
+                                <img src="/assets/images/BD-Logo-BL.png" alt="Logo" className="w-[350px] h-auto" />
                             </Link>
                             {/* <LanguageDropdown className="ms-auto w-max" /> */}
                         </div>
