@@ -7,11 +7,20 @@ import 'tippy.js/dist/tippy.css';
 import sortBy from 'lodash/sortBy';
 import IconPencil from '@/components/icon/icon-pencil';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
-import { _manageBhikku } from '@/services/bhikku';
+import { _manageVihara } from '@/services/vihara';
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition, DialogPanel, TransitionChild } from '@headlessui/react';
 
-const ComponentsDatatablesMultipleTables = () => {
+function formatDate(val?: string | null) {
+  if (!val) return '—';
+  // Try to display YYYY-MM-DD if ISO timestamp, else pass through
+  const onlyDate = /^\d{4}-\d{2}-\d{2}$/.test(val);
+  if (onlyDate) return val;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? val : d.toISOString().slice(0, 10);
+}
+
+const ViharaList = () => {
   const [recordsData, setRecordsData] = useState<any[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
 
@@ -20,7 +29,7 @@ const ComponentsDatatablesMultipleTables = () => {
   const [pageSize, setPageSize] = useState(10);
 
   const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-    columnAccessor: 'br_regn',
+    columnAccessor: 'vh_trn',
     direction: 'asc',
   });
 
@@ -28,10 +37,10 @@ const ComponentsDatatablesMultipleTables = () => {
   const [loading, setLoading] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedRegn, setSelectedRegn] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const router = useRouter();
 
-  // ✅ Fetch Bhikku Data with backend pagination by page number
+  // ✅ Fetch Vihara Data (matches your API and response)
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -39,36 +48,36 @@ const ComponentsDatatablesMultipleTables = () => {
       const body = {
         action: 'READ_ALL',
         payload: {
-          // send page-based pagination
-          page,                 // 1-based page index
-          limit: pageSize,      // page size
+          skip: (page - 1) * pageSize,
+          limit: pageSize,
+          page,
           search_key: search || '',
-          // optionally let backend sort so we only get current page rows
-          sort_by: sortStatus.columnAccessor,
-          sort_dir: sortStatus.direction, // 'asc' | 'desc'
         },
       };
 
-      const result = await _manageBhikku(body);
+      const result = await _manageVihara(body);
 
-      // robust parsing for different API shapes
-      const bhikkuData = result?.data?.data || result?.data?.rows || [];
-      const cleaned = bhikkuData.map(
-        ({ br_id, br_is_deleted, br_version_number, br_upasampada_serial_no, ...rest }: any) => rest
-      );
+      // Response shape you provided:
+      // { status, message, data: [...], totalRecords, page, limit }
+      const rows = result?.data?.data ?? [];
+      const cleaned = rows.map((r: any) => ({
+        ...r,
+        vh_bgndate: formatDate(r.vh_bgndate),
+        vh_syojakarmdate: formatDate(r.vh_syojakarmdate),
+        vh_pralesigdate: formatDate(r.vh_pralesigdate),
+        vh_bacgrcmdate: formatDate(r.vh_bacgrcmdate),
+        vh_minissecrsigdate: formatDate(r.vh_minissecrsigdate),
+        vh_ssbmsigdate: formatDate(r.vh_ssbmsigdate),
+        vh_created_at: formatDate(r.vh_created_at),
+        vh_updated_at: formatDate(r.vh_updated_at),
+      }));
 
-      // if backend already sorted, skip client sort;
-      // otherwise keep client-side sort for safety
-      const maybeSorted = sortBy(cleaned, sortStatus.columnAccessor);
+      // Client-side sort fallback
+      const maybeSorted = sortBy(cleaned, sortStatus.columnAccessor as string);
       const finalData = sortStatus.direction === 'desc' ? maybeSorted.reverse() : maybeSorted;
 
       setRecordsData(finalData);
-      setTotalRecords(
-        result?.data?.totalRecords ??
-        result?.data?.total ??
-        result?.data?.count ??
-        0
-      );
+      setTotalRecords(result?.data?.totalRecords ?? 0);
     } catch (err) {
       console.error('Fetch Error:', err);
     } finally {
@@ -76,18 +85,21 @@ const ComponentsDatatablesMultipleTables = () => {
     }
   };
 
-  // ✅ Delete confirmation handler
+  // ✅ Delete (uses vh_id)
   const handleDeleteData = async () => {
-    if (!selectedRegn) return;
+    if (selectedId == null) return;
     try {
       setLoading(true);
       const body = {
         action: 'DELETE',
-        payload: { br_regn: selectedRegn },
+        payload: { vh_id: selectedId },
       };
-      await _manageBhikku(body);
-      // refetch current page (if page becomes empty after delete, you can adjust page - 1 here)
-      fetchData();
+      await _manageVihara(body);
+
+      // Optional: if last item on page was deleted, step back a page
+      // if (recordsData.length === 1 && page > 1) setPage(p => p - 1);
+
+      await fetchData();
       setModalOpen(false);
     } catch (err) {
       console.error('Delete Error:', err);
@@ -105,7 +117,7 @@ const ComponentsDatatablesMultipleTables = () => {
     <div className="panel mt-6">
       {/* Header with Search and Add Button */}
       <div className="mb-5 flex flex-col gap-5 md:flex-row md:items-center">
-        <h5 className="text-lg font-semibold dark:text-white-light">Bhikku List</h5>
+        <h5 className="text-lg font-semibold dark:text-white-light">Vihara List</h5>
         <div className="flex items-center gap-3 ltr:ml-auto rtl:mr-auto">
           <input
             type="text"
@@ -120,41 +132,60 @@ const ComponentsDatatablesMultipleTables = () => {
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => router.push('/bhikku/add')}
+            onClick={() => router.push('/vihara/add')}
           >
-            Add Bhikku
+            Add Vihara
           </button>
         </div>
       </div>
 
-      {/* ✅ Data Table */}
+      {/* ✅ Data Table (columns reflect your response fields) */}
       <div className="datatables">
         <DataTable
           className="table-hover whitespace-nowrap"
           fetching={loading}
           records={recordsData}
           columns={[
-            { accessor: 'br_regn', title: 'Reg. No', sortable: true },
-            { accessor: 'br_gihiname', title: 'Name', sortable: true },
-            { accessor: 'br_fathrname', title: 'Father Name' },
-            { accessor: 'br_mobile', title: 'Mobile' },
-            { accessor: 'br_email', title: 'Email' },
-            { accessor: 'br_mahananame', title: 'Mahanayaka' },
-            { accessor: 'br_remarks', title: 'Remarks' },
-            { accessor: 'br_cat', title: 'Category' },
-            { accessor: 'br_currstat', title: 'Status' },
+            { accessor: 'vh_trn', title: 'TRN', sortable: true },
+            { accessor: 'vh_vname', title: 'Vihara Name', sortable: true },
+            { accessor: 'vh_addrs', title: 'Address' },
+            { accessor: 'vh_mobile', title: 'Mobile' },
+            { accessor: 'vh_whtapp', title: 'WhatsApp' },
+            { accessor: 'vh_email', title: 'Email' },
+            { accessor: 'vh_typ', title: 'Type' },
+            { accessor: 'vh_gndiv', title: 'GN Div.' },
+            { accessor: 'vh_fmlycnt', title: 'Families' },
+            { accessor: 'vh_bgndate', title: 'Begin Date' },
+            { accessor: 'vh_ownercd', title: 'Owner Code' },
+            { accessor: 'vh_parshawa', title: 'Parshawa' },
+            { accessor: 'vh_ssbmcode', title: 'SSBM Code' },
+            { accessor: 'vh_syojakarmakrs', title: 'Syoja Karma Krs' },
+            { accessor: 'vh_syojakarmdate', title: 'Syoja Karma Date' },
+            { accessor: 'vh_landownrship', title: 'Land Ownership' },
+            { accessor: 'vh_pralename', title: 'Prale Name' },
+            { accessor: 'vh_pralesigdate', title: 'Prale Sig. Date' },
+            { accessor: 'vh_bacgrecmn', title: 'Background Recmn' },
+            { accessor: 'vh_bacgrcmdate', title: 'Background Rcm Date' },
+            { accessor: 'vh_minissecrsigdate', title: 'Ministry Sec. Sig. Date' },
+            { accessor: 'vh_minissecrmrks', title: 'Ministry Sec. Remarks' },
+            { accessor: 'vh_ssbmsigdate', title: 'SSBM Sig. Date' },
+            { accessor: 'vh_created_at', title: 'Created At' },
+            { accessor: 'vh_updated_at', title: 'Updated At' },
+            { accessor: 'vh_created_by', title: 'Created By' },
+            { accessor: 'vh_updated_by', title: 'Updated By' },
+            { accessor: 'vh_version_number', title: 'Version' },
+            { accessor: 'vh_id', title: 'ID', sortable: true },
             {
               accessor: 'action',
               title: 'Action',
               titleClassName: '!text-center',
-              render: (record) => (
+              render: (record: any) => (
                 <div className="mx-auto flex w-max items-center gap-2">
-                  {/* ✅ EDIT BUTTON REDIRECT */}
                   <Tippy content="Edit">
                     <button
                       type="button"
                       className="text-primary hover:text-blue-600"
-                      onClick={() => router.push(`/bhikku/edit/${record.br_regn}`)}
+                      onClick={() => router.push(`/vihara/edit/${record.vh_id}`)}
                     >
                       <IconPencil />
                     </button>
@@ -165,7 +196,7 @@ const ComponentsDatatablesMultipleTables = () => {
                       type="button"
                       className="text-danger hover:text-red-600"
                       onClick={() => {
-                        setSelectedRegn(record.br_regn);
+                        setSelectedId(record.vh_id);
                         setModalOpen(true);
                       }}
                     >
@@ -233,8 +264,8 @@ const ComponentsDatatablesMultipleTables = () => {
                   </div>
                   <div className="p-5">
                     <p>
-                      Are you sure you want to delete this Bhikku record (
-                      <strong>{selectedRegn}</strong>)? This action cannot be undone.
+                      Are you sure you want to delete this Vihara record (
+                      <strong>{selectedId ?? ''}</strong>)? This action cannot be undone.
                     </p>
                     <div className="flex justify-end items-center mt-8">
                       <button
@@ -263,4 +294,4 @@ const ComponentsDatatablesMultipleTables = () => {
   );
 };
 
-export default ComponentsDatatablesMultipleTables;
+export default ViharaList;
