@@ -8,6 +8,8 @@ import sortBy from 'lodash/sortBy';
 import IconPencil from '@/components/icon/icon-pencil';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { _manageBhikku } from '@/services/bhikku';
+import { _manageVihara } from '@/services/vihara';
+
 import { useRouter } from 'next/navigation';
 import { Dialog, Transition, DialogPanel, TransitionChild } from '@headlessui/react';
 

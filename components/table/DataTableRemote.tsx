@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { DataTable, DataTableColumn, DataTableSortStatus } from "mantine-datatable";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  DataTable,
+  DataTableColumn,
+  DataTableSortStatus,
+  DataTableRowExpansionProps,
+} from "mantine-datatable";
 
 export type RemoteFetchArgs = {
   page: number;
@@ -16,41 +21,40 @@ export type RemoteFetchResult<T> = {
 };
 
 type BaseRecord = Record<string, any>;
+type RowExpandArgs<T> = { record: T; recordIndex: number; collapse: () => void };
 
 export type DataTableRemoteProps<T extends BaseRecord> = {
   columns: DataTableColumn<T>[];
-  /** Required for stable keys if a record has no `id` */
+  /** Build a stable unique key; if provided, it will be stored on __rowId */
   getRowId?: (row: T, index: number) => string | number;
   fetcher: (args: RemoteFetchArgs) => Promise<RemoteFetchResult<T>>;
-  /** initial states */
   initialPage?: number;
   initialPageSize?: number;
   initialSort?: DataTableSortStatus;
-  /** search bound from outside if you want to control it globally */
   search?: string;
-  /** table chrome */
   className?: string;
   minHeight?: number;
   recordsPerPageOptions?: number[];
-  /** Called whenever data is loaded */
   onDataLoaded?: (result: RemoteFetchResult<T>) => void;
+  renderExpand?: (args: RowExpandArgs<T>) => React.ReactNode;
+  expandTransitionMs?: number;
 };
 
-export default function DataTableRemote<T extends BaseRecord>(props: DataTableRemoteProps<T>) {
-  const {
-    columns,
-    getRowId,
-    fetcher,
-    initialPage = 1,
-    initialPageSize = 10,
-    initialSort,
-    search,
-    className,
-    minHeight = 300,
-    recordsPerPageOptions = [10, 20, 30, 50, 100],
-    onDataLoaded,
-  } = props;
-
+export default function DataTableRemote<T extends BaseRecord>({
+  columns,
+  getRowId,
+  fetcher,
+  initialPage = 1,
+  initialPageSize = 10,
+  initialSort,
+  search,
+  className,
+  minHeight = 300,
+  recordsPerPageOptions = [10, 20, 30, 50, 100],
+  onDataLoaded,
+  renderExpand,
+  expandTransitionMs = 150,
+}: DataTableRemoteProps<T>) {
   const [records, setRecords] = useState<T[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [page, setPage] = useState(initialPage);
@@ -60,7 +64,6 @@ export default function DataTableRemote<T extends BaseRecord>(props: DataTableRe
   );
   const [loading, setLoading] = useState(false);
 
-  // re-fetch when deps change
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -80,20 +83,31 @@ export default function DataTableRemote<T extends BaseRecord>(props: DataTableRe
     return () => {
       cancelled = true;
     };
-  }, [page, pageSize, sortStatus?.columnAccessor, sortStatus?.direction, search]);
+  }, [page, pageSize, sortStatus?.columnAccessor, sortStatus?.direction, search, fetcher, onDataLoaded]);
 
-  // stable row key
-  const rowIdAccessor = useMemo(() => {
-    if (getRowId) return getRowId;
-    return (row: T, index: number) => (row.id ?? row._id ?? row.key ?? index);
-  }, [getRowId]);
+  // If getRowId is provided, clone records and add __rowId to each one
+  const tableRecords = useMemo(() => {
+    if (!getRowId) return records;
+    return records.map((r, i) => ({ ...(r as object), __rowId: getRowId(r, i) })) as unknown as T[];
+  }, [records, getRowId]);
+
+  // Mantine expects a string path for the accessor
+  const idAccessor: string | undefined = getRowId ? "__rowId" : undefined;
+
+  const rowExpansion: DataTableRowExpansionProps<T> | undefined = renderExpand
+    ? {
+        content: ({ record, recordIndex, collapse }) =>
+          renderExpand({ record, recordIndex, collapse }),
+        collapseProps: { transitionDuration: expandTransitionMs },
+      }
+    : undefined;
 
   return (
     <div className="datatables">
       <DataTable
         className={className ?? "table-hover whitespace-nowrap"}
         fetching={loading}
-        records={records}
+        records={tableRecords}
         columns={columns}
         totalRecords={totalRecords}
         recordsPerPage={pageSize}
@@ -107,11 +121,11 @@ export default function DataTableRemote<T extends BaseRecord>(props: DataTableRe
         sortStatus={sortStatus}
         onSortStatusChange={setSortStatus}
         minHeight={minHeight}
-        rowExpansion={{
-          collapseProps: { transitionDuration: 150 },
-        }}
-        rowIdAccessor={rowIdAccessor as any}
-        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
+        rowExpansion={rowExpansion}
+        idAccessor={idAccessor} // ✅ string path, not a function
+        paginationText={({ from, to, totalRecords }) =>
+          `Showing ${from} to ${to} of ${totalRecords} entries`
+        }
       />
     </div>
   );
