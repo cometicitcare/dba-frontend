@@ -3,8 +3,8 @@ import React, { useMemo, useState } from "react";
 
 /** Compact radial dashboard (responsive, no overlap) */
 
-// ---------------- Icons ----------------
-const Svg = ({ children, className = "", strokeWidth = 2 }: any) => (
+/* ---------------- Icons (LOCAL, not exported) ---------------- */
+const Svg = ({ children, className = "", strokeWidth = 2, ...rest }: any) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -14,12 +14,13 @@ const Svg = ({ children, className = "", strokeWidth = 2 }: any) => (
     strokeLinejoin="round"
     className={className}
     aria-hidden="true"
+    {...rest}
   >
     {children}
   </svg>
 );
 
-export const IconUsers = (p: any) => (
+const IconUsers = (p: any) => (
   <Svg {...p}>
     <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
@@ -27,49 +28,49 @@ export const IconUsers = (p: any) => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </Svg>
 );
-export const IconHome = (p: any) => (
+const IconHome = (p: any) => (
   <Svg {...p}>
     <path d="M3 9l9-7 9 7" />
     <path d="M9 22V12h6v10" />
   </Svg>
 );
-export const IconBookOpen = (p: any) => (
+const IconBookOpen = (p: any) => (
   <Svg {...p}>
     <path d="M12 3a6 6 0 0 0-6 6v10a6 6 0 0 1 6-6" />
     <path d="M12 3a6 6 0 0 1 6 6v10a6 6 0 0 0-6-6" />
   </Svg>
 );
-export const IconGraduationCap = (p: any) => (
+const IconGraduationCap = (p: any) => (
   <Svg {...p}>
     <path d="M22 10L12 5 2 10l10 5 10-5z" />
     <path d="M6 12v5a6 6 0 0 0 12 0v-5" />
   </Svg>
 );
-export const IconSettings = (p: any) => (
+const IconSettings = (p: any) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.04 2.4l.06.06c.5.5 1.22.65 1.82.33A1.65 1.65 0 0 0 10.42 1H11a2 2 0 1 1 4 0v.09c0 .66.39 1.26 1 1.51.6.32 1.32.17 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06c-.5.5-.65 1.22-.33 1.82.25.61.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.66 0-1.26.39-1.51 1z" />
   </Svg>
 );
-export const IconEye = (p: any) => (
+const IconEye = (p: any) => (
   <Svg {...p}>
     <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
     <circle cx="12" cy="12" r="3" />
   </Svg>
 );
-export const IconPlus = (p: any) => (
+const IconPlus = (p: any) => (
   <Svg {...p}>
     <path d="M12 5v14" />
     <path d="M5 12h14" />
   </Svg>
 );
-export const IconSearch = (p: any) => (
+const IconSearch = (p: any) => (
   <Svg {...p}>
     <circle cx="11" cy="11" r="7" />
     <path d="M21 21l-3.5-3.5" />
   </Svg>
 );
-export const IconFileText = (p: any) => (
+const IconFileText = (p: any) => (
   <Svg {...p}>
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <path d="M14 2v6h6" />
@@ -78,13 +79,13 @@ export const IconFileText = (p: any) => (
     <path d="M10 9H8" />
   </Svg>
 );
-export const IconEdit = (p: any) => (
+const IconEdit = (p: any) => (
   <Svg {...p}>
     <path d="M12 20h9" />
     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
   </Svg>
 );
-export const IconTrash = (p: any) => (
+const IconTrash = (p: any) => (
   <Svg {...p}>
     <path d="M3 6h18" />
     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -93,7 +94,7 @@ export const IconTrash = (p: any) => (
     <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" />
   </Svg>
 );
-export const IconBarChart = (p: any) => (
+const IconBarChart = (p: any) => (
   <Svg {...p}>
     <path d="M3 3v18h18" />
     <rect x="7" y="9" width="3" height="9" rx="1" />
@@ -102,38 +103,33 @@ export const IconBarChart = (p: any) => (
   </Svg>
 );
 
-// ---------------- Types ----------------
-export type IconType = React.FC<any>;
-export interface SubItem {
+/* ---------------- Types (LOCAL) ---------------- */
+type IconType = React.FC<any>;
+interface SubItem {
   icon: IconType;
   label: string;
   action: string;
   route: string;
 }
-export interface Service {
+interface Service {
   id: string;
   name: string;
   icon: IconType;
   gradient: [string, string];
   subItems: SubItem[];
 }
-export interface Position { x: number; y: number }
+interface Position {
+  x: number;
+  y: number;
+}
 
-// ---------------- Utils ----------------
+/* ---------------- Utils ---------------- */
 const polar = (deg: number, r: number): Position => {
   const a = (deg * Math.PI) / 180;
   return { x: Math.cos(a) * r, y: Math.sin(a) * r };
 };
 
-// ---------------- Component ----------------
-export interface DBADashboardProps {
-  services?: Service[];
-  /** Distance of sub-items from center (inside the 200px card). */
-  radius?: number;
-  onNavigate?: (route: string) => void;
-  footerText?: string;
-}
-
+/* ---------------- Data ---------------- */
 const DEFAULT_SERVICES: Service[] = [
   {
     id: "bhikku",
@@ -209,12 +205,19 @@ const DEFAULT_SERVICES: Service[] = [
   },
 ];
 
-const DBADashboard: React.FC<DBADashboardProps> = ({
+/* ---------------- Dashboard (LOCAL component) ---------------- */
+function DBADashboard({
   services = DEFAULT_SERVICES,
   radius,
   onNavigate,
   footerText = "© 2025 Department of Buddhist Affairs - All Rights Reserved",
-}) => {
+}: {
+  services?: Service[];
+  /** Distance of sub-items from center (inside the 200px card). */
+  radius?: number;
+  onNavigate?: (route: string) => void;
+  footerText?: string;
+}) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Gradient defs
@@ -255,7 +258,9 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
               <div
                 className="relative group"
                 onMouseEnter={() => setHoveredId(service.id)}
-                onMouseLeave={() => setTimeout(() => hoveredId === service.id && setHoveredId(null), 160)}
+                onMouseLeave={() =>
+                  setTimeout(() => hoveredId === service.id && setHoveredId(null), 160)
+                }
               >
                 <button
                   type="button"
@@ -263,7 +268,8 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
                   aria-expanded={hoveredId === service.id}
                   onFocus={() => setHoveredId(service.id)}
                   onBlur={(e) => {
-                    if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) setHoveredId(null);
+                    if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node))
+                      setHoveredId(null);
                   }}
                   className="relative rounded-3xl border border-white/70 bg-white/90 
                              shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-400
@@ -271,7 +277,8 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
                              w-[200px] h-[200px] flex items-center justify-center"
                   style={{
                     background: `linear-gradient(135deg, ${service.gradient[0]}, ${service.gradient[1]})`,
-                    transform: hoveredId === service.id ? "translateZ(0) scale(1.04)" : "translateZ(0) scale(1)",
+                    transform:
+                      hoveredId === service.id ? "translateZ(0) scale(1.04)" : "translateZ(0) scale(1)",
                   }}
                 >
                   <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-30 blur-xl transition-opacity" />
@@ -284,10 +291,7 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
                 </button>
 
                 {/* Sub-items ring (inside the card) */}
-                <div
-                  className="absolute inset-0 z-20 pointer-events-none"
-                  style={{ width: 200, height: 200 }}
-                >
+                <div className="absolute inset-0 z-20 pointer-events-none" style={{ width: 200, height: 200 }}>
                   {service.subItems.map((subItem, index) => {
                     const step = 360 / service.subItems.length;
                     const start = -90; // top
@@ -320,7 +324,9 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
                             strokeWidth={2.2}
                             style={{ color: `url(#g-${service.id})` as any }}
                           />
-                          <span className="text-[10px] font-medium text-gray-700 leading-none">{subItem.label}</span>
+                          <span className="text-[10px] font-medium text-gray-700 leading-none">
+                            {subItem.label}
+                          </span>
                         </button>
                       </div>
                     );
@@ -339,7 +345,7 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
         </div>
       </div>
 
-      {/* Reduce m otion preference */}
+      {/* Reduce motion preference */}
       <style jsx>{`
         @media (prefers-reduced-motion: reduce) {
           * {
@@ -352,6 +358,9 @@ const DBADashboard: React.FC<DBADashboardProps> = ({
       `}</style>
     </div>
   );
-};
+}
 
-export default DBADashboard;
+/* ---------------- Page export (ONLY export) ---------------- */
+export default function Page() {
+  return <DBADashboard />;
+}

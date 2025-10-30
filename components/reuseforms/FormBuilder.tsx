@@ -1,13 +1,20 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useForm, Controller, FieldValues, SubmitHandler } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import type { ZodTypeAny } from "zod";
+import {
+  useForm,
+  Controller,
+  FieldValues,
+  SubmitHandler,
+  DefaultValues,
+  Resolver,
+} from "react-hook-form";
+import type { ZodTypeAny, ZodIssue } from "zod";
 import Flatpickr from "react-flatpickr";
 import "flatpickr/dist/flatpickr.css";
 
 export type Option = { label: string; value: string | number };
+
 export type FieldType =
   | "text"
   | "email"
@@ -35,8 +42,9 @@ export type FieldConfig = {
 
 type Props<TForm extends FieldValues> = {
   fields: FieldConfig[];
-  defaultValues?: TForm;
-  zodSchema?: ZodTypeAny; // optional. if provided, overrides rules
+  defaultValues?: DefaultValues<TForm>;
+  /** Keep loose to avoid zod version generic constraints */
+  zodSchema?: ZodTypeAny;
   onSubmit: SubmitHandler<TForm>;
   submitLabel?: string;
   columns?: 1 | 2 | 3 | 4; // grid columns
@@ -46,6 +54,46 @@ type Props<TForm extends FieldValues> = {
   enableDragReorder?: boolean;
   onReorder?: (orderedFieldNames: string[]) => void;
 };
+
+/** Minimal Zod -> RHF error mapper */
+function zodToRHFErrors(issues: ZodIssue[]) {
+  // RHF expects a nested field error map; we’ll build a shallow map from paths
+  const errors: Record<
+    string,
+    {
+      type: string;
+      message?: string;
+      // RHF accepts additional properties; keep minimal
+    }
+  > = {};
+  for (const issue of issues) {
+    const key = issue.path?.join(".") || "_root";
+    if (!errors[key]) {
+      errors[key] = { type: issue.code || "zod", message: issue.message };
+    }
+  }
+  return errors;
+}
+
+/** Custom resolver that avoids zodResolver overload issues entirely */
+function makeZodResolver<TForm extends FieldValues>(
+  schema: ZodTypeAny
+): Resolver<TForm, any, TForm> {
+  return async (values: any) => {
+    const parsed = schema.safeParse(values);
+    if (parsed.success) {
+      // parsed.data may be narrowed/transformed by Zod; assert as TForm (caller responsibility)
+      return {
+        values: parsed.data as TForm,
+        errors: {},
+      };
+    }
+    return {
+      values: {} as any,
+      errors: zodToRHFErrors(parsed.error.issues) as any,
+    };
+  };
+}
 
 export default function FormBuilder<TForm extends FieldValues>({
   fields,
@@ -63,10 +111,12 @@ export default function FormBuilder<TForm extends FieldValues>({
     [...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
   );
 
-  // If parent changes the fields prop, keep local in sync
+  // Keep local order in sync if parent updates fields
   React.useEffect(() => {
     setOrdered([...fields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)));
   }, [fields]);
+
+  const resolver = zodSchema ? makeZodResolver<TForm>(zodSchema) : undefined;
 
   const {
     register,
@@ -74,9 +124,9 @@ export default function FormBuilder<TForm extends FieldValues>({
     control,
     reset,
     formState: { errors, isSubmitting, isDirty },
-  } = useForm<TForm>({
-    defaultValues: defaultValues as any,
-    resolver: zodSchema ? zodResolver(zodSchema) : undefined,
+  } = useForm<TForm, any, TForm>({
+    defaultValues,
+    resolver,
     mode: "onSubmit",
   });
 
@@ -90,7 +140,7 @@ export default function FormBuilder<TForm extends FieldValues>({
     return map[columns] || "sm:grid-cols-3";
   }, [columns]);
 
-  // naive drag-n-drop (no 3rd-party deps)
+  // lightweight drag-n-drop
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const onDragStart = (i: number) => () => setDragIndex(i);
   const onDragOver = (e: React.DragEvent, i: number) => {
@@ -132,12 +182,11 @@ export default function FormBuilder<TForm extends FieldValues>({
       : { className: `${span}` };
 
     return (
-      <div key={f.name} {...wrapProps}>
+      <div key={f.name} {...(wrapProps as any)}>
         <label className="mb-1 block text-sm font-medium text-gray-700">
           {f.label}
         </label>
 
-        {/* switch on type */}
         {(() => {
           switch (f.type) {
             case "textarea":
@@ -149,6 +198,7 @@ export default function FormBuilder<TForm extends FieldValues>({
                   className={`${base} min-h-[96px]`}
                 />
               );
+
             case "select":
               return (
                 <select
@@ -164,6 +214,7 @@ export default function FormBuilder<TForm extends FieldValues>({
                   ))}
                 </select>
               );
+
             case "multiselect":
               return (
                 <select
@@ -179,6 +230,7 @@ export default function FormBuilder<TForm extends FieldValues>({
                   ))}
                 </select>
               );
+
             case "checkbox":
               return (
                 <input
@@ -188,11 +240,15 @@ export default function FormBuilder<TForm extends FieldValues>({
                   className="h-4 w-4 rounded border-gray-300"
                 />
               );
+
             case "radio":
               return (
                 <div className="flex flex-wrap gap-4">
                   {f.options?.map((opt) => (
-                    <label key={`${f.name}_${opt.value}`} className="flex items-center gap-2">
+                    <label
+                      key={`${f.name}_${opt.value}`}
+                      className="flex items-center gap-2"
+                    >
                       <input
                         type="radio"
                         value={opt.value}
@@ -204,15 +260,16 @@ export default function FormBuilder<TForm extends FieldValues>({
                   ))}
                 </div>
               );
+
             case "date":
               return (
-                <Controller
+                <Controller<TForm>
                   name={f.name as any}
                   control={control}
                   rules={zodSchema ? {} : f.rules}
                   render={({ field }) => (
                     <Flatpickr
-                      value={field.value || ""}
+                      value={(field.value as any) || ""}
                       onChange={(dates) =>
                         field.onChange(
                           dates[0] ? dates[0].toISOString().slice(0, 10) : ""
@@ -228,6 +285,7 @@ export default function FormBuilder<TForm extends FieldValues>({
                   )}
                 />
               );
+
             case "email":
             case "number":
             case "text":
