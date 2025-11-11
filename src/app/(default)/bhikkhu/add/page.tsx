@@ -1,7 +1,8 @@
-// app/(your-route)/AddBhikkhuPage.tsx
+// File: src/app/(default)/bhikkhu/add/page.tsx
+// ───────────────────────────────────────────────────────────────────────────────
 "use client";
 
-import React, { useMemo, useRef, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { _getLocationData, _getGnDivitions } from "@/services/locationData";
 import { _manageBhikku } from "@/services/bhikku";
@@ -9,6 +10,9 @@ import { _manageTemple } from "@/services/temple";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
+
+// Avoid static prerender/export crashes for CSR pages using search params
+export const dynamic = "force-dynamic";
 
 /* ---------------- Types ---------------- */
 type FieldRule<T> = {
@@ -205,7 +209,7 @@ const bhikkhuInitialValues: Partial<BhikkhuForm> = {
   br_viharadhipathi_name: "",
   br_nikaya_name: "",
   br_parshawaya: "",
-  br_mahanayaka_name: "", // br_regn
+  br_mahanayaka_name: "",
   br_mahanayaka_address: "",
 
   br_cat: "",
@@ -216,11 +220,11 @@ const bhikkhuInitialValues: Partial<BhikkhuForm> = {
 
   br_mahanadate: "",
   br_mahananame: "",
-  br_mahanaacharyacd: "", // br_regn
-  br_robing_tutor_residence: "", // vh_trn ✅
+  br_mahanaacharyacd: "",
+  br_robing_tutor_residence: "",
 
-  br_mahanatemple: "", // vh_trn
-  br_robing_after_residence_temple: "", // vh_trn
+  br_mahanatemple: "",
+  br_robing_after_residence_temple: "",
 };
 
 /* ---------------- Location UI ---------------- */
@@ -580,8 +584,8 @@ async function safeReadText(res: Response) {
   }
 }
 
-/* ---------------- Page ---------------- */
-export default function AddBhikkhuPage() {
+/* ---------------- Inner Page (uses hooks) ---------------- */
+function AddBhikkhuPageInner() {
   const search = useSearchParams();
   const bhikkhuId = search.get("id") || undefined;
 
@@ -684,7 +688,6 @@ export default function AddBhikkhuPage() {
   };
 
   async function upsertBhikkhu(payload: Partial<BhikkhuForm>) {
-    // br_mahanayaka_name & br_mahanaacharyacd contain br_regn; temple fields contain vh_trn
     const endpoint = bhikkhuId ? `/api/bhikkhu/${encodeURIComponent(bhikkhuId)}` : `/api/bhikkhu`;
     const method = bhikkhuId ? "PUT" : "POST";
     const res = await fetch(endpoint, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -712,12 +715,12 @@ export default function AddBhikkhuPage() {
 
   // Friendly display for review/autocomplete fields
   const [display, setDisplay] = useState<{
-    br_viharadhipathi_name?: string; // text
-    br_mahanayaka_name?: string; // "Name — REGN"
-    br_mahanaacharyacd?: string; // "Name — REGN"
-    br_mahanatemple?: string; // "Temple — TRN"
-    br_robing_after_residence_temple?: string; // "Temple — TRN"
-    br_robing_tutor_residence?: string; // "Temple — TRN"  ✅
+    br_viharadhipathi_name?: string;
+    br_mahanayaka_name?: string;
+    br_mahanaacharyacd?: string;
+    br_mahanatemple?: string;
+    br_robing_after_residence_temple?: string;
+    br_robing_tutor_residence?: string;
   }>({});
 
   return (
@@ -764,7 +767,6 @@ export default function AddBhikkhuPage() {
                         const val = (values[f.name] as unknown as string) ?? "";
                         const err = errors[f.name];
 
-                        // Composite Location Picker
                         if (id === "br_province") {
                           const selection = {
                             provinceCode: (values.br_province as string) || undefined,
@@ -792,7 +794,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Viharadhipathi (save NAME) ---
                         if (id === "br_viharadhipathi_name") {
                           return (
                             <div key={id}>
@@ -813,7 +814,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Mahanayaka (save REGN) ---
                         if (id === "br_mahanayaka_name") {
                           return (
                             <div key={id}>
@@ -834,7 +834,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Robing Tutor (save REGN) ---
                         if (id === "br_mahanaacharyacd") {
                           return (
                             <div key={id}>
@@ -855,7 +854,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Tutor’s residence (save TRN) ✅ ---
                         if (id === "br_robing_tutor_residence") {
                           return (
                             <div key={id}>
@@ -876,7 +874,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Temple where robing took place (save TRN) ---
                         if (id === "br_mahanatemple") {
                           return (
                             <div key={id}>
@@ -897,7 +894,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // --- Autocomplete: Temple of residence after robing (save TRN) ---
                         if (id === "br_robing_after_residence_temple") {
                           return (
                             <div key={id}>
@@ -952,7 +948,6 @@ export default function AddBhikkhuPage() {
                           );
                         }
 
-                        // Hide these (managed by LocationPicker)
                         if (id === "br_district" || id === "br_division" || id === "br_gndiv") return null;
 
                         return (
@@ -1047,5 +1042,15 @@ export default function AddBhikkhuPage() {
         <FooterBar />
       </div>
     </div>
+  );
+}
+
+/* ---------------- Page wrapper with Suspense (no hooks here) ---------------- */
+export default function AddBhikkhuPage() {
+  // why: satisfies Next.js requirement to wrap useSearchParams in Suspense
+  return (
+    <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
+      <AddBhikkhuPageInner />
+    </Suspense>
   );
 }
