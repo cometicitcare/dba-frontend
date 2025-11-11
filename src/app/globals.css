@@ -1,0 +1,5 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* keep animation utility for PetalMenu */
+.animate-petal-open { animation: petal-open 0.3s ease-out forwards; }
