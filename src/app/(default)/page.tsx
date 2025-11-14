@@ -104,9 +104,47 @@ export default function Dashboard() {
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [user, setUser] = useState<UserData | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Only rotate through images that actually load
   const [slides, setSlides] = useState<string[]>([]);
+
+  // Update time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Get time-based greeting
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour >= 5 && hour < 12) {
+      return "Good Morning";
+    } else if (hour >= 12 && hour < 17) {
+      return "Good Afternoon";
+    } else if (hour >= 17 && hour < 21) {
+      return "Good Evening";
+    } else {
+      return "Good Night";
+    }
+  };
+
+  // Format date and time
+  const formatDateTime = () => {
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    };
+    return currentTime.toLocaleDateString('en-US', options);
+  };
 
   const fetchProvinces = async () => {
     try {
@@ -190,26 +228,41 @@ export default function Dashboard() {
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
         <main className="p-6">
           {/* hero */}
-          <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-8 mb-8 text-white relative overflow-hidden">
-            <div className="relative z-10">
-              <h1 className="text-4xl font-bold mb-2">Good Afternoon</h1>
-              <h2 className="text-3xl font-bold mb-2">Welcome!</h2>
-              <p className="text-xl opacity-90">
+          <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
+            <div className="relative z-10 max-w-[55%] sm:max-w-[50%] md:max-w-[45%] lg:max-w-[40%] xl:max-w-[35%] pr-4">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{getGreeting()}</h1>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Welcome!</h2>
+              <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
                 {user ? `${user.ua_first_name} ${user.ua_last_name}` : "User"}
               </p>
+              <div className="text-sm sm:text-base md:text-lg opacity-80 leading-tight">
+                <p className="text-white/90">{formatDateTime()}</p>
+              </div>
             </div>
 
-            <div className="absolute right-0 top-0 w-2/3 h-full opacity-65 transition-opacity duration-700">
+            <div className="absolute right-0 top-0 w-[40%] sm:w-[45%] md:w-[50%] lg:w-[55%] xl:w-[60%] h-full opacity-70 transition-opacity duration-700 overflow-hidden rounded-r-2xl">
               {currentImage ? (
-                <img
-                  key={currentImage} // why: ensure transition when src changes
-                  src={currentImage}
-                  alt="Background"
-                  className="w-full h-full object-cover transition-all duration-1000 ease-in-out"
-                  onError={() =>
-                    setCurrentImageIndex((p) => ((p + 1) % Math.max(1, slides.length)))
-                  } // why: skip broken at runtime
-                />
+                <div className="relative w-full h-full">
+                  <img
+                    key={currentImage}
+                    src={currentImage}
+                    alt="Background"
+                    className="absolute inset-0 w-full h-full transition-all duration-1000 ease-in-out
+                               object-cover object-center
+                               sm:object-cover sm:object-center
+                               md:object-contain md:object-center
+                               lg:object-contain lg:object-center
+                               xl:object-cover xl:object-center"
+                    onError={() =>
+                      setCurrentImageIndex((p) => ((p + 1) % Math.max(1, slides.length)))
+                    }
+                  />
+                  {/* Gradient overlay to ensure text readability across all screen sizes */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/30 via-blue-400/15 to-transparent 
+                                  sm:from-blue-500/25 sm:via-blue-400/10 
+                                  md:from-blue-500/20 md:via-transparent
+                                  lg:from-blue-500/15 lg:via-transparent"></div>
+                </div>
               ) : null}
             </div>
           </div>
