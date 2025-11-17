@@ -362,22 +362,22 @@ export default function BhikkhuList() {
                   <PlusIcon className="w-5 h-5" />
                   Add Bhikku
                 </button>
-                <button
+                {/* <button
                   onClick={handleAddSilmatha}
                   disabled={loading}
                   className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
                   Add Silmatha
-                </button>
-                <button
+                </button> */}
+                {/* <button
                   onClick={handleAddUpasampada}
                   disabled={loading}
                   className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
                   Add Upasampada
-                </button>
+                </button> */}
                 <button
                   ref={filterButtonRef}
                   type="button"
