@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboardIcon, UsersIcon } from "lucide-react";
-import { ROLES } from "@/utils/roles"; // ✅ import roles
 
 interface SidebarProps {
   isOpen: boolean;
@@ -46,12 +45,16 @@ export function Sidebar({ isOpen }: SidebarProps) {
   // ✅ Load user data from localStorage
   useEffect(() => {
     const stored = localStorage.getItem("user");
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch (err) {
-        console.error("Invalid user data in localStorage", err);
-      }
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      const normalized: UserData | null =
+        parsed && typeof parsed === "object"
+          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
+          : null;
+      if (normalized) setUser(normalized);
+    } catch (err) {
+      console.error("Invalid user data in localStorage", err);
     }
   }, []);
 
@@ -60,29 +63,22 @@ export function Sidebar({ isOpen }: SidebarProps) {
     icon: IconComponent;
     label: string;
     path: string;
-    roles: string[];
   }> = [
     {
       icon: LayoutDashboardIcon,
       label: "Dashboard",
       path: "/",
-      roles: [ROLES.ADMIN.id, ROLES.SUPERVISOR.id, ROLES.DATA_ENTRY.id],
     },
     {
       icon: MonkIcon, // ✅ use the custom SVG icon here
       label: "Bhikkhu",
       path: "/bhikkhu",
-      roles: [ROLES.ADMIN.id, ROLES.SUPERVISOR.id, ROLES.DATA_ENTRY.id],
     },
     // If you still need the Lucide UsersIcon elsewhere, you can add it too:
     // { icon: UsersIcon, label: "Users", path: "/users", roles: [...] },
   ];
 
-  // ✅ Filter items by user role
-  const items = user
-    ? allItems.filter((item) => item.roles.includes(user.ro_role_id))
-    : [];
-
+  const items = allItems;
   if (!isOpen) return null;
 
   return (
@@ -99,11 +95,11 @@ export function Sidebar({ isOpen }: SidebarProps) {
             <div className="absolute bottom-0 right-0 w-6 h-6 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <h3 className="text-lg font-semibold text-gray-800">
-            {user ? `${user.ua_first_name} ${user.ua_last_name}` : "User"}
+            {user ? `${user.ua_first_name} ${user.ua_last_name}` : "Loading..."}
           </h3>
-          <p className="text-sm text-gray-500">
+          {/* <p className="text-sm text-gray-500">
             {user?.role?.ro_role_name || "Loading..."}
-          </p>
+          </p> */}
         </div>
       </div>
 

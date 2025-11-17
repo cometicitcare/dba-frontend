@@ -201,12 +201,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch (err) {
-        console.error("Invalid user data in localStorage", err);
-      }
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      const normalized: UserData | null =
+        parsed && typeof parsed === "object"
+          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
+          : null;
+      if (normalized) setUser(normalized);
+    } catch (err) {
+      console.error("Invalid user data in localStorage", err);
     }
   }, []);
 
@@ -233,7 +237,7 @@ export default function Dashboard() {
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{getGreeting()}</h1>
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Welcome!</h2>
               <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
-                {user ? `${user.ua_first_name} ${user.ua_last_name}` : "User"}
+                {user ? `${user.ua_first_name} ${user.ua_last_name}` : "Loading..."}
               </p>
               <div className="text-sm sm:text-base md:text-lg opacity-80 leading-tight">
                 <p className="text-white/90">{formatDateTime()}</p>

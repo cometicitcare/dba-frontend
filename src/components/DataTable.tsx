@@ -29,6 +29,7 @@ interface DataTableProps<T extends Record<string, unknown> = any> {
     siblingCount?: number; // pages around current
     boundaryCount?: number; // pages at start/end
   };
+  hidePagination?: boolean;
 }
 
 function isNumberLike(v: unknown): v is number {
@@ -105,6 +106,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
   onEdit,
   onDelete,
   paginationConfig,
+  hidePagination = false,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -157,6 +159,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
   }, [sorted, safeCurrentPage, itemsPerPage]);
 
   const startIndex = (safeCurrentPage - 1) * itemsPerPage;
+  const displayedRows = hidePagination ? sorted : page;
 
   const goToPage = (p: number) => {
     const clamped = Math.max(1, Math.min(totalPages, p));
@@ -170,7 +173,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
 
   return (
     <div className="bg-white rounded-lg shadow">
-      <div className="p-4 border-b border-gray-200">
+      {/* <div className="p-4 border-b border-gray-200">
         <div className="relative">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -183,7 +186,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
           />
         </div>
-      </div>
+      </div> */}
 
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -221,7 +224,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
           </thead>
 
           <tbody className="bg-white divide-y divide-gray-200">
-            {page.map((item, idx) => (
+            {displayedRows.map((item, idx) => (
               <tr key={idx} className="hover:bg-gray-50">
                 {columns.map((c) => (
                   <td key={c.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -254,7 +257,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                 )}
               </tr>
             ))}
-            {page.length === 0 && (
+            {displayedRows.length === 0 && (
               <tr>
                 <td
                   colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
@@ -268,109 +271,111 @@ export function DataTable<T extends Record<string, unknown> = any>({
         </table>
       </div>
 
-      <div className="px-6 py-4 border-t border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="text-sm text-gray-700">
-          Showing {sorted.length === 0 ? 0 : startIndex + 1} to{" "}
-          {Math.min(startIndex + itemsPerPage, sorted.length)} of {sorted.length} entries
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-700">Records per page</span>
-            <select
-              value={itemsPerPage}
-              onChange={(e) => {
-                const n = Math.max(1, Number(e.target.value));
-                setItemsPerPage(n);
-                setCurrentPage(1);
-              }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              {[5, 10, 25, 50, 100, 250].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+      {!hidePagination && (
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-gray-700">
+            Showing {sorted.length === 0 ? 0 : startIndex + 1} to{" "}
+            {Math.min(startIndex + itemsPerPage, sorted.length)} of {sorted.length} entries
           </div>
 
-          <nav className="flex items-center gap-1" aria-label="Pagination">
-            <button
-              onClick={() => goToPage(1)}
-              disabled={safeCurrentPage === 1}
-              className={`px-2 py-1 rounded border text-sm ${
-                safeCurrentPage === 1
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white hover:bg-gray-50 text-gray-700"
-              }`}
-              aria-label="First page"
-              title="First page"
-            >
-              <ChevronsLeftIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => goToPage(safeCurrentPage - 1)}
-              disabled={safeCurrentPage === 1}
-              className={`px-2 py-1 rounded border text-sm ${
-                safeCurrentPage === 1
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white hover:bg-gray-50 text-gray-700"
-              }`}
-              aria-label="Previous page"
-              title="Previous page"
-            >
-              <ChevronLeftIcon className="w-4 h-4" />
-            </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">Records per page</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  const n = Math.max(1, Number(e.target.value));
+                  setItemsPerPage(n);
+                  setCurrentPage(1);
+                }}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              >
+                {[5, 10, 25, 50, 100, 250].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            {visibleRange.map((p, i) =>
-              p === "…" ? (
-                <span key={`ellipsis-${i}`} className="px-2 py-1 text-sm text-gray-500">
-                  …
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  onClick={() => goToPage(p)}
-                  className={`px-3 py-1 rounded text-sm ${
-                    p === safeCurrentPage
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {p}
-                </button>
-              )
-            )}
+            <nav className="flex items-center gap-1" aria-label="Pagination">
+              <button
+                onClick={() => goToPage(1)}
+                disabled={safeCurrentPage === 1}
+                className={`px-2 py-1 rounded border text-sm ${
+                  safeCurrentPage === 1
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+                aria-label="First page"
+                title="First page"
+              >
+                <ChevronsLeftIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => goToPage(safeCurrentPage - 1)}
+                disabled={safeCurrentPage === 1}
+                className={`px-2 py-1 rounded border text-sm ${
+                  safeCurrentPage === 1
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+                aria-label="Previous page"
+                title="Previous page"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+              </button>
 
-            <button
-              onClick={() => goToPage(safeCurrentPage + 1)}
-              disabled={safeCurrentPage === totalPages}
-              className={`px-2 py-1 rounded border text-sm ${
-                safeCurrentPage === totalPages
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white hover:bg-gray-50 text-gray-700"
-              }`}
-              aria-label="Next page"
-              title="Next page"
-            >
-              <ChevronRightIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => goToPage(totalPages)}
-              disabled={safeCurrentPage === totalPages}
-              className={`px-2 py-1 rounded border text-sm ${
-                safeCurrentPage === totalPages
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white hover:bg-gray-50 text-gray-700"
-              }`}
-              aria-label="Last page"
-              title="Last page"
-            >
-              <ChevronsRightIcon className="w-4 h-4" />
-            </button>
-          </nav>
+              {visibleRange.map((p, i) =>
+                p === "…" ? (
+                  <span key={`ellipsis-${i}`} className="px-2 py-1 text-sm text-gray-500">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => goToPage(p)}
+                    className={`px-3 py-1 rounded text-sm ${
+                      p === safeCurrentPage
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => goToPage(safeCurrentPage + 1)}
+                disabled={safeCurrentPage === totalPages}
+                className={`px-2 py-1 rounded border text-sm ${
+                  safeCurrentPage === totalPages
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+                aria-label="Next page"
+                title="Next page"
+              >
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => goToPage(totalPages)}
+                disabled={safeCurrentPage === totalPages}
+                className={`px-2 py-1 rounded border text-sm ${
+                  safeCurrentPage === totalPages
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+                aria-label="Last page"
+                title="Last page"
+              >
+                <ChevronsRightIcon className="w-4 h-4" />
+              </button>
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

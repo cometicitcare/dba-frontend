@@ -12,7 +12,7 @@ async function searchBhikkhus(q: string, page = 1, limit = 10): Promise<BhikkhuO
   const rows: any[] = (res as any)?.data?.data ?? [];
   return rows.map((r) => ({
     regn: r.br_regn,
-    name: r.br_mahananame || r.br_gihiname || r.br_mahanayaka_name || r.br_regn,
+    name: r.br_mahananame || r.br_gihiname || r.br_regn,
   }));
 }
 

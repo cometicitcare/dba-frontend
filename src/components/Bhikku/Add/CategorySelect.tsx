@@ -1,14 +1,24 @@
-﻿"use client";
-import React, { useEffect, useRef, useState } from "react";
-import { _manageCategory } from "@/services/category";
+"use client";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import selectionsData from "@/utils/selectionsData.json";
+
+type CategoryRecord = {
+  cc_code: string;
+  cc_catogry: string;
+};
 
 type CategoryOption = { code: string; name: string };
 
-async function fetchCategories(page = 1, limit = 100): Promise<CategoryOption[]> {
-  const res = await _manageCategory({ action: "READ_ALL", payload: { page, limit, search_key: "" } } as any);
-  const rows: any[] = (res as any)?.data?.data ?? [];
-  return rows.map((r) => ({ code: r.cc_code, name: r.cc_catogry }));
-}
+const STATIC_CATEGORIES: CategoryRecord[] = Array.isArray((selectionsData as any)?.categories)
+  ? ((selectionsData as any).categories as CategoryRecord[])
+  : Array.isArray(selectionsData)
+    ? (selectionsData as CategoryRecord[])
+    : [];
+
+const CATEGORY_OPTIONS: CategoryOption[] = STATIC_CATEGORIES.map((r) => ({
+  code: r.cc_code,
+  name: r.cc_catogry,
+}));
 
 type Props = {
   id: string;
@@ -35,9 +45,7 @@ export default function BhikkhuCategorySelect({
   onPick,
   onChangeMulti,
 }: Props) {
-  const [options, setOptions] = useState<CategoryOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const options = useMemo(() => CATEGORY_OPTIONS, []);
   const [internalValue, setInternalValue] = useState<string>(initialCode);
   const [internalValues, setInternalValues] = useState<string[]>(initialCode ? [initialCode] : []);
   const isControlledSingle = !multiple && typeof value === "string";
@@ -64,23 +72,10 @@ export default function BhikkhuCategorySelect({
   }, [initialCode, isControlledSingle, multiple]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const list = await fetchCategories();
-        if (!cancelled) {
-          setOptions(list);
-          if (!multiple && initialCode && !isControlledSingle) emitSinglePick(initialCode, list);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load categories");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [initialCode, isControlledSingle, multiple]);
+    if (!multiple && initialCode && !isControlledSingle) {
+      emitSinglePick(initialCode, options);
+    }
+  }, [initialCode, isControlledSingle, multiple, options]);
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (multiple) {
@@ -94,14 +89,13 @@ export default function BhikkhuCategorySelect({
     }
   };
 
-  if (loading) return <div className="text-sm text-slate-600">Loading categories...</div>;
-  if (error) return <div role="alert" className="text-sm text-red-600">Error: {error}</div>;
-
   const selectValue: string | string[] = multiple ? currentMulti : currentSingle;
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+        {label}
+      </label>
       <select
         id={id}
         multiple={multiple}

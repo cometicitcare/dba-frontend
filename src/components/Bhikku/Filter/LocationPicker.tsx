@@ -1,24 +1,49 @@
-﻿"use client";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { _getGnDivitions, _getLocationData } from "@/services/locationData";
-
-export type Division = { dv_id: number; dv_dvcode: string; dv_distrcd: string; dv_dvname: string };
-export type District = { dd_id: number; dd_dcode: string; dd_dname: string; dd_prcode: string; divisional_secretariats: Division[] };
-export type Province = { cp_id: number; cp_code: string; cp_name: string; districts: District[] };
-type DistrictOption = District & { provinceCode: string };
-type DivisionOption = Division & { districtCode: string; provinceCode: string };
+"use client";
+import React, { useCallback, useMemo, useState } from "react";
+import selectionsData from "@/utils/selectionsData.json";
 
 export type GnDivision = {
+  gn_id?: number;
   gn_gnc?: string;
   gn_code?: string;
   gn_gnname: string;
   [k: string]: unknown;
 };
 
+export type Division = {
+  dv_id: number;
+  dv_dvcode: string;
+  dv_distrcd: string;
+  dv_dvname: string;
+  gn_divisions?: GnDivision[];
+};
+
+export type District = {
+  dd_id: number;
+  dd_dcode: string;
+  dd_dname: string;
+  dd_prcode: string;
+  divisional_secretariats: Division[];
+};
+
+export type Province = {
+  cp_id: number;
+  cp_code: string;
+  cp_name: string;
+  districts: District[];
+};
+
+type DistrictOption = District & { provinceCode: string };
+type DivisionOption = Division & { districtCode: string; provinceCode: string };
+
+const STATIC_PROVINCES: Province[] = Array.isArray((selectionsData as any)?.provinces)
+  ? ((selectionsData as any).provinces as Province[])
+  : [];
+
+const gnCodeOf = (g?: GnDivision): string | undefined => g?.gn_gnc ?? g?.gn_code ?? undefined;
+
 export type LocationSelection = { provinceCode?: string; districtCode?: string; divisionCode?: string; gnCode?: string };
 export type LocationPayload = { province?: Province; district?: District; division?: Division; gn?: GnDivision };
-
-export const gnCodeOf = (g?: GnDivision): string | undefined => (g?.gn_gnc ?? g?.gn_code ?? undefined);
 
 type Props = {
   value?: LocationSelection;
@@ -29,36 +54,17 @@ type Props = {
   labels?: Partial<{ province: string; district: string; division: string; gn: string }>;
 };
 
-export default function LocationPicker({ value, onChange, className, disabled = false, required = false, labels: labelsOverride }: Props) {
+export default function LocationPicker({
+  value,
+  onChange,
+  className,
+  disabled = false,
+  required = false,
+  labels: labelsOverride,
+}: Props) {
   const labels = { province: "Province", district: "District", division: "Divisional Secretariat", gn: "GN Division", ...labelsOverride };
 
-  const [provinces, setProvinces] = useState<Province[]>([]);
-  const [gnDivisions, setGnDivisions] = useState<GnDivision[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [gnLoading, setGnLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [gnError, setGnError] = useState<string | null>(null);
-  const [internal, setInternal] = useState<LocationSelection>({});
-
-  const selection: LocationSelection = value ?? internal;
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await _getLocationData();
-        const arr = (result as any)?.data?.data as Province[] | undefined;
-        if (!cancelled) setProvinces(Array.isArray(arr) ? arr : []);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load locations");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const currentProvince = useMemo(() => provinces.find((p) => p.cp_code === selection.provinceCode), [provinces, selection.provinceCode]);
+  const provinces = STATIC_PROVINCES;
   const districtOptionsAll = useMemo<DistrictOption[]>(
     () => provinces.flatMap((p) => p.districts.map((d) => ({ ...d, provinceCode: p.cp_code }))),
     [provinces]
@@ -72,6 +78,11 @@ export default function LocationPicker({ value, onChange, className, disabled = 
       ),
     [provinces]
   );
+
+  const [internal, setInternal] = useState<LocationSelection>({});
+  const selection: LocationSelection = value ?? internal;
+
+  const currentProvince = useMemo(() => provinces.find((p) => p.cp_code === selection.provinceCode), [provinces, selection.provinceCode]);
 
   const currentDistrict = useMemo(() => {
     if (!selection.districtCode) return undefined;
@@ -109,31 +120,8 @@ export default function LocationPicker({ value, onChange, className, disabled = 
     return divisionOptionsAll;
   }, [currentDistrict, divisionOptionsAll]);
 
-  const currentGn = useMemo(
-    () => gnDivisions.find((g) => gnCodeOf(g) === selection.gnCode),
-    [gnDivisions, selection.gnCode]
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    const code = currentDivision?.dv_dvcode;
-    setGnError(null);
-    setGnDivisions([]);
-    if (!code) return;
-    (async () => {
-      try {
-        setGnLoading(true);
-        const res = await _getGnDivitions(code);
-        const list = (res as any)?.data?.data as GnDivision[] | undefined;
-        if (!cancelled) setGnDivisions(Array.isArray(list) ? list : []);
-      } catch (err) {
-        if (!cancelled) setGnError(err instanceof Error ? err.message : "Failed to load GN divisions");
-      } finally {
-        if (!cancelled) setGnLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [currentDivision?.dv_dvcode]);
+  const gnDivisions = currentDivision?.gn_divisions ?? [];
+  const currentGn = useMemo(() => gnDivisions.find((g) => gnCodeOf(g) === selection.gnCode), [gnDivisions, selection.gnCode]);
 
   const emit = useCallback(
     (next: LocationSelection) => {
@@ -151,8 +139,7 @@ export default function LocationPicker({ value, onChange, className, disabled = 
     [emit, internal, value]
   );
 
-  if (loading) return <div>Loading location...</div>;
-  if (error) return <div role="alert">Error: {error}</div>;
+  if (!provinces.length) return <div role="alert">No location data available.</div>;
 
   return (
     <div className={className}>
@@ -224,12 +211,6 @@ export default function LocationPicker({ value, onChange, className, disabled = 
               </option>
             ))}
           </select>
-          {gnLoading && <p className="text-xs mt-1">Loading GN divisions...</p>}
-          {gnError && (
-            <p className="text-xs text-red-600 mt-1" role="alert">
-              {gnError}
-            </p>
-          )}
         </div>
 
         <div>
@@ -238,7 +219,7 @@ export default function LocationPicker({ value, onChange, className, disabled = 
             className="w-full border rounded-md px-3 py-2"
             value={selection.gnCode ?? ""}
             onChange={(e) => setSelection({ gnCode: e.target.value || undefined })}
-            disabled={disabled || !currentDivision || gnLoading || !gnDivisions.length}
+            disabled={disabled || !currentDivision || !gnDivisions.length}
             required={required}
           >
             <option value="">Select GN Division</option>

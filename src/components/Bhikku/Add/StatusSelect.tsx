@@ -1,14 +1,24 @@
-﻿"use client";
-import React, { useEffect, useRef, useState } from "react";
-import { _manageBhikkuStatus } from "@/services/bhikkuStatus";
+"use client";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import selectionsData from "@/utils/selectionsData.json";
+
+type StatusRecord = {
+  st_statcd: string;
+  st_descr: string;
+};
 
 type StatusOption = { code: string; name: string };
 
-async function fetchBhikkhuStatuses(): Promise<StatusOption[]> {
-  const res = await _manageBhikkuStatus({ action: "READ_ALL", payload: { page: 1, limit: 100, search_key: "" } });
-  const rows: any[] = (res as any)?.data?.data ?? [];
-  return rows.map((r) => ({ code: r.st_statcd as string, name: r.st_descr as string }));
-}
+const STATIC_STATUSES: StatusRecord[] = Array.isArray((selectionsData as any)?.statuses)
+  ? ((selectionsData as any).statuses as StatusRecord[])
+  : Array.isArray(selectionsData)
+    ? (selectionsData as StatusRecord[])
+    : [];
+
+const STATUS_OPTIONS: StatusOption[] = STATIC_STATUSES.map((r) => ({
+  code: r.st_statcd,
+  name: r.st_descr,
+}));
 
 type Props = {
   id: string;
@@ -35,9 +45,7 @@ export default function BhikkhuStatusSelect({
   onPick,
   onChangeMulti,
 }: Props) {
-  const [options, setOptions] = useState<StatusOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const options = useMemo(() => STATUS_OPTIONS, []);
   const [internalValue, setInternalValue] = useState<string>(initialCode);
   const [internalValues, setInternalValues] = useState<string[]>(initialCode ? [initialCode] : []);
   const isControlledSingle = !multiple && typeof value === "string";
@@ -64,23 +72,10 @@ export default function BhikkhuStatusSelect({
   }, [initialCode, isControlledSingle, multiple]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        const list = await fetchBhikkhuStatuses();
-        if (!cancelled) {
-          setOptions(list);
-          if (!multiple && initialCode && !isControlledSingle) emitSinglePick(initialCode, list);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load statuses");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [initialCode, isControlledSingle, multiple]);
+    if (!multiple && initialCode && !isControlledSingle) {
+      emitSinglePick(initialCode, options);
+    }
+  }, [initialCode, isControlledSingle, multiple, options]);
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     if (multiple) {
@@ -94,14 +89,13 @@ export default function BhikkhuStatusSelect({
     }
   };
 
-  if (loading) return <div className="text-sm text-slate-600">Loading statuses...</div>;
-  if (error) return <div role="alert" className="text-sm text-red-600">Error: {error}</div>;
-
   const selectValue: string | string[] = multiple ? currentMulti : currentSingle;
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+        {label}
+      </label>
       <select
         id={id}
         multiple={multiple}

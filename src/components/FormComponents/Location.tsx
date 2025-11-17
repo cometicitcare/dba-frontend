@@ -1,13 +1,22 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { _getLocationData, _getGnDivitions } from "@/services/locationData";
+import React, { useMemo, useState, useCallback } from "react";
+import selectionsData from "@/utils/selectionsData.json";
+
+export type GnDivision = {
+  gn_id?: number;
+  gn_code?: string;
+  gn_gnc?: string;
+  gn_gnname: string;
+  [k: string]: unknown;
+};
 
 export type Division = {
   dv_id: number;
   dv_dvcode: string;
   dv_distrcd: string;
   dv_dvname: string;
+  gn_divisions?: GnDivision[];
 };
 
 export type District = {
@@ -23,12 +32,6 @@ export type Province = {
   cp_code: string;
   cp_name: string;
   districts: District[];
-};
-
-export type GnDivision = {
-  gn_code: string;
-  gn_gnname: string;
-  [k: string]: unknown;
 };
 
 export type LocationSelection = {
@@ -61,6 +64,10 @@ type LocationProps = {
   labels?: Partial<Labels>;
 };
 
+const STATIC_PROVINCES: Province[] = Array.isArray((selectionsData as any)?.provinces)
+  ? ((selectionsData as any).provinces as Province[])
+  : [];
+
 export default function Location({
   value,
   onChange,
@@ -77,13 +84,7 @@ export default function Location({
     ...labelsOverride,
   };
 
-  const [provinces, setProvinces] = useState<Province[]>([]);
-  const [gnDivisions, setGnDivisions] = useState<GnDivision[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [gnLoading, setGnLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [gnError, setGnError] = useState<string | null>(null);
-
+  const provinces = STATIC_PROVINCES;
   const [internal, setInternal] = useState<LocationSelection>({
     provinceCode: undefined,
     districtCode: undefined,
@@ -92,25 +93,6 @@ export default function Location({
   });
 
   const selection: LocationSelection = value ?? internal;
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await _getLocationData();
-        const arr = (result as any)?.data?.data as Province[] | undefined;
-        if (!cancelled) setProvinces(Array.isArray(arr) ? arr : []);
-      } catch (err) {
-        if (!cancelled)
-          setError(err instanceof Error ? err.message : "Failed to load locations");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const currentProvince = useMemo(
     () => provinces.find((p) => p.cp_code === selection.provinceCode),
@@ -129,34 +111,11 @@ export default function Location({
     [divisions, selection.divisionCode]
   );
 
+  const gnDivisions = currentDivision?.gn_divisions ?? [];
   const currentGn = useMemo(
-    () => gnDivisions.find((g) => g.gn_code === selection.gnCode),
+    () => gnDivisions.find((g) => g.gn_code === selection.gnCode || g.gn_gnc === selection.gnCode),
     [gnDivisions, selection.gnCode]
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    const code = currentDivision?.dv_dvcode;
-    setGnError(null);
-    setGnDivisions([]);
-    if (!code) return;
-    (async () => {
-      try {
-        setGnLoading(true);
-        const res = await _getGnDivitions(code);
-        const list = (res as any)?.data?.data as GnDivision[] | undefined;
-        if (!cancelled) setGnDivisions(Array.isArray(list) ? list : []);
-      } catch (err) {
-        if (!cancelled)
-          setGnError(err instanceof Error ? err.message : "Failed to load GN divisions");
-      } finally {
-        if (!cancelled) setGnLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentDivision?.dv_dvcode]);
 
   const emit = useCallback(
     (next: LocationSelection) => {
@@ -181,7 +140,6 @@ export default function Location({
 
   const handleProvince = (cp_code: string | "") => {
     const code = cp_code || undefined;
-    setGnDivisions([]);
     setSelection({
       provinceCode: code,
       districtCode: undefined,
@@ -192,7 +150,6 @@ export default function Location({
 
   const handleDistrict = (dd_dcode: string | "") => {
     const code = dd_dcode || undefined;
-    setGnDivisions([]);
     setSelection({
       districtCode: code,
       divisionCode: undefined,
@@ -213,12 +170,10 @@ export default function Location({
     setSelection({ gnCode: code });
   };
 
-  if (loading) return <div>Loading location…</div>;
-  if (error) return <div role="alert">Error: {error}</div>;
+  if (!provinces.length) return <div role="alert">No location data available.</div>;
 
   return (
     <div className={className}>
-
       {/* Province */}
       <div className="mb-3">
         <label className="block mb-1 text-sm font-medium">{labels.province}</label>
@@ -274,12 +229,6 @@ export default function Location({
             </option>
           ))}
         </select>
-        {gnLoading && <p className="text-xs mt-1">Loading GN divisions…</p>}
-        {gnError && (
-          <p className="text-xs text-red-600 mt-1" role="alert">
-            {gnError}
-          </p>
-        )}
       </div>
 
       {/* GN Division */}
@@ -289,15 +238,18 @@ export default function Location({
           className="w-full border rounded-md px-3 py-2"
           value={selection.gnCode ?? ""}
           onChange={(e) => handleGn(e.target.value)}
-          disabled={disabled || !currentDivision || gnLoading || !gnDivisions.length}
+          disabled={disabled || !currentDivision || !gnDivisions.length}
           required={required}
         >
           <option value="">Select {labels.gn}</option>
-          {gnDivisions.map((g) => (
-            <option key={g.gn_code} value={g.gn_code}>
-              {g.gn_gnname /* fixed from gn_gnname */}
-            </option>
-          ))}
+          {gnDivisions.map((g) => {
+            const code = g.gn_code ?? g.gn_gnc;
+            return (
+              <option key={code} value={code}>
+                {g.gn_gnname}
+              </option>
+            );
+          })}
         </select>
       </div>
     </div>

@@ -198,7 +198,8 @@ export default function Login() {
 
       if (hasUser(resp)) {
         // Why: keep session contract consistent with old UI.
-        localStorage.setItem("user", JSON.stringify(resp.data.user));
+        console.log("datadatadata",resp?.data)
+        localStorage.setItem("user", JSON.stringify(resp.data));
         router.push("/"); // redirect to home/dashboard, same as old UI
       } else {
         setError("Login failed. Please try again.");
@@ -427,7 +428,7 @@ export default function Login() {
                     onClick={(e) => {
                       e.preventDefault();
                       // TODO: Add forgot password functionality
-                      alert('Forgot password functionality to be implemented');
+                      router.push("/forgot-password");
                     }}
                   >
                     Forgot Password?

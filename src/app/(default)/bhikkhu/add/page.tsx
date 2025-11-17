@@ -1,12 +1,13 @@
+// app/(whatever)/bhikkhu/add/page.tsx
 "use client";
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { _manageBhikku } from "@/services/bhikku";
-import { _getNikayaAndParshawa } from "@/services/nikaya";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
+import selectionsData from "@/utils/selectionsData.json";
 
 import {
   DateField,
@@ -23,7 +24,9 @@ import {
   Errors,
 } from "@/components/Bhikku/Add";
 
-export const dynamic = "force-dynamic";
+// Toasts
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css"; // If Next.js complains about global CSS, move this import to your root layout.
 
 // Types local to page
 type NikayaAPIItem = {
@@ -31,20 +34,32 @@ type NikayaAPIItem = {
   main_bhikku: {
     regn: string; gihiname: string; mahananame: string; current_status: string;
     parshawaya: string; livtemple: string; mahanatemple: string; address: string;
-  };
+  } | null;
   parshawayas: Array<{ code: string; name: string; remarks?: string; start_date?: string; nayaka_regn?: string; nayaka?: any }>;
 };
+
+const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any)?.nikayas)
+  ? ((selectionsData as any).nikayas as NikayaAPIItem[])
+  : [];
 
 // Import after types to avoid cycle
 import type { BhikkhuForm, StepConfig } from "@/components/Bhikku/Add";
 
+const NOVICE_CATEGORY_CODE = "CAT03";
+
+export const dynamic = "force-dynamic";
+
 function AddBhikkhuPageInner() {
+  const router = useRouter(); // redirect after toast
   const search = useSearchParams();
   const bhikkhuId = search.get("id") || undefined;
 
   const steps = useMemo(() => bhikkhuSteps(), []);
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [values, setValues] = useState<Partial<BhikkhuForm>>(bhikkhuInitialValues);
+  const [values, setValues] = useState<Partial<BhikkhuForm>>({
+    ...bhikkhuInitialValues,
+    br_cat: NOVICE_CATEGORY_CODE,
+  });
   const [errors, setErrors] = useState<Errors<BhikkhuForm>>({});
   const [submitting, setSubmitting] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
@@ -146,6 +161,7 @@ function AddBhikkhuPageInner() {
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) { setCurrentStep(firstInvalidStep); scrollTop(); return; }
+
     try {
       setSubmitting(true);
       const payload: Partial<BhikkhuForm> = {
@@ -156,6 +172,18 @@ function AddBhikkhuPageInner() {
         br_declaration_date: toYYYYMMDD(values.br_declaration_date),
       };
       await _manageBhikku({ action: "CREATE", payload: { data: payload } } as any);
+
+      // Success toast then redirect (delay allows user to see it; move ToastContainer to root for persistence across routes).
+      toast.success(bhikkhuId ? "Bhikkhu updated successfully." : "Bhikkhu created successfully.", {
+        autoClose: 1200,
+        onClose: () => router.push("/bhikkhu"),
+      });
+
+      // Fallback redirect in case container unmounts before onClose fires.
+      setTimeout(() => router.push("/bhikkhu"), 1400);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to submit. Please try again.";
+      toast.error(msg); // Show error toast
     } finally {
       setSubmitting(false);
     }
@@ -165,6 +193,7 @@ function AddBhikkhuPageInner() {
   const [display, setDisplay] = useState<{
     br_viharadhipathi?: string;
     br_mahanayaka_name?: string;
+    br_mahanayaka_address?: string;
     br_mahanaacharyacd?: string;
     br_mahanatemple?: string;
     br_robing_after_residence_temple?: string;
@@ -177,26 +206,9 @@ function AddBhikkhuPageInner() {
   }>({});
 
   // Nikaya & Parshawa
-  const [nikayaLoading, setNikayaLoading] = useState<boolean>(false);
-  const [nikayaError, setNikayaError] = useState<string | null>(null);
-  const [nikayaData, setNikayaData] = useState<NikayaAPIItem[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setNikayaLoading(true);
-        const res = await _getNikayaAndParshawa();
-        const list = ((res as any)?.data?.data ?? []) as NikayaAPIItem[];
-        if (!cancelled) setNikayaData(Array.isArray(list) ? list : []);
-      } catch (e) {
-        if (!cancelled) setNikayaError(e instanceof Error ? e.message : "Failed to load Nikaya data");
-      } finally {
-        if (!cancelled) setNikayaLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  const nikayaData = STATIC_NIKAYA_DATA;
+  const nikayaLoading = false;
+  const nikayaError: string | null = null;
 
   const findNikayaByCode = useCallback((code?: string | null) => nikayaData.find((n) => n.nikaya.code === (code ?? "")), [nikayaData]);
   const parshawaOptions = useCallback((nikayaCode?: string | null) => findNikayaByCode(nikayaCode)?.parshawayas ?? [], [findNikayaByCode]);
@@ -229,7 +241,7 @@ function AddBhikkhuPageInner() {
     handleInputChange("br_parshawaya", code);
     const nikaya = findNikayaByCode(values.br_nikaya);
     const p = nikaya?.parshawayas.find((x) => x.code === code);
-    setDisplay((d) => ({ ...d, br_parshawaya: p ? `${p.name} — ${p.code}` : code }));
+    setDisplay((d) => ({ ...d, br_parshawaya: p ? `${p.name} - ${p.code}` : code }));
   };
 
   const gridCols = stepTitle === "Birth Location" ? "md:grid-cols-3" : "md:grid-cols-2";
@@ -277,7 +289,6 @@ function AddBhikkhuPageInner() {
                         const id = String(f.name);
                         const val = (values[f.name] as unknown as string) ?? "";
                         const err = errors[f.name];
-
                         if (id === "br_province") {
                           const selection = {
                             provinceCode: (values.br_province as string) || undefined,
@@ -498,11 +509,8 @@ function AddBhikkhuPageInner() {
                                 id={id}
                                 label={f.label}
                                 required={!!f.rules?.required}
-                                initialCode={values.br_cat ?? ""}
-                                onPick={({ code, display: disp }) => {
-                                  handleInputChange("br_cat", code);
-                                  setDisplay((d) => ({ ...d, br_cat: disp }));
-                                }}
+                                value={values.br_cat ?? NOVICE_CATEGORY_CODE}
+                                disabled
                               />
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                             </div>
@@ -547,18 +555,19 @@ function AddBhikkhuPageInner() {
                         }
 
                         if (f.type === "textarea") {
-                          const span2 = id === "br_mahanayaka_address" || id === "br_remarks";
-                          const spanClass = id === "br_remarks" ? (gridCols.includes("md:grid-cols-3") ? "md:col-span-3" : "md:col-span-2") : "";
+                          const idStr = String(f.name);
+                          const span2 = idStr === "br_mahanayaka_address" || idStr === "br_remarks";
+                          const spanClass = idStr === "br_remarks" ? (gridCols.includes("md:grid-cols-3") ? "md:col-span-3" : "md:col-span-2") : "";
                           return (
-                            <div key={id} className={span2 ? spanClass : ""}>
-                              <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                            <div key={idStr} className={span2 ? spanClass : ""}>
+                              <label htmlFor={idStr} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
                               <textarea
-                                id={id}
+                                id={idStr}
                                 value={val}
                                 rows={f.rows ?? 4}
                                 onChange={(e) => handleInputChange(f.name, e.target.value)}
                                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
-                                placeholder={f.placeholder ?? (id === "br_mahanayaka_address" ? "Auto-filled from Nikaya, editable…" : undefined)}
+                                placeholder={f.placeholder ?? (idStr === "br_mahanayaka_address" ? "Auto-filled from Nikaya, editable…" : undefined)}
                               />
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                             </div>
@@ -672,6 +681,9 @@ function AddBhikkhuPageInner() {
         </main>
         <FooterBar />
       </div>
+
+      {/* Toast container must exist in the tree to render toasts */}
+      <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
   );
 }
