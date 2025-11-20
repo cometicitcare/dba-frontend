@@ -1,7 +1,6 @@
 'use client'
 
 import BhikkhuList from '@/components/Bhikku/BhikkhuList/BhikkhuList'
-import SilmathaList from '@/components/Bhikku/SilmathaList/SilmathaList'
 import UpasampadaList from '@/components/Bhikku/UpasampadaList/UpasampadaList '
 import { FooterBar } from '@/components/FooterBar'
 import { Sidebar } from '@/components/Sidebar'
@@ -10,9 +9,9 @@ import { Tabs } from '@/components/ui/Tabs'
 import React,{useState} from 'react'
 
 const tabItems = [
-    { id: 'bhikkhu', label: 'Bhikkhu list' },
-    { id: 'upasampada', label: 'Upasampada list' },
-    { id: 'silmatha', label: 'Silmatha list' },
+    { id: 'bhikkhu', label: 'Bhikkhu List' },
+    { id: 'upasampada', label: 'Upasampada List' },
+
   ];
 
 export default function page() {
@@ -30,9 +29,8 @@ export default function page() {
             renderContent={(activeId) => {
               if (activeId === 'upasampada') {
                 return <UpasampadaList />
-              }if (activeId === 'silmatha') {
-                return <SilmathaList/>
-              }else{
+              }
+              else{
                 return <BhikkhuList />
               }
             }}
