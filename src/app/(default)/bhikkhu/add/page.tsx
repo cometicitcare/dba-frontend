@@ -46,6 +46,8 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 import type { BhikkhuForm, StepConfig } from "@/components/Bhikku/Add";
 
 const NOVICE_CATEGORY_CODE = "CAT03";
+const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_fathrname", "br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
+const OPTIONAL_LOCATION_FIELDS: Array<keyof BhikkhuForm> = ["br_korale", "br_pattu", "br_division", "br_vilage", "br_gndiv"];
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +56,27 @@ function AddBhikkhuPageInner() {
   const search = useSearchParams();
   const bhikkhuId = search.get("id") || undefined;
 
-  const steps = useMemo(() => bhikkhuSteps(), []);
+  const steps = useMemo(() => {
+    return bhikkhuSteps().map((step) => {
+      if (step.id === 1) {
+        return {
+          ...step,
+          fields: step.fields.filter((field) => !OMITTED_PERSONAL_FIELDS.includes(field.name)),
+        };
+      }
+      if (step.id === 2) {
+        return {
+          ...step,
+          fields: step.fields.map((field) =>
+            OPTIONAL_LOCATION_FIELDS.includes(field.name)
+              ? { ...field, rules: field.rules ? { ...field.rules, required: false } : { required: false } }
+              : field
+          ),
+        };
+      }
+      return step;
+    });
+  }, []);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [values, setValues] = useState<Partial<BhikkhuForm>>({
     ...bhikkhuInitialValues,
