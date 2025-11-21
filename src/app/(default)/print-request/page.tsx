@@ -5,7 +5,7 @@ import ReprintRequest from '@/components/Reprint/ReprintRequest'
 import { FooterBar } from '@/components/FooterBar'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
-export default function page() {
+export default function Page() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     
     return (
