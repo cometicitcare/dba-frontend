@@ -8,7 +8,7 @@ import { QrReader } from 'react-qr-reader'
 
 
 
-export default function page() {
+export default function Page() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [statusMessage, setStatusMessage] = useState('Click "Start Scan" to use your camera')
   const [scanError, setScanError] = useState('')
