@@ -21,3 +21,4 @@ export default function ImportantNotes({ children, className = "" }: Props) {
   );
 }
 
+
