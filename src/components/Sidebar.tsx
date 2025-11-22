@@ -71,7 +71,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     },
     {
       icon: MonkIcon, // ✅ use the custom SVG icon here
-      label: "Bhikku & Sirimatha",
+      label: "Bhikku",
       path: "/bhikkhu",
     },
     // If you still need the Lucide UsersIcon elsewhere, you can add it too:
