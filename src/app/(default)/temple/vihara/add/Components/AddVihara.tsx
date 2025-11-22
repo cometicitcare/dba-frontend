@@ -171,9 +171,34 @@ function AddViharaPageInner() {
 
     try {
       setSubmitting(true);
-      const payload: Partial<ViharaForm> = {
+      // Parse JSON strings back to objects/arrays for resident_bhikkhus and temple_owned_land
+      let parsedResidentBhikkhus: any[] = [];
+      let parsedTempleOwnedLand: any[] = [];
+      
+      try {
+        parsedResidentBhikkhus = values.resident_bhikkhus 
+          ? (typeof values.resident_bhikkhus === 'string' ? JSON.parse(values.resident_bhikkhus) : values.resident_bhikkhus)
+          : [];
+      } catch (e) {
+        console.error("Error parsing resident_bhikkhus:", e);
+        parsedResidentBhikkhus = [];
+      }
+      
+      try {
+        parsedTempleOwnedLand = values.temple_owned_land 
+          ? (typeof values.temple_owned_land === 'string' ? JSON.parse(values.temple_owned_land) : values.temple_owned_land)
+          : [];
+      } catch (e) {
+        console.error("Error parsing temple_owned_land:", e);
+        parsedTempleOwnedLand = [];
+      }
+      
+      const payload: any = {
         ...values,
+        resident_bhikkhus: parsedResidentBhikkhus,
+        temple_owned_land: parsedTempleOwnedLand,
       };
+      console.log("Vihara Form Payload:", payload);
       await _manageVihara({ action: "CREATE", payload: { data: payload } } as any);
 
       toast.success(viharaId ? "Vihara updated successfully." : "Vihara created successfully.", {
