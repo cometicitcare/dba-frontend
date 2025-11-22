@@ -59,7 +59,11 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
   };
 
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      data-filter-keepopen="true"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
       <input
         id={id}
@@ -75,7 +79,10 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
         autoComplete="off"
       />
       {open && focused && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+        <div
+          className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {loading && <div className="px-3 py-2 text-sm text-slate-500">Searching…</div>}
           {!loading && options.length === 0 && <div className="px-3 py-2 text-sm text-slate-500">No matches</div>}
           {options.map((o) => (

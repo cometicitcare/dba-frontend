@@ -15,11 +15,10 @@ import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageBhikku } from "@/services/bhikku";
 import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
-import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
-import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
+import LocationPickerStacked from "@/components/Bhikku/Filter/LocationPickerStacked";
 import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
-import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
+import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerStacked";
 import selectionsData from "@/utils/selectionsData.json";
 
 type BhikkuRow = {
@@ -90,7 +89,6 @@ type FilterState = {
   gn: string;
   vhTrn: string;
   status: string;
-  category: string;
   dateFrom: string; // yyyy-mm-dd
   dateTo: string; // yyyy-mm-dd
   searchKey: string;
@@ -133,7 +131,6 @@ const DEFAULT_FILTERS: FilterState = {
   gn: "",
   vhTrn: "",
   status: "",
-  category: "",
   dateFrom: "",
   dateTo: "",
   searchKey: "",
@@ -161,7 +158,6 @@ function buildFilterPayload(f: FilterState) {
   if (f.childTempleTrn) payload.child_temple = f.childTempleTrn;
   if (f.nikaya) payload.nikaya = f.nikaya;
   if (f.parchawa) payload.parshawaya = f.parchawa;
-  if (f.category.length) payload.category = [f.category];
   if (f.status.length) payload.status = [f.status];
   const from = toYYYYMMDD(f.dateFrom);
   if (from) payload.date_from = from;
@@ -360,7 +356,8 @@ export default function UpasampadaList () {
     if (!filterPanelOpen) return undefined;
 
     const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target as HTMLElement;
+      if (target?.closest('[data-filter-keepopen="true"]')) return;
       if (
         filterPanelRef.current &&
         !filterPanelRef.current.contains(target) &&
@@ -385,7 +382,7 @@ export default function UpasampadaList () {
 
   return (
     <div >
-      <main className="p-6">
+      <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-800">Bhikku List</h1>
@@ -434,10 +431,11 @@ export default function UpasampadaList () {
             {filterPanelOpen && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-                style={{ width: "min(90vw, 900px)" }}
+                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
+                style={{ width: "300px", height: "400px" }}
                 role="dialog"
                 aria-label="Bhikku filters"
+                data-filter-keepopen="true"
               >
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-lg font-semibold text-slate-800">
@@ -452,8 +450,8 @@ export default function UpasampadaList () {
                     <XIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <label className="flex flex-col gap-1">
                       <span className="text-sm text-gray-600">Search</span>
                       <input
@@ -472,7 +470,7 @@ export default function UpasampadaList () {
                   </div>
 
                   {/* Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -510,7 +508,7 @@ export default function UpasampadaList () {
                   </div>
 
                   {/* Child Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -608,22 +606,11 @@ export default function UpasampadaList () {
                     </select>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                    <LocationPicker
+                  <div>
+                    <LocationPickerStacked
                       value={locationSelection}
                       onChange={(sel) => handleLocationChange(sel)}
                       className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuCategorySelect
-                      id="flt-category"
-                      label="Category"
-                      value={filters.category}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, category: code }))
-                      }
                     />
                   </div>
 
