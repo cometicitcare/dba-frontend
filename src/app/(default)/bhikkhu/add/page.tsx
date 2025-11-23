@@ -46,7 +46,7 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 import type { BhikkhuForm, StepConfig } from "@/components/Bhikku/Add";
 
 const NOVICE_CATEGORY_CODE = "CAT03";
-const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_fathrname", "br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
+const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
 const OPTIONAL_LOCATION_FIELDS: Array<keyof BhikkhuForm> = ["br_korale", "br_pattu", "br_division", "br_vilage", "br_gndiv"];
 
 export const dynamic = "force-dynamic";

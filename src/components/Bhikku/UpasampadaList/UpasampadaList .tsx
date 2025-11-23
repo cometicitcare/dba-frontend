@@ -13,7 +13,7 @@ import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
-import { _manageBhikku } from "@/services/bhikku";
+import { _manageHighBhikku } from "@/services/bhikku";
 import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
 import LocationPickerStacked from "@/components/Bhikku/Filter/LocationPickerStacked";
 import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
@@ -21,16 +21,14 @@ import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerStacked";
 import selectionsData from "@/utils/selectionsData.json";
 
-type BhikkuRow = {
+type UpasampadaRow = {
+  id: number;
   regNo: string;
-  name: string;
-  fatherName?: string;
-  mobile?: string;
-  email?: string;
-  mahanayaka?: string;
-  remarks?: string;
-  category?: string;
+  highBhikkhuName: string;
+  parshawaya?: string;
+  livtemple?: string;
   status?: string;
+  workflow?: string;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -171,7 +169,7 @@ export default function UpasampadaList () {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [records, setRecords] = useState<BhikkuRow[]>([]);
+  const [records, setRecords] = useState<UpasampadaRow[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -225,10 +223,10 @@ export default function UpasampadaList () {
   const columns: Column[] = useMemo(
     () => [
       { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "name", label: "Name", sortable: true },
-      { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
+      { key: "highBhikkhuName", label: "High Bhikkhu Name", sortable: true },
+      { key: "livtemple", label: "Living Temple" },
       { key: "status", label: "Status", sortable: true },
+      { key: "workflow", label: "Workflow" },
     ],
     []
   );
@@ -242,18 +240,16 @@ export default function UpasampadaList () {
           payload: buildFilterPayload(f),
         };
         // @ts-expect-error: service typing may be loose
-        const res = await _manageBhikku(body, { signal });
+        const res = await _manageHighBhikku(body, { signal });
         const raw = pickRows<any>(res);
-        const cleaned: BhikkuRow[] = raw.map((row: any) => ({
-          regNo: String(row?.br_regn ?? ""),
-          name: String(row?.br_gihiname ?? ""),
-          fatherName: row?.br_fathrname ?? "",
-          mobile: row?.br_mobile ?? "",
-          email: row?.br_email ?? "",
-          mahanayaka: row?.br_mahananame ?? "",
-          remarks: row?.br_remarks ?? "",
-          category: row?.br_cat ?? "",
-          status: row?.br_currstat?.st_descr ?? "",
+        const cleaned: UpasampadaRow[] = raw.map((row: any) => ({
+          id: Number(row?.bhr_id ?? 0),
+          regNo: String(row?.bhr_regn ?? ""),
+          highBhikkhuName: String(row?.bhr_assumed_name ?? ""),
+          parshawaya: row?.bhr_parshawaya?.name || row?.bhr_parshawaya?.code || "",
+          livtemple: row?.bhr_livtemple?.vh_vname || row?.bhr_livtemple?.vh_trn || "",
+          status: row?.bhr_currstat?.st_descr || row?.bhr_currstat || "",
+          workflow: row?.bhr_workflow_status ?? "",
         }));
         setRecords(cleaned);
         setHasMoreResults(cleaned.length === f.limit);
@@ -277,36 +273,28 @@ export default function UpasampadaList () {
   }, []); // initial load only
 
   const handleAdd = useCallback(() => {
-    router.push("/bhikkhu/add");
-  }, [router]);
-
-  const handleAddSilmatha = useCallback(() => {
-    router.push("/silmatha/add");
-  }, [router]);
-
-  const handleAddUpasampada = useCallback(() => {
     router.push("/bhikkhu/upasmpada/add");
   }, [router]);
 
   const handleEdit = useCallback(
-    (item: BhikkuRow) => {
-      router.push(`/bhikkhu/manage/${encodeURIComponent(item.regNo)}`);
+    (item: UpasampadaRow) => {
+      router.push(`/bhikkhu/upasmpada/manage/${encodeURIComponent(item.id)}`);
     },
     [router]
   );
 
   const handleDelete = useCallback(
-    async (item: BhikkuRow) => {
+    async (item: UpasampadaRow) => {
       const ok =
         typeof window !== "undefined"
-          ? window.confirm(`Delete Bhikku ${item.regNo}?`)
+          ? window.confirm(`Delete Upasampada ${item.regNo}?`)
           : true;
       if (!ok) return;
       setLoading(true);
       try {
-        await _manageBhikku({
+        await _manageHighBhikku({
           action: "DELETE",
-          payload: { br_regn: item.regNo },
+          payload: { bhr_id: item.id },
         });
         await fetchData(undefined, filters);
       } catch (e) {
@@ -385,7 +373,7 @@ export default function UpasampadaList () {
       <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Bhikku List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">High Bhikkhu List</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -393,7 +381,7 @@ export default function UpasampadaList () {
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
-                  Add Bhikku
+                  Add High Bhikkhu
                 </button>
                 {/* <button
                   onClick={handleAddSilmatha}

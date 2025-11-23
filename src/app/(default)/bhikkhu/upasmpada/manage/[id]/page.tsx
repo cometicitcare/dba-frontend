@@ -1,14 +1,21 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { FooterBar } from "@/components/FooterBar";
-import { BhikkhuAutocomplete, BhikkhuStatusSelect, DateField, TempleAutocomplete, toYYYYMMDD } from "@/components/Bhikku/Add";
+import {
+  BhikkhuAutocomplete,
+  BhikkhuStatusSelect,
+  DateField,
+  TempleAutocomplete,
+  toYYYYMMDD,
+} from "@/components/Bhikku/Add";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { _manageHighBhikku } from "@/services/bhikku";
+import { Tabs } from "@/components/ui/Tabs";
 
 type UpasampadaForm = {
   candidateRegNo: string;
@@ -82,103 +89,189 @@ const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
 
 const UPASAMPADA_CATEGORY_CODE = "CAT02";
 
-export default function AddUpasampadaPage() {
+type PageProps = { params: { id: string } };
+
+type NormalizedRecord = {
+  recordId?: number;
+  formPatch: Partial<UpasampadaForm>;
+};
+
+const normalizeRecord = (api: any): NormalizedRecord => {
+  const s = (v: unknown) => (v == null ? "" : String(v));
+
+  const templeTrn = (val: any) => s(val?.vh_trn ?? val);
+  const templeDisplay = (val: any) => {
+    const trn = templeTrn(val);
+    const name = s(val?.vh_vname ?? val?.name ?? "");
+    if (name && trn) return `${name} - ${trn}`;
+    return name || trn;
+  };
+
+  const bhikkhuRegn = (val: any) => s(val?.br_regn ?? val?.regn ?? val);
+  const bhikkhuDisplay = (val: any) => {
+    const regn = bhikkhuRegn(val);
+    const name = s(val?.br_mahananame ?? val?.br_gihiname ?? val?.name ?? "");
+    if (name && regn) return `${name} - ${regn}`;
+    return name || regn;
+  };
+
+  const formPatch: Partial<UpasampadaForm> = {
+    candidateRegNo: s(api?.bhr_candidate_regn?.br_regn ?? api?.bhr_candidate_regn ?? api?.bhr_candidate?.br_regn),
+    candidateDisplay: bhikkhuDisplay(api?.bhr_candidate ?? api?.bhr_candidate_regn),
+    currentStatus: s(api?.bhr_currstat?.st_statcd ?? api?.bhr_currstat),
+    higherOrdinationPlace: s(api?.bhr_higher_ordination_place),
+    higherOrdinationDate: toYYYYMMDD(s(api?.bhr_higher_ordination_date)),
+    karmacharyaName: s(api?.bhr_karmacharya_name),
+    upaddhyayaName: s(api?.bhr_upaddhyaya_name),
+    assumedName: s(api?.bhr_assumed_name),
+    higherOrdinationResidenceTrn: templeTrn(api?.bhr_residence_higher_ordination_trn),
+    higherOrdinationResidenceDisplay: templeDisplay(api?.bhr_residence_higher_ordination_trn),
+    permanentResidenceTrn: templeTrn(api?.bhr_residence_permanent_trn),
+    permanentResidenceDisplay: templeDisplay(api?.bhr_residence_permanent_trn),
+    declarationResidenceAddress: s(api?.bhr_declaration_residence_address ?? api?.bhr_residence_at_declaration),
+    tutorsTutorRegNo: bhikkhuRegn(api?.bhr_tutors_tutor_regn),
+    tutorsTutorDisplay: bhikkhuDisplay(api?.bhr_tutors_tutor_regn),
+    presidingBhikshuRegNo: bhikkhuRegn(api?.bhr_presiding_bhikshu_regn),
+    presidingBhikshuDisplay: bhikkhuDisplay(api?.bhr_presiding_bhikshu_regn),
+    samaneraSerial: s(api?.bhr_samanera_serial_no),
+    declarationDate: toYYYYMMDD(s(api?.bhr_declaration_date)),
+    remarks: s(api?.bhr_remarks),
+  };
+
+  const recordId = Number(api?.bhr_id ?? api?.id ?? api?.bhr_regn ?? api?.regn) || undefined;
+
+  return { formPatch, recordId };
+};
+
+export default function ManageUpasampadaPage({ params }: PageProps) {
+  const editId = params.id;
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [recordId, setRecordId] = useState<number | null>(null);
 
+  const tabs = useMemo(() => FORM_STEPS.map((step) => ({ id: String(step.id), label: step.title })), []);
   const totalSteps = FORM_STEPS.length;
-  const currentStepConfig = FORM_STEPS[currentStep - 1];
-  const stepRequirements = REQUIRED_BY_STEP[currentStep] ?? [];
+  const currentStepConfig = FORM_STEPS[currentStep - 1] ?? FORM_STEPS[0];
+  const stepRequirements = REQUIRED_BY_STEP[currentStepConfig.id] ?? [];
   const stepIsValid = useMemo(() => {
+    if (loading) return false;
     return stepRequirements.every((field) => {
       const value = form[field];
       return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
     });
-  }, [form, stepRequirements]);
-  const isLastStep = currentStep === totalSteps;
+  }, [form, stepRequirements, loading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await _manageHighBhikku({
+          action: "READ_ONE",
+          payload: { bhr_regn: editId, bhr_id: Number(editId) || undefined },
+        } as any);
+        const api = (res as any)?.data?.data ?? (res as any)?.data ?? res;
+        const { formPatch, recordId: fetchedId } = normalizeRecord(api);
+        if (cancelled) return;
+        setForm((prev) => ({ ...prev, ...formPatch }));
+        setRecordId(fetchedId ?? null);
+      } catch (error: any) {
+        if (cancelled) return;
+        const message = error?.message ?? "Failed to load record.";
+        toast.error(message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [editId]);
 
   const updateField = (field: keyof UpasampadaForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const goNext = () => setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
-  const goBack = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateTab = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!isLastStep || !stepIsValid || submitting) return;
+    if (!stepIsValid || submitting) return;
     setSubmitting(true);
 
     const today = toYYYYMMDD(new Date().toISOString());
 
-    const requestBody = {
-      action: "CREATE",
-      payload: {
-        data: {
-          bhr_reqstdate: today,
-          bhr_currstat: form.currentStatus,
-          bhr_parshawaya: "",
-          bhr_livtemple: form.permanentResidenceTrn || form.higherOrdinationResidenceTrn || "",
-          bhr_candidate_regn: form.candidateRegNo,
-          bhr_cc_code: UPASAMPADA_CATEGORY_CODE,
-          bhr_samanera_serial_no: form.samaneraSerial,
-          bhr_higher_ordination_place: form.higherOrdinationPlace,
-          bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
-          bhr_karmacharya_name: form.karmacharyaName,
-          bhr_upaddhyaya_name: form.upaddhyayaName,
-          bhr_assumed_name: form.assumedName,
-          bhr_residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
-          bhr_residence_permanent_trn: form.permanentResidenceTrn,
-          bhr_declaration_residence_address: form.declarationResidenceAddress,
-          bhr_tutors_tutor_regn: form.tutorsTutorRegNo,
-          bhr_presiding_bhikshu_regn: form.presidingBhikshuRegNo,
-          bhr_declaration_date: toYYYYMMDD(form.declarationDate),
-          bhr_remarks: form.remarks,
-        },
-      },
+    const payload = {
+      bhr_reqstdate: today,
+      bhr_currstat: form.currentStatus,
+      bhr_parshawaya: "",
+      bhr_livtemple: form.permanentResidenceTrn || form.higherOrdinationResidenceTrn || "",
+      bhr_candidate_regn: form.candidateRegNo,
+      bhr_cc_code: UPASAMPADA_CATEGORY_CODE,
+      bhr_samanera_serial_no: form.samaneraSerial,
+      bhr_higher_ordination_place: form.higherOrdinationPlace,
+      bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
+      bhr_karmacharya_name: form.karmacharyaName,
+      bhr_upaddhyaya_name: form.upaddhyayaName,
+      bhr_assumed_name: form.assumedName,
+      bhr_residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
+      bhr_residence_permanent_trn: form.permanentResidenceTrn,
+      bhr_declaration_residence_address: form.declarationResidenceAddress,
+      bhr_tutors_tutor_regn: form.tutorsTutorRegNo,
+      bhr_presiding_bhikshu_regn: form.presidingBhikshuRegNo,
+      bhr_declaration_date: toYYYYMMDD(form.declarationDate),
+      bhr_remarks: form.remarks,
     };
 
     try {
-      await _manageHighBhikku(requestBody as any);
+      await _manageHighBhikku({
+        action: "UPDATE",
+        payload: { data: payload, bhr_regn: editId, bhr_id: recordId ?? undefined },
+      } as any);
 
-      toast.success("Upasampada record saved.", {
+      toast.success(`"${currentStepConfig.title}" updated.`, {
         autoClose: 1200,
         onClose: () => router.push("/bhikkhu"),
       });
       setTimeout(() => router.push("/bhikkhu"), 1400);
     } catch (error: any) {
-      const message = error?.message ?? "Failed to save record.";
+      const message = error?.message ?? "Failed to update record.";
       toast.error(message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const renderStep = () => {
-    switch (currentStep) {
+  const renderStep = (stepNumber: number) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-40 text-slate-500">
+          Loading record...
+        </div>
+      );
+    }
+
+    switch (stepNumber) {
       case 1:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-              <BhikkhuAutocomplete
-                id="bhikkhu-search"
-                label="Search Bhikkhu"
-                initialDisplay={form.candidateDisplay}
-                onPick={({ regn, display }) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    candidateRegNo: regn ?? "",
-                    candidateDisplay: display,
-                  }))
-                }
-                required
+              <label htmlFor="linked-bhikkhu" className="block text-sm font-medium text-slate-700 mb-2">
+                Linked Bhikkhu
+              </label>
+              <input
+                id="linked-bhikkhu"
+                type="text"
+                value={form.candidateDisplay || form.candidateRegNo || ""}
+                readOnly
+                aria-readonly="true"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-700"
               />
-              {form.candidateRegNo ? (
-                <p className="mt-2 text-sm text-slate-500">Linked Bhikkhu: {form.candidateDisplay}</p>
-              ) : null}
+              <p className="mt-2 text-sm text-slate-500">
+                Linked Bhikkhu cannot be changed in edit mode.
+              </p>
             </div>
             <TextField
               id="place-higher-ordination"
@@ -301,12 +394,20 @@ export default function AddUpasampadaPage() {
               required
               onPick={({ code }) => updateField("currentStatus", code)}
             />
-            <TextField
-              id="samanera-serial"
-              label="Serial Number in Samanera Register, if any"
-              value={form.samaneraSerial}
-              onChange={(v) => updateField("samaneraSerial", v)}
-            />
+            <div className="grid grid-cols-1">
+              <label htmlFor="samanera-serial" className="block text-sm font-medium text-slate-700 mb-2">
+                Serial Number in Samanera Register, if any
+              </label>
+              <input
+                id="samanera-serial"
+                type="text"
+                value={form.samaneraSerial}
+                readOnly
+                aria-readonly="true"
+                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm bg-slate-100 text-slate-700"
+              />
+              <p className="mt-2 text-sm text-slate-500">This serial number is fixed and cannot be edited.</p>
+            </div>
             <DateField
               id="declaration-date"
               label="Date of making the declaration"
@@ -337,92 +438,48 @@ export default function AddUpasampadaPage() {
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">Upasampada Registration</h1>
-                    <p className="text-slate-300 text-sm">Provide the higher-ordination details for the selected Bhikkhu.</p>
+                    <h1 className="text-2xl font-bold text-white mb-1">Update Upasampada</h1>
+                    <p className="text-slate-300 text-sm">
+                      Edit the higher-ordination details for this Bhikkhu.
+                    </p>
+                  </div>
+                  <div className="text-sm text-slate-200">
+                    Record: <span className="font-semibold">{editId}</span>
                   </div>
                 </div>
               </div>
 
               <div className="px-4 md:px-10 py-6">
-                <div className="flex items-center justify-between mb-6">
-                  {FORM_STEPS.map((step, idx) => {
-                    const stepNumber = idx + 1;
+                <Tabs
+                  tabs={tabs}
+                  value={String(currentStep)}
+                  onChange={(id) => setCurrentStep(Number(id))}
+                  contentClassName="pt-6"
+                  renderContent={(activeId) => {
+                    const stepNumber = Number(activeId) || 1;
+                    const step = FORM_STEPS.find((s) => String(s.id) === activeId) ?? FORM_STEPS[0];
                     return (
-                      <div key={step.id} className="flex items-center flex-1">
-                        <div className="flex flex-col items-center flex-1">
-                          <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
-                              currentStep > stepNumber
-                                ? "bg-green-500 text-white"
-                                : currentStep === stepNumber
-                                  ? "bg-slate-700 text-white ring-4 ring-slate-200"
-                                  : "bg-slate-200 text-slate-400"
-                            }`}
-                          >
-                            {currentStep > stepNumber ? "✓" : stepNumber}
-                          </div>
-                          <span
-                            className={`text-[11px] mt-2 font-medium text-center ${
-                              currentStep >= stepNumber ? "text-slate-700" : "text-slate-400"
-                            }`}
-                          >
-                            {step.title}
-                          </span>
+                      <form className="space-y-8" onSubmit={handleUpdateTab}>
+                        <div>
+                          <h2 className="text-xl font-bold text-slate-800">{step.title}</h2>
+                          <p className="text-sm text-slate-500 mt-1">{step.description}</p>
                         </div>
-                        {idx < totalSteps - 1 && (
-                          <div
-                            className={`h-1 flex-1 mx-2 rounded transition-all duration-300 ${
-                              currentStep > stepNumber ? "bg-green-500" : "bg-slate-200"
-                            }`}
-                          />
-                        )}
-                      </div>
+
+                        <div className="min-h-[360px]">{renderStep(stepNumber)}</div>
+
+                        <div className="flex justify-end pt-4 border-t border-slate-100">
+                          <button
+                            type="submit"
+                            disabled={!stepIsValid || submitting}
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-60"
+                          >
+                            {submitting ? "Saving..." : `Update ${step.title}`}
+                          </button>
+                        </div>
+                      </form>
                     );
-                  })}
-                </div>
-
-                <form className="space-y-8" onSubmit={handleSubmit}>
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800">{currentStepConfig.title}</h2>
-                    <p className="text-sm text-slate-500 mt-1">{currentStepConfig.description}</p>
-                  </div>
-
-                  <div className="min-h-[360px]">{renderStep()}</div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={goBack}
-                      disabled={currentStep === 1}
-                      className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
-                        currentStep === 1 ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                      }`}
-                    >
-                      Back
-                    </button>
-                    <div className="flex items-center gap-3">
-                      {currentStep < totalSteps && (
-                        <button
-                          type="button"
-                          onClick={goNext}
-                          disabled={!stepIsValid}
-                          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-60"
-                        >
-                          Continue
-                        </button>
-                      )}
-                      {isLastStep && (
-                        <button
-                          type="submit"
-                          disabled={!stepIsValid || submitting}
-                          className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-60"
-                        >
-                          {submitting ? "Saving…" : "Submit record"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </form>
+                  }}
+                />
               </div>
             </div>
           </div>
