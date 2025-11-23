@@ -279,10 +279,9 @@ export default function UpasampadaList () {
 
   const columns: Column<UpasampadaRow>[] = useMemo(
     () => [
-      { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "highBhikkhuName", label: "High Bhikkhu Name", sortable: true },
-      { key: "livtemple", label: "Living Temple" },
-      { key: "status", label: "Status", sortable: true },
+      { key: "regNo", label: "REG.NO", sortable: true },
+      { key: "highBhikkhuName", label: "UPASAMPADA NAME", sortable: true },
+      { key: "livtemple", label: "LIVING TEMPALE" },
       {
         key: "workflowStatus",
         label: "Workflow Status",
@@ -292,6 +291,7 @@ export default function UpasampadaList () {
             row.workflowStatus
           ),
       },
+      { key: "status", label: "STATUS", sortable: true }
     ],
     []
   );
@@ -468,7 +468,7 @@ export default function UpasampadaList () {
       <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">High Bhikkhu List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">UPASAMPADA BHIKKHU LIST</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}

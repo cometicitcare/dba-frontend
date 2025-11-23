@@ -97,7 +97,6 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
       { name: "br_parshawaya", label: "Name of Chapter", type: "text", rules: { required: true } },
       { name: "br_mahanayaka_name", label: "Name of Mahanayaka Thera or Nayaka Thero of the Nikaya", type: "text", rules: { required: true } },
       { name: "br_mahanayaka_address", label: "Full postal address of the Mahanayaka Thera or Nayaka Theri of the Nikaya", type: "textarea", rows: 4, rules: { required: true } },
-      { name: "br_robing_after_residence_temple", label: "Temple of residence after robing", type: "text", rules: { required: true } },
     ],
   },
   {
@@ -109,6 +108,7 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
       { name: "br_mahanaacharyacd", label: "Name of robing tutor", type: "text", rules: { required: true } },
       { name: "br_robing_tutor_residence", label: "Name of robing tutor’s residence", type: "text", rules: { required: true } },
       { name: "br_mahanatemple", label: "Temple where robing took place", type: "text", rules: { required: true } },
+      { name: "br_robing_after_residence_temple", label: "Temple of residence after robing", type: "text", rules: { required: true } },
     ],
   },
   {

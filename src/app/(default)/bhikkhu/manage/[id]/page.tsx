@@ -52,7 +52,6 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const HIDDEN_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
-  "br_fathrname",
   "br_email",
   "br_fathrsaddrs",
   "br_mobile",
