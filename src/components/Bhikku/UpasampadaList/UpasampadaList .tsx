@@ -28,7 +28,8 @@ type UpasampadaRow = {
   parshawaya?: string;
   livtemple?: string;
   status?: string;
-  workflow?: string;
+  workflowStatus?: string;
+  workflowStatusCode?: string;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -103,6 +104,62 @@ type RawNikayaEntry = {
   nikaya: { code: string; name: string };
   parshawayas?: Array<{ code: string; name: string }>;
 };
+
+type WorkflowStatusMeta = {
+  label: string;
+  textColor: string;
+  bgColor: string;
+};
+
+// Normalize codes/labels to a single key so slight spelling or spacing differences still match colors
+function normalizeWorkflowKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
+const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
+  (selectionsData as any)?.workflowStatuses
+)
+  ? ((selectionsData as any).workflowStatuses as any[]).reduce(
+      (acc: Record<string, WorkflowStatusMeta>, item) => {
+        const meta: WorkflowStatusMeta = {
+          label: item?.label ?? item?.code ?? "-",
+          textColor: item?.textColor ?? "#1f2937",
+          bgColor: item?.bgColor ?? "#e5e7eb",
+        };
+        const keys = [
+          normalizeWorkflowKey(item?.code),
+          normalizeWorkflowKey(item?.label),
+        ].filter(Boolean) as string[];
+
+        keys.forEach((key) => {
+          if (!acc[key]) acc[key] = meta;
+        });
+
+        return acc;
+      },
+      {}
+    )
+  : {};
+
+function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
+  const code = normalizeWorkflowKey(statusCode);
+  const meta =
+    (code ? WORKFLOW_STATUS_META[code] : undefined) ||
+    (fallbackLabel ? WORKFLOW_STATUS_META[normalizeWorkflowKey(fallbackLabel)] : undefined);
+  const label = meta?.label ?? fallbackLabel ?? statusCode ?? "-";
+
+  if (!meta) return label || "-";
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
 
 const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
   (selectionsData as any)?.nikayas
@@ -220,13 +277,21 @@ export default function UpasampadaList () {
     }));
   }, []);
 
-  const columns: Column[] = useMemo(
+  const columns: Column<UpasampadaRow>[] = useMemo(
     () => [
       { key: "regNo", label: "Reg. No", sortable: true },
       { key: "highBhikkhuName", label: "High Bhikkhu Name", sortable: true },
       { key: "livtemple", label: "Living Temple" },
       { key: "status", label: "Status", sortable: true },
-      { key: "workflow", label: "Workflow" },
+      {
+        key: "workflowStatus",
+        label: "Workflow Status",
+        render: (row) =>
+          renderWorkflowStatusBadge(
+            row.workflowStatusCode,
+            row.workflowStatus
+          ),
+      },
     ],
     []
   );
@@ -242,15 +307,45 @@ export default function UpasampadaList () {
         // @ts-expect-error: service typing may be loose
         const res = await _manageHighBhikku(body, { signal });
         const raw = pickRows<any>(res);
-        const cleaned: UpasampadaRow[] = raw.map((row: any) => ({
-          id: Number(row?.bhr_id ?? 0),
-          regNo: String(row?.bhr_regn ?? ""),
-          highBhikkhuName: String(row?.bhr_assumed_name ?? ""),
-          parshawaya: row?.bhr_parshawaya?.name || row?.bhr_parshawaya?.code || "",
-          livtemple: row?.bhr_livtemple?.vh_vname || row?.bhr_livtemple?.vh_trn || "",
-          status: row?.bhr_currstat?.st_descr || row?.bhr_currstat || "",
-          workflow: row?.bhr_workflow_status ?? "",
-        }));
+        const cleaned: UpasampadaRow[] = raw.map((row: any) => {
+          const workflowRaw = row?.bhr_workflow_status;
+          const workflowStatusCode = normalizeWorkflowKey(
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.code ??
+                  workflowRaw?.status ??
+                  workflowRaw?.st_statcd ??
+                  workflowRaw?.st_code ??
+                  workflowRaw?.status_code ??
+                  workflowRaw?.statusCode ??
+                  ""
+          );
+          const workflowLabel =
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.st_descr ??
+                workflowRaw?.description ??
+                workflowRaw?.label ??
+                workflowRaw?.name ??
+                "";
+          const workflowStatus =
+            WORKFLOW_STATUS_META[workflowStatusCode]?.label ||
+            workflowLabel ||
+            workflowStatusCode;
+
+          return {
+            id: Number(row?.bhr_id ?? 0),
+            regNo: String(row?.bhr_regn ?? ""),
+            highBhikkhuName: String(row?.bhr_assumed_name ?? ""),
+            parshawaya:
+              row?.bhr_parshawaya?.name || row?.bhr_parshawaya?.code || "",
+            livtemple:
+              row?.bhr_livtemple?.vh_vname || row?.bhr_livtemple?.vh_trn || "",
+            status: row?.bhr_currstat?.st_descr || row?.bhr_currstat || "",
+            workflowStatus,
+            workflowStatusCode,
+          };
+        });
         setRecords(cleaned);
         setHasMoreResults(cleaned.length === f.limit);
       } catch (e: any) {
