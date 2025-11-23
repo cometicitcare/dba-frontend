@@ -47,6 +47,8 @@ import {
   Button as MuiButton,
   TextField,
 } from "@mui/material";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -69,6 +71,7 @@ const OPTIONAL_LOCATION_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
 const CERTIFICATE_URL_BASE =
   "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = "https://api.dbagovlk.com";
 
 type CertificateMeta = {
   number: string;
@@ -674,9 +677,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const MAX_SCAN_BYTES = 5 * 1024 * 1024;
   const resolveScanUrl = (path?: string | null) => {
     if (!path) return null;
-    const trimmed = String(path);
-    if (trimmed.startsWith("http")) return trimmed;
-    return `https://hrms.dbagovlk.com${trimmed}`;
+    const trimmed = String(path).trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${normalizedPath}`;
   };
   const formatFileSize = (bytes: number) => {
     if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -805,6 +810,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
       lower.endsWith(".jpeg") ||
       lower.endsWith(".gif") ||
       lower.endsWith(".webp");
+    const isPdf = lower.includes(".pdf");
     return (
       <div className="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -832,6 +838,12 @@ function ManageBhikkhuInner({ params }: PageProps) {
               alt="Scanned certificate"
               className="w-full max-h-96 object-contain"
             />
+          </div>
+        ) : isPdf ? (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+              <Viewer fileUrl={existingScanUrl} withCredentials={false} />
+            </Worker>
           </div>
         ) : null}
       </div>
@@ -999,25 +1011,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                   No scanned document uploaded yet.
                                 </div>
                               )}
-                              <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div>
-                                    <p className="text-sm font-semibold text-slate-900">
-                                      Upload a new scan
-                                    </p>
-                                    <p className="text-xs text-slate-600">
-                                      PDF/JPG/PNG, max 5 MB.
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowUploadModal(true)}
-                                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950"
-                                  >
-                                    Upload
-                                  </button>
-                                </div>
-                              </div>
                             </div>
                           ) : (
                             <>
