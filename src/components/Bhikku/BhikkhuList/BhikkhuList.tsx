@@ -281,15 +281,15 @@ export default function BhikkhuList() {
 
   const columns: Column<BhikkuRow>[] = useMemo(
     () => [
-      { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "name", label: "Bhikkhu Name", sortable: true },
+      { key: "regNo", label: "REG.NO", sortable: true },
+      { key: "name", label: "SAMANERA NAME", sortable: true },
       {
         key: "workflowStatus",
         label: "Workflow Status",
         render: (row) =>
           renderWorkflowStatusBadge(row.workflowStatusCode, row.workflowStatus),
       },
-      { key: "status", label: "Status", sortable: true },
+      { key: "status", label: "STATUS", sortable: true },
     ],
     []
   );
@@ -474,7 +474,7 @@ export default function BhikkhuList() {
       <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Bhikku List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">SAMANERA LIST</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
