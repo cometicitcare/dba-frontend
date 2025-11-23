@@ -14,7 +14,11 @@ import {
 } from "@/components/Bhikku/Add";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { _manageHighBhikku } from "@/services/bhikku";
+import {
+  _manageHighBhikku,
+  _markPrintedHighBhikkhu,
+  _uploadScannedHighDocument,
+} from "@/services/bhikku";
 import { Tabs } from "@/components/ui/Tabs";
 
 type UpasampadaForm = {
@@ -88,6 +92,7 @@ const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
 };
 
 const UPASAMPADA_CATEGORY_CODE = "CAT02";
+const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
 
 type PageProps = { params: { id: string } };
 
@@ -147,23 +152,39 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const editId = params.id;
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [activeTab, setActiveTab] = useState<string>(String(FORM_STEPS[0].id));
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [recordId, setRecordId] = useState<number | null>(null);
+  const [markingPrinted, setMarkingPrinted] = useState(false);
+  const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [uploadingScan, setUploadingScan] = useState(false);
 
-  const tabs = useMemo(() => FORM_STEPS.map((step) => ({ id: String(step.id), label: step.title })), []);
-  const totalSteps = FORM_STEPS.length;
-  const currentStepConfig = FORM_STEPS[currentStep - 1] ?? FORM_STEPS[0];
-  const stepRequirements = REQUIRED_BY_STEP[currentStepConfig.id] ?? [];
+  const tabs = useMemo(
+    () => [
+      ...FORM_STEPS.map((step) => ({ id: String(step.id), label: step.title, type: "form" as const, step })),
+      { id: "certificates", label: "Certificates", type: "cert" as const },
+      { id: "upload-scans", label: "Upload Scanned Files", type: "upload" as const },
+    ],
+    []
+  );
+  const activeFormStep = useMemo(
+    () => FORM_STEPS.find((s) => String(s.id) === activeTab),
+    [activeTab]
+  );
+  const stepRequirements = activeFormStep ? REQUIRED_BY_STEP[activeFormStep.id] ?? [] : [];
   const stepIsValid = useMemo(() => {
+    if (!activeFormStep) return true;
     if (loading) return false;
     return stepRequirements.every((field) => {
       const value = form[field];
       return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
     });
-  }, [form, stepRequirements, loading]);
+  }, [form, stepRequirements, loading, activeFormStep]);
+  const certificateNumber = form.candidateRegNo || editId;
+  const certificateUrl = certificateNumber ? `${CERTIFICATE_URL_BASE}/${certificateNumber}` : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -198,12 +219,13 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
 
   const handleUpdateTab = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!stepIsValid || submitting) return;
+    if (!stepIsValid || submitting || !activeFormStep) return;
     setSubmitting(true);
 
     const today = toYYYYMMDD(new Date().toISOString());
 
     const payload = {
+      bhr_id: recordId ?? (Number(editId) || undefined),
       bhr_reqstdate: today,
       bhr_currstat: form.currentStatus,
       bhr_parshawaya: "",
@@ -228,10 +250,10 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     try {
       await _manageHighBhikku({
         action: "UPDATE",
-        payload: { data: payload, bhr_regn: editId, bhr_id: recordId ?? undefined },
+        payload: { data: payload },
       } as any);
 
-      toast.success(`"${currentStepConfig.title}" updated.`, {
+      toast.success(`"${activeFormStep.title}" updated.`, {
         autoClose: 1200,
         onClose: () => router.push("/bhikkhu"),
       });
@@ -243,6 +265,66 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
       setSubmitting(false);
     }
   };
+
+  const handleMarkPrinted = async () => {
+    const regn = certificateNumber;
+    if (!regn) {
+      toast.error("Missing Bhikkhu registration number.");
+      return;
+    }
+    try {
+      setMarkingPrinted(true);
+      await _markPrintedHighBhikkhu(regn);
+      toast.success("Marked certificate as printed.", { autoClose: 1200 });
+    } catch (error: any) {
+      const message = error?.message ?? "Failed to mark as printed.";
+      toast.error(message);
+    } finally {
+      setMarkingPrinted(false);
+    }
+  };
+
+  const handleScanFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setScannedFile(file);
+    if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+    if (file && file.type.startsWith("image/")) {
+      setScanPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setScanPreviewUrl(null);
+    }
+  };
+
+  const handleUploadScan = async () => {
+    const regn = certificateNumber;
+    if (!regn) {
+      toast.error("Missing Bhikkhu registration number.");
+      return;
+    }
+    if (!scannedFile) {
+      toast.error("Please choose a file to upload.");
+      return;
+    }
+    try {
+      setUploadingScan(true);
+      await _uploadScannedHighDocument(regn, scannedFile);
+      toast.success("Scanned file uploaded.", { autoClose: 1200 });
+      setScannedFile(null);
+      if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+      setScanPreviewUrl(null);
+    } catch (error: any) {
+      const message = error?.message ?? "Failed to upload file.";
+      toast.error(message);
+    } finally {
+      setUploadingScan(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+    };
+  }, [scanPreviewUrl]);
 
   const renderStep = (stepNumber: number) => {
     if (loading) {
@@ -452,32 +534,130 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
               <div className="px-4 md:px-10 py-6">
                 <Tabs
                   tabs={tabs}
-                  value={String(currentStep)}
-                  onChange={(id) => setCurrentStep(Number(id))}
+                  value={activeTab}
+                  onChange={(id) => setActiveTab(id)}
                   contentClassName="pt-6"
                   renderContent={(activeId) => {
-                    const stepNumber = Number(activeId) || 1;
-                    const step = FORM_STEPS.find((s) => String(s.id) === activeId) ?? FORM_STEPS[0];
-                    return (
-                      <form className="space-y-8" onSubmit={handleUpdateTab}>
-                        <div>
-                          <h2 className="text-xl font-bold text-slate-800">{step.title}</h2>
-                          <p className="text-sm text-slate-500 mt-1">{step.description}</p>
-                        </div>
+                    const activeConfig = tabs.find((t) => t.id === activeId);
+                    if (activeConfig?.type === "form") {
+                      const stepNumber = activeConfig.step?.id ?? 1;
+                      const step = activeConfig.step ?? FORM_STEPS[0];
+                      return (
+                        <form className="space-y-8" onSubmit={handleUpdateTab}>
+                          <div>
+                            <h2 className="text-xl font-bold text-slate-800">{step.title}</h2>
+                            <p className="text-sm text-slate-500 mt-1">{step.description}</p>
+                          </div>
 
-                        <div className="min-h-[360px]">{renderStep(stepNumber)}</div>
+                          <div className="min-h-[360px]">{renderStep(stepNumber)}</div>
 
-                        <div className="flex justify-end pt-4 border-t border-slate-100">
-                          <button
-                            type="submit"
-                            disabled={!stepIsValid || submitting}
-                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-60"
-                          >
-                            {submitting ? "Saving..." : `Update ${step.title}`}
-                          </button>
+                          <div className="flex justify-end pt-4 border-t border-slate-100">
+                            <button
+                              type="submit"
+                              disabled={!stepIsValid || submitting}
+                              className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-60"
+                            >
+                              {submitting ? "Saving..." : `Update ${step.title}`}
+                            </button>
+                          </div>
+                        </form>
+                      );
+                    }
+
+                    if (activeConfig?.type === "cert") {
+                      return (
+                        <div className="space-y-6">
+                          <div>
+                            <h2 className="text-xl font-bold text-slate-800">Certificates</h2>
+                            <p className="text-sm text-slate-500 mt-1">
+                              View or mark the certificate for this Bhikkhu.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                            <p className="text-sm text-slate-600">
+                              Certificate URL:{" "}
+                              {certificateUrl ? (
+                                <a href={certificateUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                                  {certificateUrl}
+                                </a>
+                              ) : (
+                                <span className="text-slate-400">Unavailable (missing registration number)</span>
+                              )}
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              <button
+                                type="button"
+                                onClick={() => certificateUrl && window.open(certificateUrl, "_blank")}
+                                disabled={!certificateUrl}
+                                className="px-5 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold disabled:opacity-50"
+                              >
+                                Open certificate
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleMarkPrinted}
+                                disabled={markingPrinted || !certificateNumber}
+                                className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50"
+                              >
+                                {markingPrinted ? "Marking..." : "Mark as printed"}
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                      </form>
-                    );
+                      );
+                    }
+
+                    if (activeConfig?.type === "upload") {
+                      return (
+                        <div className="space-y-6">
+                          <div>
+                            <h2 className="text-xl font-bold text-slate-800">Upload Scanned Files</h2>
+                            <p className="text-sm text-slate-500 mt-1">
+                              Attach scanned certificates or related documents.
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 space-y-4">
+                            <input type="file" accept="image/*,.pdf" onChange={handleScanFileChange} />
+                            {scannedFile ? (
+                              <p className="text-sm text-slate-600">
+                                Selected: {scannedFile.name} ({Math.round(scannedFile.size / 1024)} KB)
+                              </p>
+                            ) : (
+                              <p className="text-sm text-slate-500">Choose a file to upload.</p>
+                            )}
+                            {scanPreviewUrl ? (
+                              <div className="overflow-hidden rounded border border-slate-200 bg-white">
+                                <img src={scanPreviewUrl} alt="Preview" className="max-h-64 w-full object-contain" />
+                              </div>
+                            ) : null}
+                            <div className="flex gap-3">
+                              <button
+                                type="button"
+                                onClick={handleUploadScan}
+                                disabled={uploadingScan || !scannedFile}
+                                className="px-5 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold disabled:opacity-50"
+                              >
+                                {uploadingScan ? "Uploading..." : "Upload file"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setScannedFile(null);
+                                  if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+                                  setScanPreviewUrl(null);
+                                }}
+                                disabled={uploadingScan || !scannedFile}
+                                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold disabled:opacity-50"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
                   }}
                 />
               </div>
