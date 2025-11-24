@@ -1,0 +1,23 @@
+[
+  { "regNo": "001", "name": "Bhikku Ananda", "city": "Colombo" },
+  { "regNo": "002", "name": "Bhikku Sumana", "city": "Kandy" },
+  { "regNo": "003", "name": "Bhikku Rahula", "city": "Galle" },
+  { "regNo": "004", "name": "Bhikku Kassapa", "city": "Kurunegala" },
+  { "regNo": "005", "name": "Bhikku Sobhitha", "city": "Matara" },
+  { "regNo": "006", "name": "Bhikku Nandaka", "city": "Badulla" },
+  { "regNo": "007", "name": "Bhikku Revata", "city": "Anuradhapura" },
+  { "regNo": "008", "name": "Bhikku Moggallana", "city": "Polonnaruwa" },
+  { "regNo": "009", "name": "Bhikku Mahinda", "city": "Jaffna" },
+  { "regNo": "010", "name": "Bhikku Vajira", "city": "Hambantota" },
+
+  { "regNo": "011", "name": "Bhikku Dhammananda", "city": "Trincomalee" },
+  { "regNo": "012", "name": "Bhikku Piyadassi", "city": "Vavuniya" },
+  { "regNo": "013", "name": "Bhikku Ariyadhamma", "city": "Batticaloa" },
+  { "regNo": "014", "name": "Bhikku Devananda", "city": "Mannar" },
+  { "regNo": "015", "name": "Bhikku Chandima", "city": "Ampara" },
+  { "regNo": "016", "name": "Bhikku Gunasiri", "city": "Monaragala" },
+  { "regNo": "017", "name": "Bhikku Rathana", "city": "Rathnapura" },
+  { "regNo": "018", "name": "Bhikku Sarananda", "city": "Kalutara" },
+  { "regNo": "019", "name": "Bhikku Medhananda", "city": "Negombo" },
+  { "regNo": "020", "name": "Bhikku Jinapala", "city": "Kegalle" }
+]
