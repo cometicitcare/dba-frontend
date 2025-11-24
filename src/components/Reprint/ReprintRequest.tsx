@@ -437,43 +437,18 @@ export default function ReprintRequest() {
 
       {mode === "create" && step === "select" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        
           <div>
-            <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-              Select type
-            </label>
-            <select
-              value={role}
-              onChange={(e) => {
-                const nextRole = e.target.value as Role;
-                setRole(nextRole);
-                setSelectedBhikku(null);
-                setSearch("");
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                color: "#0f172a",
-              }}
-            >
-              <option value="High Bhikku">High Bhikku</option>
-              <option value="Samanera">Samanera</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-              Bhikku (autocomplete)
-            </label>
-            <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
+          <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+            Enter ID Number
+          </label>
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
                 setSelectedBhikku(null);
               }}
-              placeholder="Search and select bhikku"
+              placeholder="ID Number"
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -493,27 +468,7 @@ export default function ReprintRequest() {
                   background: "white",
                 }}
               >
-                {filteredOptions.map((bhikku) => (
-                  <button
-                    key={bhikku.name}
-                    onClick={() => {
-                      setSelectedBhikku(bhikku);
-                      setSearch(bhikku.name);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      border: "none",
-                      borderBottom: "1px solid #f1f5f9",
-                      background: "white",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontWeight: 600, color: "#0f172a" }}>{bhikku.name}</div>
-                    <div style={{ color: "#475569", fontSize: "13px" }}>{bhikku.monastery || "No monastery"}</div>
-                  </button>
-                ))}
+              
               </div>
             )}
           </div>

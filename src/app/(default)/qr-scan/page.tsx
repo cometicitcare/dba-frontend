@@ -5,6 +5,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { useState } from 'react'
 import { QrReader } from 'react-qr-reader'
+import { useRouter } from 'next/navigation'
 
 
 
@@ -13,6 +14,7 @@ export default function Page() {
   const [statusMessage, setStatusMessage] = useState('Click "Start Scan" to use your camera')
   const [scanError, setScanError] = useState('')
   const [isScanning, setIsScanning] = useState(false)
+  const router = useRouter()
 
   const handleStartScan = () => {
     setScanError('')
@@ -32,11 +34,18 @@ export default function Page() {
     const trimmed = String(rawValue).trim()
     try {
       const url = new URL(trimmed)
-      setStatusMessage('Opening link...')
+      const segments = url.pathname.split('/').filter(Boolean)
+      const id = segments.at(-1)
+
+      if (!id) {
+        throw new Error('Unable to determine certificate ID')
+      }
+
+      setStatusMessage('Opening certificate...')
       setIsScanning(false)
-      window.location.href = url.toString()
+      router.push(`/qr-scan/qr-view/${encodeURIComponent(id)}`)
     } catch {
-      setScanError(`Scanned value is not a valid URL: ${trimmed}`)
+      setScanError(`Scanned value is not a valid certificate URL: ${trimmed}`)
       setStatusMessage('Try scanning another QR code')
     }
   }
