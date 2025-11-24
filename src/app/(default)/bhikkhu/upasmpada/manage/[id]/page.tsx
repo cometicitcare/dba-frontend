@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
@@ -18,8 +18,22 @@ import {
   _manageHighBhikku,
   _markPrintedHighBhikkhu,
   _uploadScannedHighDocument,
+  _approveHighBhikkhu,
+  _rejectHighBhikkhu,
 } from "@/services/bhikku";
 import { Tabs } from "@/components/ui/Tabs";
+import QRCode from "react-qr-code";
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  TextField as MuiTextField,
+  Button as MuiButton,
+} from "@mui/material";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
 
 type UpasampadaForm = {
   candidateRegNo: string;
@@ -93,12 +107,17 @@ const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
 
 const UPASAMPADA_CATEGORY_CODE = "CAT02";
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
+const API_BASE_URL = "https://api.dbagovlk.com";
+const FALLBACK_PDF_URL =
+  "https://api.dbagovlk.com/storage/bhikku_regist/2025/11/23/BH2025000051/scanned_document_20251123_191251_5aa366eb.pdf";
 
 type PageProps = { params: { id: string } };
 
 type NormalizedRecord = {
   recordId?: number;
+  certificateRegn?: string;
   formPatch: Partial<UpasampadaForm>;
+  scannedDocumentPath?: string;
 };
 
 const normalizeRecord = (api: any): NormalizedRecord => {
@@ -144,8 +163,10 @@ const normalizeRecord = (api: any): NormalizedRecord => {
   };
 
   const recordId = Number(api?.bhr_id ?? api?.id ?? api?.bhr_regn ?? api?.regn) || undefined;
+  const certificateRegn = s(api?.bhr_regn ?? "");
+  const scannedDocumentPath = s(api?.bhr_scanned_document_path ?? "");
 
-  return { formPatch, recordId };
+  return { formPatch, recordId, certificateRegn, scannedDocumentPath };
 };
 
 export default function ManageUpasampadaPage({ params }: PageProps) {
@@ -157,10 +178,21 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [recordId, setRecordId] = useState<number | null>(null);
-  const [markingPrinted, setMarkingPrinted] = useState(false);
+  const [certificateRegn, setCertificateRegn] = useState<string>("");
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [printingMarking, setPrintingMarking] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
+  const certificatePaperRef = useRef<HTMLDivElement | null>(null);
+  const [scannedDocumentPath, setScannedDocumentPath] = useState<string>("");
+
+  const resolveRecordId = () => recordId ?? (Number(editId) || null);
 
   const tabs = useMemo(
     () => [
@@ -183,8 +215,64 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
       return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
     });
   }, [form, stepRequirements, loading, activeFormStep]);
-  const certificateNumber = form.candidateRegNo || editId;
+  const certificateNumber =
+    certificateRegn ||
+    (recordId != null ? String(recordId) : "") ||
+    form.candidateRegNo ||
+    editId;
   const certificateUrl = certificateNumber ? `${CERTIFICATE_URL_BASE}/${certificateNumber}` : "";
+  const certificateNumberLabel = certificateNumber || "Pending assignment";
+  const certificateUrlLabel = certificateUrl || "Not assigned yet";
+  const certificateQrValue = certificateUrl || `${CERTIFICATE_URL_BASE}/sample`;
+  const pdfUrl = useMemo(() => {
+    const trimmed = scannedDocumentPath.trim();
+    if (trimmed) {
+      if (/^https?:\/\//i.test(trimmed)) return trimmed;
+      const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+      return `${API_BASE_URL}${normalizedPath}`;
+    }
+    return FALLBACK_PDF_URL;
+  }, [scannedDocumentPath]);
+
+  const collectApprovalErrors = (source: any) => {
+    const container = source?.data ?? source;
+    const rawErrors =
+      container?.errors ??
+      container?.[""] ??
+      container?.data?.errors ??
+      container?.data?.[""];
+    const messages = Array.isArray(rawErrors)
+      ? rawErrors
+          .map((err) => {
+            if (!err) return "";
+            const msg = err.message ?? err.msg ?? "";
+            const field = err.field ?? err.name ?? "";
+            if (field && msg) return `${field}: ${msg}`;
+            if (msg) return msg;
+            return field ? `${field}: Validation failed.` : "";
+          })
+          .filter(Boolean)
+      : [];
+    const fallback =
+      container?.message ??
+      container?.data?.message ??
+      "Failed to approve. Please try again.";
+    return { messages, fallback };
+  };
+
+  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
+  const handleCloseApproveDialog = () => {
+    if (approving) return;
+    setApproveDialogOpen(false);
+  };
+  const handleOpenRejectDialog = () => {
+    setRejectionReason("");
+    setRejectDialogOpen(true);
+  };
+  const handleCloseRejectDialog = () => {
+    if (rejecting) return;
+    setRejectDialogOpen(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -196,10 +284,17 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
           payload: { bhr_regn: editId, bhr_id: Number(editId) || undefined },
         } as any);
         const api = (res as any)?.data?.data ?? (res as any)?.data ?? res;
-        const { formPatch, recordId: fetchedId } = normalizeRecord(api);
+        const {
+          formPatch,
+          recordId: fetchedId,
+          certificateRegn: fetchedRegn,
+          scannedDocumentPath: fetchedScannedPath,
+        } = normalizeRecord(api);
         if (cancelled) return;
         setForm((prev) => ({ ...prev, ...formPatch }));
         setRecordId(fetchedId ?? null);
+        setCertificateRegn(fetchedRegn ?? "");
+        setScannedDocumentPath(fetchedScannedPath ?? "");
       } catch (error: any) {
         if (cancelled) return;
         const message = error?.message ?? "Failed to load record.";
@@ -224,28 +319,44 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
 
     const today = toYYYYMMDD(new Date().toISOString());
 
-    const payload = {
-      bhr_id: recordId ?? (Number(editId) || undefined),
-      bhr_reqstdate: today,
-      bhr_currstat: form.currentStatus,
-      bhr_parshawaya: "",
-      bhr_livtemple: form.permanentResidenceTrn || form.higherOrdinationResidenceTrn || "",
-      bhr_candidate_regn: form.candidateRegNo,
-      bhr_cc_code: UPASAMPADA_CATEGORY_CODE,
-      bhr_samanera_serial_no: form.samaneraSerial,
-      bhr_higher_ordination_place: form.higherOrdinationPlace,
-      bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
-      bhr_karmacharya_name: form.karmacharyaName,
-      bhr_upaddhyaya_name: form.upaddhyayaName,
-      bhr_assumed_name: form.assumedName,
-      bhr_residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
-      bhr_residence_permanent_trn: form.permanentResidenceTrn,
-      bhr_declaration_residence_address: form.declarationResidenceAddress,
-      bhr_tutors_tutor_regn: form.tutorsTutorRegNo,
-      bhr_presiding_bhikshu_regn: form.presidingBhikshuRegNo,
-      bhr_declaration_date: toYYYYMMDD(form.declarationDate),
-      bhr_remarks: form.remarks,
+    const resolvedId = recordId ?? (Number(editId) || undefined);
+    const resolvedRegn = certificateRegn || editId || "";
+
+    const baseIdentifiers = {
+      bhr_id: resolvedId,
+      bhr_regn: resolvedRegn || undefined,
     };
+
+    const payload = (() => {
+      switch (activeFormStep.id) {
+        case 1:
+          return {
+            ...baseIdentifiers,
+            bhr_higher_ordination_place: form.higherOrdinationPlace,
+            bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
+            bhr_karmacharya_name: form.karmacharyaName,
+            bhr_upaddhyaya_name: form.upaddhyayaName,
+            bhr_assumed_name: form.assumedName,
+          };
+        case 2:
+          return {
+            ...baseIdentifiers,
+            bhr_residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
+            bhr_residence_permanent_trn: form.permanentResidenceTrn,
+            bhr_declaration_residence_address: form.declarationResidenceAddress,
+            bhr_tutors_tutor_regn: form.tutorsTutorRegNo,
+            bhr_presiding_bhikshu_regn: form.presidingBhikshuRegNo,
+          };
+        case 3:
+        default:
+          return {
+            ...baseIdentifiers,
+            bhr_currstat: form.currentStatus,
+            bhr_declaration_date: toYYYYMMDD(form.declarationDate),
+            bhr_remarks: form.remarks,
+          };
+      }
+    })();
 
     try {
       await _manageHighBhikku({
@@ -255,9 +366,14 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
 
       toast.success(`"${activeFormStep.title}" updated.`, {
         autoClose: 1200,
-        onClose: () => router.push("/bhikkhu"),
       });
-      setTimeout(() => router.push("/bhikkhu"), 1400);
+
+      const nextStepId = activeFormStep.id + 1;
+      if (FORM_STEPS.some((step) => step.id === nextStepId)) {
+        setActiveTab(String(nextStepId));
+      } else {
+        setTimeout(() => router.push("/bhikkhu"), 1400);
+      }
     } catch (error: any) {
       const message = error?.message ?? "Failed to update record.";
       toast.error(message);
@@ -266,21 +382,101 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     }
   };
 
-  const handleMarkPrinted = async () => {
-    const regn = certificateNumber;
-    if (!regn) {
-      toast.error("Missing Bhikkhu registration number.");
+  const handleApprove = async () => {
+    const id = resolveRecordId();
+    if (!id) {
+      toast.error("Missing record id.");
       return;
     }
     try {
-      setMarkingPrinted(true);
-      await _markPrintedHighBhikkhu(regn);
+      setApproving(true);
+      setApproveDialogOpen(false);
+      const res = await _approveHighBhikkhu({
+        action: "APPROVE",
+        bhr_id: id,
+      });
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+      toast.success("Approved successfully.", { autoClose: 1200 });
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error ? e.message : "Failed to approve. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const handleReject = async () => {
+    const id = resolveRecordId();
+    if (!id) {
+      toast.error("Missing record id.");
+      return;
+    }
+    const reason = rejectionReason.trim();
+    if (!reason) {
+      toast.error("Please enter a rejection reason.");
+      return;
+    }
+    try {
+      setRejecting(true);
+      setRejectDialogOpen(false);
+      const res = await _rejectHighBhikkhu({
+        action: "REJECT",
+        bhr_id: id,
+        rejection_reason: reason,
+      });
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+      toast.success("Rejected successfully.", { autoClose: 1200 });
+      setRejectionReason("");
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error ? e.message : "Failed to reject. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setRejecting(false);
+    }
+  };
+
+  const handleOpenPrintDialog = async () => {
+    const id = resolveRecordId();
+    if (!id) {
+      toast.error("Missing record id.");
+      return;
+    }
+    try {
+      setPrintingMarking(true);
+      await _markPrintedHighBhikkhu({
+        action: "MARK_PRINTED",
+        bhr_id: id,
+      });
       toast.success("Marked certificate as printed.", { autoClose: 1200 });
     } catch (error: any) {
       const message = error?.message ?? "Failed to mark as printed.";
       toast.error(message);
     } finally {
-      setMarkingPrinted(false);
+      setShowUploadModal(true);
+      window.print();
+      setPrintingMarking(false);
     }
   };
 
@@ -298,7 +494,7 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const handleUploadScan = async () => {
     const regn = certificateNumber;
     if (!regn) {
-      toast.error("Missing Bhikkhu registration number.");
+      toast.error("Missing registration number.");
       return;
     }
     if (!scannedFile) {
@@ -318,6 +514,11 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     } finally {
       setUploadingScan(false);
     }
+  };
+
+  const handleCloseUploadModal = () => {
+    if (uploadingScan) return;
+    setShowUploadModal(false);
   };
 
   useEffect(() => {
@@ -525,8 +726,40 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                       Edit the higher-ordination details for this Bhikkhu.
                     </p>
                   </div>
-                  <div className="text-sm text-slate-200">
-                    Record: <span className="font-semibold">{editId}</span>
+                  <div className="flex flex-col items-end gap-2 text-sm text-slate-200">
+                    <div>
+                      Record: <span className="font-semibold">{editId}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleOpenRejectDialog}
+                        disabled={loading || submitting || rejecting}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || submitting || rejecting
+                              ? "bg-red-700/60 text-white cursor-not-allowed"
+                              : "bg-red-600 text-white hover:bg-red-700"
+                          }`}
+                        aria-label="Reject registration"
+                        title="Reject registration"
+                      >
+                        {rejecting ? "Rejecting..." : "Reject"}
+                      </button>
+                      <button
+                        onClick={handleOpenApproveDialog}
+                        disabled={loading || submitting || approving}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || submitting || approving
+                              ? "bg-green-700/60 text-white cursor-not-allowed"
+                              : "bg-green-600 text-white hover:bg-green-700"
+                          }`}
+                        aria-label="Approve registration"
+                        title="Approve registration"
+                      >
+                        {approving ? "Approving..." : "Approve"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -567,42 +800,80 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                     if (activeConfig?.type === "cert") {
                       return (
                         <div className="space-y-6">
-                          <div>
-                            <h2 className="text-xl font-bold text-slate-800">Certificates</h2>
-                            <p className="text-sm text-slate-500 mt-1">
-                              View or mark the certificate for this Bhikkhu.
-                            </p>
-                          </div>
-                          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-                            <p className="text-sm text-slate-600">
-                              Certificate URL:{" "}
-                              {certificateUrl ? (
-                                <a href={certificateUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">
-                                  {certificateUrl}
-                                </a>
-                              ) : (
-                                <span className="text-slate-400">Unavailable (missing registration number)</span>
-                              )}
-                            </p>
-                            <div className="flex flex-wrap gap-3">
+                          <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
+                            <div className="flex flex-col gap-2 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+                              <div>
+                                <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
+                                  Certificate number
+                                </p>
+                                <p className="text-2xl font-semibold text-slate-900">
+                                  {certificateNumberLabel}
+                                </p>
+                                <p className="break-all text-slate-500">
+                                  {certificateUrlLabel}
+                                </p>
+                              </div>
                               <button
-                                type="button"
-                                onClick={() => certificateUrl && window.open(certificateUrl, "_blank")}
-                                disabled={!certificateUrl}
-                                className="px-5 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold disabled:opacity-50"
+                                onClick={handleOpenPrintDialog}
+                                disabled={printingMarking || !certificateNumber}
+                                className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
                               >
-                                Open certificate
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleMarkPrinted}
-                                disabled={markingPrinted || !certificateNumber}
-                                className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50"
-                              >
-                                {markingPrinted ? "Marking..." : "Mark as printed"}
+                                {printingMarking ? "Please wait..." : "Print QR on Certificate"}
                               </button>
                             </div>
+                            <p className="text-xs text-slate-500">
+                              Insert the pre-printed legal-size certificate into the printer.
+                              Only the QR code positioned at the bottom-right corner of the sheet will be printed.
+                            </p>
                           </div>
+
+                          <div className="flex justify-center">
+                            <div
+                              id="certificate-print-area"
+                              ref={certificatePaperRef}
+                              className="relative bg-white"
+                              style={{ width: "8.5in", height: "14in" }}
+                            >
+                              <div className="absolute inset-0 pointer-events-none" />
+                              <div className="absolute bottom-20 right-16">
+                                <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                  <QRCode
+                                    value={certificateQrValue}
+                                    size={80}
+                                    className="h-20 w-20"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <style>{`
+                            @media print {
+                              @page {
+                                margin: 0;
+                              }
+                              body {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                              }
+                              body * {
+                                visibility: hidden;
+                                box-shadow: none !important;
+                              }
+                              #certificate-print-area,
+                              #certificate-print-area * {
+                                visibility: visible;
+                              }
+                              #certificate-print-area {
+                                position: absolute;
+                                left: 0;
+                                top: 0;
+                                right: 0;
+                                margin: 0 auto;
+                                box-shadow: none !important;
+                              }
+                            }
+                          `}</style>
                         </div>
                       );
                     }
@@ -611,47 +882,18 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                       return (
                         <div className="space-y-6">
                           <div>
-                            <h2 className="text-xl font-bold text-slate-800">Upload Scanned Files</h2>
+                            <h2 className="text-xl font-bold text-slate-800">Reference PDF</h2>
                             <p className="text-sm text-slate-500 mt-1">
-                              Attach scanned certificates or related documents.
+                              View the Buddhist Temporalities Consolidated 2024 document.
                             </p>
                           </div>
-                          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6 space-y-4">
-                            <input type="file" accept="image/*,.pdf" onChange={handleScanFileChange} />
-                            {scannedFile ? (
-                              <p className="text-sm text-slate-600">
-                                Selected: {scannedFile.name} ({Math.round(scannedFile.size / 1024)} KB)
-                              </p>
-                            ) : (
-                              <p className="text-sm text-slate-500">Choose a file to upload.</p>
-                            )}
-                            {scanPreviewUrl ? (
-                              <div className="overflow-hidden rounded border border-slate-200 bg-white">
-                                <img src={scanPreviewUrl} alt="Preview" className="max-h-64 w-full object-contain" />
-                              </div>
-                            ) : null}
-                            <div className="flex gap-3">
-                              <button
-                                type="button"
-                                onClick={handleUploadScan}
-                                disabled={uploadingScan || !scannedFile}
-                                className="px-5 py-2.5 rounded-lg bg-slate-700 text-white text-sm font-semibold disabled:opacity-50"
-                              >
-                                {uploadingScan ? "Uploading..." : "Upload file"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setScannedFile(null);
-                                  if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
-                                  setScanPreviewUrl(null);
-                                }}
-                                disabled={uploadingScan || !scannedFile}
-                                className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold disabled:opacity-50"
-                              >
-                                Clear
-                              </button>
+                          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm space-y-4">
+                            <div className="aspect-[8.5/11] w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                              <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+                                <Viewer fileUrl={pdfUrl} withCredentials={false} />
+                              </Worker>
                             </div>
+                            
                           </div>
                         </div>
                       );
@@ -666,6 +908,134 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
         </main>
         <FooterBar />
       </div>
+      {showUploadModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseUploadModal}
+          />
+          <div className="relative z-10 w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Upload Scanned Certificate
+                </p>
+                <p className="text-xs text-slate-500">
+                  Attach the scanned image/PDF after printing.
+                </p>
+              </div>
+              <button
+                aria-label="Close upload"
+                onClick={handleCloseUploadModal}
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-4 px-6 py-6">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center text-sm text-slate-500">
+                <p>Drag & drop or click to select the scanned certificate file.</p>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="mt-4 block w-full text-sm text-slate-700"
+                  onChange={handleScanFileChange}
+                />
+                {scannedFile ? (
+                  <div className="mt-3 text-xs text-slate-600 space-y-1">
+                    <p>Selected: {scannedFile.name}</p>
+                    <p>
+                      Size:{" "}
+                      {scannedFile.size >= 1024 * 1024
+                        ? `${(scannedFile.size / (1024 * 1024)).toFixed(1)} MB`
+                        : `${(scannedFile.size / 1024).toFixed(1)} KB`}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              {scanPreviewUrl ? (
+                <div className="overflow-hidden rounded-xl border border-slate-200">
+                  <img
+                    src={scanPreviewUrl}
+                    alt="Selected scan preview"
+                    className="w-full max-h-80 object-contain bg-slate-50"
+                  />
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                  onClick={handleCloseUploadModal}
+                  disabled={uploadingScan}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-slate-900 px-6 py-2 text-sm font-semibold text-white hover:bg-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600"
+                  onClick={handleUploadScan}
+                  disabled={uploadingScan || !scannedFile}
+                >
+                  {uploadingScan ? "Uploading..." : "Upload Scan"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <Dialog
+        open={approveDialogOpen}
+        onClose={handleCloseApproveDialog}
+        aria-labelledby="approve-dialog-title"
+      >
+        <DialogTitle id="approve-dialog-title">Approve registration?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Approving will finalize this record. This action may be irreversible.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={handleCloseApproveDialog} disabled={approving}>
+            Cancel
+          </MuiButton>
+          <MuiButton onClick={handleApprove} disabled={approving} color="primary" variant="contained">
+            {approving ? "Approving..." : "Approve"}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={handleCloseRejectDialog}
+        aria-labelledby="reject-dialog-title"
+      >
+        <DialogTitle id="reject-dialog-title">Reject registration?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Rejecting will mark this registration as declined.</DialogContentText>
+          <MuiTextField
+            autoFocus
+            margin="dense"
+            id="rejection-reason"
+            label="Rejection reason"
+            type="text"
+            fullWidth
+            multiline
+            minRows={2}
+            value={rejectionReason}
+            onChange={(e) => setRejectionReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={handleCloseRejectDialog} disabled={rejecting}>
+            Cancel
+          </MuiButton>
+          <MuiButton onClick={handleReject} disabled={rejecting} color="error" variant="contained">
+            {rejecting ? "Rejecting..." : "Reject"}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
+
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
   );
