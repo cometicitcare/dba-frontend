@@ -32,7 +32,6 @@ const SERVICE_MAP: Record<
     { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/bhikkhu/add" },
     { icon: SearchIcon, label: "Search", action: "search-bhikku", route: "/bhikkhu/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-bhikku", route: "/bhikkhu/reports" },
-    { icon: EditIcon, label: "Update", action: "update-bhikku", route: "/bhikkhu/update" },
   ],
   "/temples": [
     { icon: EyeIcon, label: "View", action: "view-temple", route: "/temple/view" },
@@ -63,15 +62,17 @@ const SERVICE_MAP: Record<
     { icon: TrashIcon, label: "Cleanup", action: "cleanup-admin", route: "/admin/cleanup" },
   ],
   "/analytics": [{ icon: EyeIcon, label: "View", action: "view-analytics", route: "/analytics" }],
+
+
 };
 
 const modules = [
   { icon: UsersIcon, label: "Bhikku & Sirimatha", color: "from-orange-400 to-orange-500", path: "/bhikkhu" },
-  { icon: BuildingIcon, label: "Temple & Devala", color: "from-purple-400 to-purple-500", path: "/temples" },
-  { icon: GraduationCapIcon, label: "Dhamma School", color: "from-blue-400 to-blue-500", path: "/dhamma-school" },
-  { icon: BookOpenIcon, label: "Dhamma Teachers", color: "from-green-400 to-green-500", path: "/teachers" },
-  { icon: SettingsIcon, label: "System Admin", color: "from-red-400 to-red-500", path: "/admin" },
-  { icon: BarChartIcon, label: "Analytics", color: "from-teal-400 to-teal-500", path: "/analytics" },
+  // { icon: BuildingIcon, label: "Temple & Devala", color: "from-purple-400 to-purple-500", path: "/temples" },
+  // { icon: GraduationCapIcon, label: "Dhamma School", color: "from-blue-400 to-blue-500", path: "/dhamma-school" },
+  // { icon: BookOpenIcon, label: "Dhamma Teachers", color: "from-green-400 to-green-500", path: "/teachers" },
+  // { icon: SettingsIcon, label: "System Admin", color: "from-red-400 to-red-500", path: "/admin" },
+  // { icon: BarChartIcon, label: "Analytics", color: "from-teal-400 to-teal-500", path: "/analytics" },
 ];
 
 const bannerImages = [
