@@ -34,6 +34,10 @@ type BhikkuRow = {
   workflowStatusCode?: string;
 };
 
+type BhikkhuListProps = {
+  canDelete?: boolean;
+};
+
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
 function pickRows<T>(res: unknown): T[] {
   const r = res as ApiResponse<T[]>;
@@ -224,7 +228,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function BhikkhuList() {
+export default function BhikkhuList({ canDelete = false }: BhikkhuListProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -753,7 +757,7 @@ export default function BhikkhuList() {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
             {loading && (

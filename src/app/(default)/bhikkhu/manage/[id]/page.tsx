@@ -14,6 +14,7 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
+import { getStoredUserData } from "@/utils/userData";
 
 import {
   DateField,
@@ -72,6 +73,8 @@ const CERTIFICATE_URL_BASE =
   "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
 const API_BASE_URL = "https://api.dbagovlk.com";
+const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
+const ADMIN_ROLE_LEVEL = "ADMIN";
 
 type CertificateMeta = {
   number: string;
@@ -183,6 +186,9 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [canAdminActions, setCanAdminActions] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -242,6 +248,18 @@ function ManageBhikkhuInner({ params }: PageProps) {
       return next;
     });
   };
+
+  useEffect(() => {
+    const stored = getStoredUserData();
+    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+      setAccessDenied(true);
+      router.replace("/");
+      setAccessChecked(true);
+      return;
+    }
+    setCanAdminActions(stored.roleLevel === ADMIN_ROLE_LEVEL);
+    setAccessChecked(true);
+  }, [router]);
 
   const validateTab = (tabIndex: number): boolean => {
     const step = steps[tabIndex - 1];
@@ -850,6 +868,24 @@ function ManageBhikkhuInner({ params }: PageProps) {
     );
   };
 
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
@@ -870,36 +906,38 @@ function ManageBhikkhuInner({ params }: PageProps) {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {editId}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleOpenRejectDialog}
-                      disabled={loading || saving || rejecting}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all
-                        ${
-                          loading || saving || rejecting
-                            ? "bg-red-700/60 text-white cursor-not-allowed"
-                            : "bg-red-600 text-white hover:bg-red-700"
-                        }`}
-                      aria-label="Reject registration"
-                      title="Reject registration"
-                    >
+                  {canAdminActions && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleOpenRejectDialog}
+                        disabled={loading || saving || rejecting}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || saving || rejecting
+                              ? "bg-red-700/60 text-white cursor-not-allowed"
+                              : "bg-red-600 text-white hover:bg-red-700"
+                          }`}
+                        aria-label="Reject registration"
+                        title="Reject registration"
+                      >
                       {rejecting ? "Rejecting..." : "Reject"}
-                    </button>
-                    <button
-                      onClick={handleOpenApproveDialog}
-                      disabled={loading || saving || approving}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all
-                        ${
-                          loading || saving || approving
-                            ? "bg-green-700/60 text-white cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
-                      aria-label="Approve registration"
-                      title="Approve registration"
-                    >
+                      </button>
+                      <button
+                        onClick={handleOpenApproveDialog}
+                        disabled={loading || saving || approving}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || saving || approving
+                              ? "bg-green-700/60 text-white cursor-not-allowed"
+                              : "bg-green-600 text-white hover:bg-green-700"
+                          }`}
+                        aria-label="Approve registration"
+                        title="Approve registration"
+                      >
                       {approving ? "Approving…" : "Approve"}
-                    </button>
-                  </div>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

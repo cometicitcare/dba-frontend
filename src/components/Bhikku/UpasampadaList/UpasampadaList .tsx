@@ -32,6 +32,10 @@ type UpasampadaRow = {
   workflowStatusCode?: string;
 };
 
+type UpasampadaListProps = {
+  canDelete?: boolean;
+};
+
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
 function pickRows<T>(res: unknown): T[] {
   const r = res as ApiResponse<T[]>;
@@ -222,7 +226,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function UpasampadaList () {
+export default function UpasampadaList({ canDelete = false }: UpasampadaListProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -748,7 +752,7 @@ export default function UpasampadaList () {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
             {loading && (

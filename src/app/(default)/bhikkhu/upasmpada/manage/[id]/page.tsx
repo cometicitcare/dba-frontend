@@ -34,6 +34,7 @@ import {
 } from "@mui/material";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
+import { getStoredUserData } from "@/utils/userData";
 
 type UpasampadaForm = {
   candidateRegNo: string;
@@ -110,6 +111,9 @@ const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const API_BASE_URL = "https://api.dbagovlk.com";
 const FALLBACK_PDF_URL =
   "https://api.dbagovlk.com/storage/bhikku_regist/2025/11/23/BH2025000051/scanned_document_20251123_191251_5aa366eb.pdf";
+const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
+const ADMIN_ROLE_LEVEL = "ADMIN";
+
 
 type PageProps = { params: { id: string } };
 
@@ -191,6 +195,9 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const [uploadingScan, setUploadingScan] = useState(false);
   const certificatePaperRef = useRef<HTMLDivElement | null>(null);
   const [scannedDocumentPath, setScannedDocumentPath] = useState<string>("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [canAdminActions, setCanAdminActions] = useState(false);
 
   const resolveRecordId = () => recordId ?? (Number(editId) || null);
 
@@ -273,6 +280,18 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     if (rejecting) return;
     setRejectDialogOpen(false);
   };
+
+  useEffect(() => {
+    const stored = getStoredUserData();
+    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+      setAccessDenied(true);
+      router.replace("/");
+      setAccessChecked(true);
+      return;
+    }
+    setCanAdminActions(stored.roleLevel === ADMIN_ROLE_LEVEL);
+    setAccessChecked(true);
+  }, [router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -710,6 +729,24 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     }
   };
 
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
@@ -730,25 +767,26 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                     <div>
                       Record: <span className="font-semibold">{editId}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleOpenRejectDialog}
-                        disabled={loading || submitting || rejecting}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                    {canAdminActions && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleOpenRejectDialog}
+                          disabled={loading || submitting || rejecting}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all
                           ${
                             loading || submitting || rejecting
                               ? "bg-red-700/60 text-white cursor-not-allowed"
                               : "bg-red-600 text-white hover:bg-red-700"
                           }`}
-                        aria-label="Reject registration"
-                        title="Reject registration"
-                      >
-                        {rejecting ? "Rejecting..." : "Reject"}
-                      </button>
-                      <button
-                        onClick={handleOpenApproveDialog}
-                        disabled={loading || submitting || approving}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          aria-label="Reject registration"
+                          title="Reject registration"
+                        >
+                          {rejecting ? "Rejecting..." : "Reject"}
+                        </button>
+                        <button
+                          onClick={handleOpenApproveDialog}
+                          disabled={loading || submitting || approving}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all
                           ${
                             loading || submitting || approving
                               ? "bg-green-700/60 text-white cursor-not-allowed"
@@ -758,8 +796,9 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                         title="Approve registration"
                       >
                         {approving ? "Approving..." : "Approve"}
-                      </button>
-                    </div>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -8,7 +8,23 @@ interface TopBarProps { onMenuClick: () => void; }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const router = useRouter();
-  const handleLogout = () => router.push("/login");
+
+  const clearClientState = () => {
+    if (typeof window === "undefined") return;
+
+    localStorage.clear();
+    sessionStorage.clear();
+    document.cookie.split(";").forEach((cookie) => {
+      const [name] = cookie.split("=");
+      if (!name) return;
+      document.cookie = `${name.trim()}=; Max-Age=0; path=/;`;
+    });
+  };
+
+  const handleLogout = () => {
+    clearClientState();
+    router.push("/login");
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-between px-6 z-50 shadow-lg">

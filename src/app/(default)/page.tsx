@@ -67,7 +67,11 @@ const SERVICE_MAP: Record<
 };
 
 const modules = [
-  { icon: UsersIcon, label: "Bhikku & Sirimatha", color: "from-orange-400 to-orange-500", path: "/bhikkhu" },
+  { icon: UsersIcon, label: "Bhikku", color: "from-orange-400 to-orange-500", path: "/bhikkhu" },
+  { icon: UsersIcon, label: "Re Print", color: "from-orange-400 to-orange-500", path: "/print-request" },
+  { icon: UsersIcon, label: "QR Scan", color: "from-orange-400 to-orange-500", path: "/qr-scan" },
+
+  
   // { icon: BuildingIcon, label: "Temple & Devala", color: "from-purple-400 to-purple-500", path: "/temples" },
   // { icon: GraduationCapIcon, label: "Dhamma School", color: "from-blue-400 to-blue-500", path: "/dhamma-school" },
   // { icon: BookOpenIcon, label: "Dhamma Teachers", color: "from-green-400 to-green-500", path: "/teachers" },
