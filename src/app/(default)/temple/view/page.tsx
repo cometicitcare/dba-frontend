@@ -52,8 +52,8 @@ const SERVICE_MAP: Record<
   // -------------------------
   // 3. Devala
   // -------------------------
-  "/dhamma-school": [
-    { icon: EyeIcon, label: "View", action: "view-devala", route: "/school/view" },
+  "/temple/dewala": [
+    { icon: EyeIcon, label: "View", action: "view-devala", route: "/temple/dewala" },
     { icon: PlusIcon, label: "Add", action: "add-devala", route: "/school/add" },
     { icon: SearchIcon, label: "Search", action: "search-devala", route: "/school/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-devala", route: "/school/reports" },
@@ -103,7 +103,7 @@ const modules = [
     icon: GraduationCapIcon, 
     label: "Devala", 
     color: "from-blue-400 to-blue-500", 
-    path: "/dhamma-school" 
+    path: "/temple/dewala" 
   },
   { 
     icon: BookOpenIcon, 
