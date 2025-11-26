@@ -14,20 +14,26 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageBhikku } from "@/services/bhikku";
-import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; 
+import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
 import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
 import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
 import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
 import selectionsData from "@/utils/selectionsData.json";
-import dummyBhikkuData from "./Records.json";
+import dummyBhikkuData from "./Nilame.json";
 
 type BhikkuRow = {
-  regNo?: any;
-  name?: string;
-  city?:string;
-}
+  regNo: string;
+  name: string;
+  fatherName?: string;
+  mobile?: string;
+  email?: string;
+  mahanayaka?: string;
+  remarks?: string;
+  category?: string;
+  status?: string;
+};
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
 function pickRows<T>(res: unknown): T[] {
@@ -166,7 +172,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function RecordList() {
+export default function Nilama () {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -221,10 +227,16 @@ export default function RecordList() {
     }));
   }, []);
 
+ 
 const columns: Column[] = [
   { key: "regNo", label: "ID", sortable: true },
-  { key: "name", label: "Name", sortable: true },
-  { key: "city", label: "Village / City" } // renamed
+  { key: "district", label: "District", sortable: true },
+  { key: "divisional_secretariat", label: "Divisionla Secretariat"},
+  { key: "location_site_name", label: "Location site name" },
+  { key: "general_location", label: "General Location" },
+  { key: "officer_name", label: "Officer Name" },
+  { key: "term_end_date", label: "Term End Date" },
+
 ];
 
 
@@ -236,8 +248,13 @@ const columns: Column[] = [
 
 const cleaned: BhikkuRow[] = raw.map((row: any) => ({
   regNo: row.regNo ?? "",
-  name: row.name ?? "",
-  city: row.city ?? "",
+  district: row.district ?? "",
+  divisional_secretariat: row.divisional_secretariat ?? "",
+  location_site_name: row.location_site_name ?? "",
+  general_location: row.general_location ?? "",
+  officer_name: row.officer_name ?? "",
+  term_end_date: row.term_end_date ?? "",
+
 }));
 
       // --- PAGINATION LOGIC ---
@@ -256,8 +273,6 @@ const cleaned: BhikkuRow[] = raw.map((row: any) => ({
   },
   [filters]
 );
-
-
   useEffect(() => {
     const ac = new AbortController();
     fetchData(ac.signal, filters);
@@ -373,7 +388,7 @@ const cleaned: BhikkuRow[] = raw.map((row: any) => ({
       <main className="p-6">
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Dewala List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">Nilame List</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -381,7 +396,7 @@ const cleaned: BhikkuRow[] = raw.map((row: any) => ({
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
-                  Add Vihara
+                  Add Vihara 
                 </button>
                 {/* <button
                   onClick={handleAddSilmatha}
@@ -658,7 +673,7 @@ const cleaned: BhikkuRow[] = raw.map((row: any) => ({
             )}
           </div>
 
-<div className="relative overflow-y-auto max-h-[400px]">
+          <div className="relative">
             <DataTable
               columns={columns}
               data={records}

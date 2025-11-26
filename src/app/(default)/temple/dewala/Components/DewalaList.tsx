@@ -5,10 +5,12 @@ import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Tabs } from '@/components/ui/Tabs'
 import React,{useState} from 'react'
-import RecordList from './RecordList'
+import Nilama from './Nilame'
+import Dewala from './Dewala'
 
 const tabItems = [
-    { id: 'dewalaList', label: 'Dewala List' },
+    { id: 'dewalaList', label: 'Dewala' },
+    { id: 'nilameList', label: 'Nilama' },
 
   ];
 
@@ -25,7 +27,12 @@ export default function DewalaList() {
             tabs={tabItems}
             contentClassName="pt-8"
             renderContent={(activeId) => {
-                return <RecordList />
+              if (activeId === 'nilameList') {
+                return <Nilama />
+              }
+              else{
+                return <Dewala />
+              }
             }}
           />
         </main>

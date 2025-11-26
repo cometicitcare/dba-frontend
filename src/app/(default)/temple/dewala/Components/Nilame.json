@@ -1,0 +1,137 @@
+[
+  {
+    "regNo": 1,
+    "district": "Kandy",
+    "divisional_secretariat": "Kandy Four Gravets",
+    "location_site_name": "Kandy Vishnu Devalaya",
+    "general_location": "Within Sri Dalada Maligawa premises",
+    "officer_name": "Mahinda Wijesinghe",
+    "term_end_date": "2027-08-15"
+  },
+  {
+    "regNo": 2,
+    "district": "Kegalle",
+    "divisional_secretariat": "Mawanella",
+    "location_site_name": "Aluthnuwara Dedimunda Devalaya",
+    "general_location": "Aluthnuwara town centre",
+    "officer_name": "Dilan Senarath",
+    "term_end_date": "2026-03-10"
+  },
+  {
+    "regNo": 3,
+    "district": "Colombo",
+    "divisional_secretariat": "Kolonnawa",
+    "location_site_name": "Navagamuwa Pattini Devalaya",
+    "general_location": "Navagamuwa junction",
+    "officer_name": "Sarath Jayawardena",
+    "term_end_date": "2028-01-22"
+  },
+  {
+    "regNo": 4,
+    "district": "Ratnapura",
+    "divisional_secretariat": "Ratnapura",
+    "location_site_name": "Ratnapura Saman Devalaya",
+    "general_location": "Near Ratnapura town",
+    "officer_name": "Chandana Abeysekara",
+    "term_end_date": "2027-11-05"
+  },
+  {
+    "regNo": 5,
+    "district": "Monaragala",
+    "divisional_secretariat": "Kataragama",
+    "location_site_name": "Kataragama Maha Devalaya",
+    "general_location": "Sacred city of Kataragama",
+    "officer_name": "Ariyasena Dissanayake",
+    "term_end_date": "2029-06-30"
+  },
+  {
+    "regNo": 6,
+    "district": "Gampaha",
+    "divisional_secretariat": "Attanagalla",
+    "location_site_name": "Kadawara Devalaya",
+    "general_location": "Wathupitiwala area",
+    "officer_name": "Suresh Perera",
+    "term_end_date": "2026-09-12"
+  },
+  {
+    "regNo": 7,
+    "district": "Matale",
+    "divisional_secretariat": "Dambulla",
+    "location_site_name": "Gale Bandara Devalaya",
+    "general_location": "Kalundawa area",
+    "officer_name": "Ruwan Ekanayake",
+    "term_end_date": "2028-02-18"
+  },
+  {
+    "regNo": 8,
+    "district": "Kurunegala",
+    "divisional_secretariat": "Bingiriya",
+    "location_site_name": "Ayyanayake Devalaya",
+    "general_location": "Near Bingiriya town",
+    "officer_name": "Lakshman Silva",
+    "term_end_date": "2027-05-25"
+  },
+  {
+    "regNo": 9,
+    "district": "Galle",
+    "divisional_secretariat": "Baddegama",
+    "location_site_name": "Bahirawa Kovil",
+    "general_location": "Baddegama village",
+    "officer_name": "Jayanath Kariyawasam",
+    "term_end_date": "2026-12-01"
+  },
+  {
+    "regNo": 10,
+    "district": "Hambantota",
+    "divisional_secretariat": "Tangalle",
+    "location_site_name": "Suniyam Devalaya",
+    "general_location": "Tangalle rural area",
+    "officer_name": "Anura Kumara",
+    "term_end_date": "2029-03-17"
+  },
+  {
+    "regNo": 11,
+    "district": "Trincomalee",
+    "divisional_secretariat": "Trincomalee Town & Gravets",
+    "location_site_name": "Ganadevi Kovil",
+    "general_location": "Inside Trincomalee town",
+    "officer_name": "K. Sivaraja",
+    "term_end_date": "2027-10-21"
+  },
+  {
+    "regNo": 12,
+    "district": "Trincomalee",
+    "divisional_secretariat": "Kuchchaveli",
+    "location_site_name": "Koneswaram Devalaya area",
+    "general_location": "Swami Rock, Trincomalee",
+    "officer_name": "T. Pratheepan",
+    "term_end_date": "2028-04-09"
+  },
+  {
+    "regNo": 13,
+    "district": "Puttalam",
+    "divisional_secretariat": "Chilaw",
+    "location_site_name": "Munneswaram Devalaya",
+    "general_location": "Munneswaram temple complex",
+    "officer_name": "N. Maheswaran",
+    "term_end_date": "2029-10-02"
+  },
+  {
+    "regNo": 14,
+    "district": "Kalutara",
+    "divisional_secretariat": "Horana",
+    "location_site_name": "Gambara Devalaya",
+    "general_location": "Kurana area",
+    "officer_name": "R. M. Nandasiri",
+    "term_end_date": "2027-01-08"
+  },
+  {
+    "regNo": 15,
+    "district": "Jaffna",
+    "divisional_secretariat": "Nallur",
+    "location_site_name": "Kandaswamy Kovil (Devalaya section)",
+    "general_location": "Nallur Temple Road",
+    "officer_name": "S. Tharmendra",
+    "term_end_date": "2028-08-29"
+  }
+]

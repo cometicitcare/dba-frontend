@@ -1,0 +1,122 @@
+[
+  {
+    "regNo": 1,
+    "deity_group": "Kataragama Deviyo",
+    "devalaya_name": "Kataragama Maha Devalaya",
+    "district": "Monaragala",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "One of the most revered devalayas; associated with Murugan/Skanda."
+  },
+  {
+    "regNo": 2,
+    "deity_group": "Natha Deviyo",
+    "devalaya_name": "Kandy Natha Devalaya",
+    "district": "Kandy",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Ancient shrine dedicated to the protector deity Natha."
+  },
+  {
+    "regNo": 3,
+    "deity_group": "Saman Deviyo",
+    "devalaya_name": "Saman Devalaya",
+    "district": "Ratnapura",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Sacred to Saman Deviyo; linked to Sri Pada worship."
+  },
+  {
+    "regNo": 4,
+    "deity_group": "Vishnu Deviyo",
+    "devalaya_name": "Vishnu Devalaya",
+    "district": "Kandy",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Guardian deity of Sri Lanka; situated within the Sri Dalada Maligawa complex."
+  },
+  {
+    "regNo": 5,
+    "deity_group": "Dedimunda Deviyo",
+    "devalaya_name": "Aluthnuwara Dedimunda Devalaya",
+    "district": "Kegalle",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Main shrine of Dedimunda Deviyo, protector of Buddhism."
+  },
+  {
+    "regNo": 6,
+    "deity_group": "Pattini Deviyo",
+    "devalaya_name": "Navagamuwa Pattini Devalaya",
+    "district": "Colombo",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "One of the oldest Pattini shrines; associated with fertility and healing."
+  },
+  {
+    "regNo": 7,
+    "deity_group": "Gambara Deviyo",
+    "devalaya_name": "Gambara Devalaya",
+    "district": "Kalutara",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Regional guardian deity shrine."
+  },
+  {
+    "regNo": 8,
+    "deity_group": "Ayyanayake Deviyo",
+    "devalaya_name": "Ayyanayake Devalaya",
+    "district": "Kurunegala",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Shrine linked to Tamil and Sinhala folk traditions."
+  },
+  {
+    "regNo": 9,
+    "deity_group": "Gale Bandara Deviyo",
+    "devalaya_name": "Gale Bandara Devalaya",
+    "district": "Matale",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Popular deity associated with folk healing rituals."
+  },
+  {
+    "regNo": 10,
+    "deity_group": "Kadawara Deviyo",
+    "devalaya_name": "Kadawara Devalaya",
+    "district": "Gampaha",
+    "nilame_type": "Basnayake Nilame",
+    "notes_significance": "Local guardian deity shrine."
+  },
+  {
+    "regNo": 11,
+    "deity_group": "Bahirawa Deviyo",
+    "devalaya_name": "Bahirawa Kovil",
+    "district": "Galle",
+    "nilame_type": "Kapumahatmaya",
+    "notes_significance": "Dedicated to earth spirits; linked to treasure protection legends."
+  },
+  {
+    "regNo": 12,
+    "deity_group": "Suniyam Deviyo",
+    "devalaya_name": "Suniyam Devalaya",
+    "district": "Hambantota",
+    "nilame_type": "Kapumahatmaya",
+    "notes_significance": "Shrine associated with protection against malevolent forces."
+  },
+  {
+    "regNo": 13,
+    "deity_group": "Gana Deviyo",
+    "devalaya_name": "Ganadevi Kovil",
+    "district": "Trincomalee",
+    "nilame_type": "Kapumahatmaya",
+    "notes_significance": "Ganesha worship; important for new beginnings."
+  },
+  {
+    "regNo": 14,
+    "deity_group": "Skanda/Murugan",
+    "devalaya_name": "Koneswaram Devalaya (within Kovil complex)",
+    "district": "Trincomalee",
+    "nilame_type": "Temple Trustee",
+    "notes_significance": "Part of ancient Koneswaram complex; strong Murugan traditions."
+  },
+  {
+    "regNo": 15,
+    "deity_group": "Shiva",
+    "devalaya_name": "Munneswaram Devalaya",
+    "district": "Puttalam",
+    "nilame_type": "Temple Trustee",
+    "notes_significance": "Multi-religious complex with strong Hindu-Buddhist syncretism."
+  }
+]
