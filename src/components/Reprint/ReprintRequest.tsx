@@ -607,6 +607,12 @@ export default function ReprintRequest() {
     }
   };
 
+  const isApprovedRequest = selectedRequest?.flowStatus === "APPROVED";
+  const isFinalizedRequest =
+    selectedRequest?.flowStatus === "APPROVED" ||
+    selectedRequest?.flowStatus === "REJECTED" ||
+    selectedRequest?.flowStatus === "COMPLETED";
+
   return (
     <div
       style={{
@@ -797,13 +803,7 @@ export default function ReprintRequest() {
                         <SubjectInfoCard subject={item.subject} />
                       </TableCell>
                       <TableCell>
-                        <Box display="flex" flexDirection="column" gap={1}>
-                          <Button variant="contained" size="small" color="success" onClick={() => handleApproveRequest(item.id)}>
-                            Approved
-                          </Button>
-                          <Button variant="contained" size="small" color="error" onClick={() => openRejectDialog(item.id)}>
-                            Rejected
-                          </Button>
+                        <Box display="flex" gap={1}>
                           <Button variant="contained" size="small" onClick={() => handleView(item)}>
                             View
                           </Button>
@@ -874,41 +874,73 @@ export default function ReprintRequest() {
               <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} flexWrap="wrap">
                 <Box>
                   <Typography variant="h6">Request details</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Regn: {selectedRequest.regn}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Request type: {selectedRequest.requestType}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Reason: {selectedRequest.requestReason || "-"}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Amount: {formatAmount(selectedRequest.amount)}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Remarks: {selectedRequest.remarks || "-"}
-                  </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Regn: {selectedRequest.regn}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Request type: {selectedRequest.requestType}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Reason: {selectedRequest.requestReason || "-"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Amount: {formatAmount(selectedRequest.amount)}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" display="flex" alignItems="center" gap={1}>
+                  Status: <StatusPill status={selectedRequest.flowStatus} />
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Remarks: {selectedRequest.remarks || "-"}
+                </Typography>
                 </Box>
-            <Box display="flex" gap={1}>
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => {
-                  setSelectedRequest(null);
-                  setPdfUrl(null);
-                  setPdfError(null);
-                }}
-                disabled={markingPrinted}
-              >
-                Close viewer
-              </Button>
-              <Button variant="contained" size="small" onClick={handleMarkPrinted} disabled={markingPrinted || !selectedRequest}>
-                {markingPrinted ? "Marking..." : "Print"}
-              </Button>
-            </Box>
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setSelectedRequest(null);
+                    setPdfUrl(null);
+                    setPdfError(null);
+                  }}
+                  disabled={markingPrinted}
+                >
+                  Close viewer
+                </Button>
+                {isApprovedRequest && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    onClick={handleMarkPrinted}
+                    disabled={markingPrinted || !selectedRequest}
+                  >
+                    {markingPrinted ? "Marking..." : "Print"}
+                  </Button>
+                )}
               </Box>
-          <Box mt={2} id="reprint-pdf-print-area">
+            </Box>
+            {!isApprovedRequest && (
+              <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="success"
+                  onClick={() => handleApproveRequest(selectedRequest.id)}
+                  disabled={isFinalizedRequest}
+                >
+                  Approve request
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  color="error"
+                  onClick={() => openRejectDialog(selectedRequest.id)}
+                  disabled={isFinalizedRequest}
+                >
+                  Reject request
+                </Button>
+              </Box>
+            )}
+              <Box mt={2} id="reprint-pdf-print-area">
             {pdfLoading ? (
               <Typography color="text.secondary">Loading PDF…</Typography>
             ) : pdfError ? (
