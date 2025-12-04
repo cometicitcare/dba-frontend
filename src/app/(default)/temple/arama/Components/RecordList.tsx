@@ -295,7 +295,7 @@ export default function RecordList() {
 
   const handleEdit = useCallback(
     (item: BhikkuRow) => {
-      router.push(`/bhikkhu/manage/${encodeURIComponent(item.regNo)}`);
+      router.push(`/temple/arama/${encodeURIComponent(item.regNo)}/update`);
     },
     [router]
   );
