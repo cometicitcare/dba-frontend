@@ -44,6 +44,7 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 // Import after types to avoid cycle
 import type { BhikkhuForm, StepConfig } from "@/components/Bhikku/Add";
+import { getStoredUserData, UserData } from "@/utils/userData";
 
 const NOVICE_CATEGORY_CODE = "CAT03";
 const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
@@ -86,6 +87,12 @@ function AddBhikkhuPageInner() {
   const [submitting, setSubmitting] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const BHIKKU_MANAGEMENT_DEPARTMENT = 'Bhikku Management';
+  const ADMIN_ROLE_LEVEL = 'ADMIN';
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+
 
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -267,6 +274,37 @@ function AddBhikkhuPageInner() {
   };
 
   const gridCols = stepTitle === "Birth Location" ? "md:grid-cols-3" : "md:grid-cols-2";
+
+  useEffect(() => {
+    const stored = getStoredUserData();
+    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+      setAccessDenied(true);
+      router.replace('/');
+      return;
+    }
+
+    setUserData(stored);
+    setAccessChecked(true);
+  }, [router]);
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="w-full min-h-screen bg-gray-50">

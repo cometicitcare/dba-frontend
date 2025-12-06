@@ -30,3 +30,6 @@ export const _uploadScannedHighDocument = (bhr_regn: any, file: File) => {
     { headers: { "Content-Type": "multipart/form-data" } }
   );
 };
+
+
+export const _manageDirectHighBhikku = (body: any) => BackendClient.post(`${baseURL}/direct-bhikku-high/manage`, body);

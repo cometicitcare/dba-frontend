@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
@@ -9,6 +9,7 @@ import { BhikkhuAutocomplete, BhikkhuStatusSelect, DateField, TempleAutocomplete
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { _manageHighBhikku } from "@/services/bhikku";
+import { getStoredUserData, UserData } from "@/utils/userData";
 
 type UpasampadaForm = {
   candidateRegNo: string;
@@ -88,7 +89,11 @@ export default function AddUpasampadaPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-
+  const BHIKKU_MANAGEMENT_DEPARTMENT = 'Bhikku Management';
+  const ADMIN_ROLE_LEVEL = 'ADMIN';
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const totalSteps = FORM_STEPS.length;
   const currentStepConfig = FORM_STEPS[currentStep - 1];
   const stepRequirements = REQUIRED_BY_STEP[currentStep] ?? [];
@@ -156,6 +161,36 @@ export default function AddUpasampadaPage() {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+  const stored = getStoredUserData();
+  if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+    setAccessDenied(true);
+    router.replace('/');
+    return;
+  }
+
+  setUserData(stored);
+  setAccessChecked(true);
+  }, [router]);
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
 
   const renderStep = () => {
     switch (currentStep) {
