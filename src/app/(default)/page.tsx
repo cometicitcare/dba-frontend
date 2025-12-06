@@ -20,7 +20,10 @@ import {
   FileTextIcon,
   EditIcon,
   TrashIcon,
+  User,
 } from "lucide-react";
+import { useRouter } from 'next/navigation'
+import { getStoredUserData, type UserData } from "@/utils/userData";
 
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
@@ -66,18 +69,7 @@ const SERVICE_MAP: Record<
 
 };
 
-const modules = [
-  { icon: UsersIcon, label: "Bhikku", color: "from-orange-400 to-orange-500", path: "/bhikkhu" },
-  { icon: UsersIcon, label: "Re Print", color: "from-orange-400 to-orange-500", path: "/print-request" },
-  { icon: UsersIcon, label: "QR Scan", color: "from-orange-400 to-orange-500", path: "/qr-scan" },
 
-  
-  // { icon: BuildingIcon, label: "Temple & Devala", color: "from-purple-400 to-purple-500", path: "/temples" },
-  // { icon: GraduationCapIcon, label: "Dhamma School", color: "from-blue-400 to-blue-500", path: "/dhamma-school" },
-  // { icon: BookOpenIcon, label: "Dhamma Teachers", color: "from-green-400 to-green-500", path: "/teachers" },
-  // { icon: SettingsIcon, label: "System Admin", color: "from-red-400 to-red-500", path: "/admin" },
-  // { icon: BarChartIcon, label: "Analytics", color: "from-teal-400 to-teal-500", path: "/analytics" },
-];
 
 const bannerImages = [
   "/dashboardBanner/bhikku.jpg",
@@ -91,25 +83,18 @@ const bannerImages = [
   "/dashboardBanner/thripitikaya.jpg",
 ];
 
-interface UserData {
-  ua_user_id: string;
-  ua_username: string;
-  ua_email: string;
-  ua_first_name: string;
-  ua_last_name: string;
-  ua_phone: string;
-  ua_status: string;
-  ro_role_id: string;
-  role_ids: string[];
-  role: { ro_role_id: string; ro_role_name: string; ro_description: string };
-}
-
 export default function Dashboard() {
+  const router = useRouter();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [user, setUser] = useState<UserData | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
+  const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
+  const ADMIN_ROLE_LEVEL = "ADMIN";
 
   // Only rotate through images that actually load
   const [slides, setSlides] = useState<string[]>([]);
@@ -205,19 +190,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      const normalized: UserData | null =
-        parsed && typeof parsed === "object"
-          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
-          : null;
-      if (normalized) setUser(normalized);
-    } catch (err) {
-      console.error("Invalid user data in localStorage", err);
-    }
+    const stored = getStoredUserData();
+    setUserData(stored ?? null);
   }, []);
+
+  
 
   const currentImage = useMemo(() => {
     if (!slides.length) return null;
@@ -229,20 +206,51 @@ export default function Dashboard() {
     if (route && typeof window !== "undefined") window.location.assign(route);
   };
 
+
+  const modules = useMemo(() => {
+    if (userData === undefined) return [];
+    const shouldShowBhikkuModule = userData?.department === BHIKKU_MANAGEMENT_DEPARTMENT;
+    return [
+      ...(shouldShowBhikkuModule
+        ? [
+            {
+              icon: UsersIcon,
+              label: "Bhikku",
+              color: "from-orange-400 to-orange-500",
+              path: "/bhikkhu",
+            },
+          ]
+        : []),
+      {
+        icon: UsersIcon,
+        label: "Re Print",
+        color: "from-orange-400 to-orange-500",
+        path: "/print-request",
+      },
+      {
+        icon: UsersIcon,
+        label: "QR Scan",
+        color: "from-orange-400 to-orange-500",
+        path: "/qr-scan",
+      },
+    ];
+  }, [userData]);
+
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar isOpen={sidebarOpen} />
 
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
-        <main className="p-6">
+        <main className="p-6 pb-32">
           {/* hero */}
           <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
             <div className="relative z-10 max-w-[55%] sm:max-w-[50%] md:max-w-[45%] lg:max-w-[40%] xl:max-w-[35%] pr-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{getGreeting()}</h1>
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Welcome!</h2>
-              <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
-                {user ? `${user.ua_first_name} ${user.ua_last_name}` : "Loading..."}
+                        <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
+                {userData ? `${userData.ua_first_name} ${userData.ua_last_name}` : "Loading..."}
               </p>
               <div className="text-sm sm:text-base md:text-lg opacity-80 leading-tight">
                 <p className="text-white/90">{formatDateTime()}</p>

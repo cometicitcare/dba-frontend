@@ -711,15 +711,15 @@ export default function ReprintRequest() {
             </FormControl>
             <TextField
               size="small"
-              label="Regn"
-              placeholder="Search by regn"
+              label="register number"
+              placeholder="Search by register number"
               value={regnInput}
               onChange={(e) => setRegnInput(e.target.value)}
               fullWidth
             />
             <TextField
               size="small"
-              label="Search key"
+              label="Global search"
               placeholder="Global search"
               value={searchKeyInput}
               onChange={(e) => setSearchKeyInput(e.target.value)}

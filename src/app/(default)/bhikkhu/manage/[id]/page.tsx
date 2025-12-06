@@ -189,6 +189,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [canAdminActions, setCanAdminActions] = useState(false);
+  
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
