@@ -161,6 +161,94 @@ function AddViharaPageInner() {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
+  // Helper function to map form fields to API field names
+  const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
+    // Map temple_owned_land array fields
+    const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
+      serial_number: land.serialNumber ?? land.serial_number,
+      land_name: land.landName ?? land.land_name,
+      village: land.village,
+      district: land.district,
+      extent: land.extent,
+      cultivation_description: land.cultivationDescription ?? land.cultivation_description,
+      ownership_nature: land.ownershipNature ?? land.ownership_nature,
+      deed_number: land.deedNumber ?? land.deed_number,
+      title_registration_number: land.titleRegistrationNumber ?? land.title_registration_number,
+      tax_details: land.taxDetails ?? land.tax_details,
+      land_occupants: land.landOccupants ?? land.land_occupants,
+    }));
+
+    // Map resident_bhikkhus array fields
+    const mappedBhikkhus = parsedResidentBhikkhus.map((bhikkhu: any) => ({
+      serial_number: bhikkhu.serialNumber ?? bhikkhu.serial_number,
+      bhikkhu_name: bhikkhu.bhikkhuName ?? bhikkhu.bhikkhu_name,
+      registration_number: bhikkhu.registrationNumber ?? bhikkhu.registration_number,
+      occupation_education: bhikkhu.occupationEducation ?? bhikkhu.occupation_education,
+    }));
+
+    return {
+      // Step A: Basic Information
+      vh_vname: formData.temple_name,
+      vh_addrs: formData.temple_address,
+      vh_mobile: formData.telephone_number,
+      vh_whtapp: formData.whatsapp_number,
+      vh_email: formData.email_address,
+      
+      // Step B: Administrative Divisions
+      vh_province: formData.province,
+      vh_district: formData.district,
+      vh_divisional_secretariat: formData.divisional_secretariat,
+      vh_pradeshya_sabha: formData.pradeshya_sabha,
+      vh_gndiv: formData.grama_niladhari_division,
+      
+      // Step C: Religious Affiliation
+      vh_nikaya: formData.nikaya,
+      vh_parshawa: formData.parshawaya,
+      
+      // Step D: Leadership
+      vh_viharadhipathi_name: formData.viharadhipathi_name,
+      vh_period_established: formData.period_established,
+      
+      // Step E: Assets & Activities
+      vh_buildings_description: formData.buildings_description,
+      vh_dayaka_families_count: formData.dayaka_families_count,
+      vh_kulangana_committee: formData.kulangana_committee,
+      vh_dayaka_sabha: formData.dayaka_sabha,
+      vh_temple_working_committee: formData.temple_working_committee,
+      vh_other_associations: formData.other_associations,
+      
+      // Step F: Land Information
+      temple_owned_land: mappedLand,
+      vh_land_info_certified: formData.land_info_certified,
+      
+      // Step G: Resident Bhikkhus
+      resident_bhikkhus: mappedBhikkhus,
+      vh_resident_bhikkhus_certified: formData.resident_bhikkhus_certified,
+      
+      // Step H: Inspection
+      vh_inspection_report: formData.inspection_report,
+      vh_inspection_code: formData.inspection_code,
+      
+      // Step I: Ownership
+      vh_grama_niladhari_division_ownership: formData.grama_niladhari_division_ownership,
+      vh_sanghika_donation_deed: formData.sanghika_donation_deed,
+      vh_government_donation_deed: formData.government_donation_deed,
+      vh_government_donation_deed_in_progress: formData.government_donation_deed_in_progress,
+      vh_authority_consent_attached: formData.authority_consent_attached,
+      vh_recommend_new_center: formData.recommend_new_center,
+      vh_recommend_registered_temple: formData.recommend_registered_temple,
+      
+      // Step J: Annex II
+      vh_annex2_recommend_construction: formData.annex2_recommend_construction,
+      vh_annex2_land_ownership_docs: formData.annex2_land_ownership_docs,
+      vh_annex2_chief_incumbent_letter: formData.annex2_chief_incumbent_letter,
+      vh_annex2_coordinator_recommendation: formData.annex2_coordinator_recommendation,
+      vh_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation,
+      vh_annex2_approval_construction: formData.annex2_approval_construction,
+      vh_annex2_referral_resubmission: formData.annex2_referral_resubmission,
+    };
+  };
+
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
@@ -193,13 +281,9 @@ function AddViharaPageInner() {
         parsedTempleOwnedLand = [];
       }
       
-      const payload: any = {
-        ...values,
-        resident_bhikkhus: parsedResidentBhikkhus,
-        temple_owned_land: parsedTempleOwnedLand,
-      };
-      console.log("Vihara Form Payload:", payload);
-      await _manageVihara({ action: "CREATE", payload: { data: payload } } as any);
+      const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
+      console.log("Vihara Form Payload:", apiPayload);
+      await _manageVihara({ action: "CREATE", payload: { data: apiPayload } } as any);
 
       toast.success(viharaId ? "Vihara updated successfully." : "Vihara created successfully.", {
         autoClose: 1200,

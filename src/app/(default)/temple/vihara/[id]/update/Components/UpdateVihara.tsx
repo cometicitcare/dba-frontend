@@ -7,7 +7,6 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-import { updateData } from "../updateData";
 
 import {
   DateField,
@@ -65,6 +64,96 @@ function UpdateViharaPageInner() {
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  // Helper function to map API fields to form fields
+  const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
+    // Map temple_owned_land array fields
+    const mappedLand = (apiData.temple_lands || []).map((land: any) => ({
+      id: String(land.id || land.serial_number || Math.random()),
+      serialNumber: land.serial_number ?? 0,
+      landName: land.land_name ?? "",
+      village: land.village ?? "",
+      district: land.district ?? "",
+      extent: land.extent ?? "",
+      cultivationDescription: land.cultivation_description ?? "",
+      ownershipNature: land.ownership_nature ?? "",
+      deedNumber: land.deed_number ?? "",
+      titleRegistrationNumber: land.title_registration_number ?? "",
+      taxDetails: land.tax_details ?? "",
+      landOccupants: land.land_occupants ?? "",
+    }));
+
+    // Map resident_bhikkhus array fields
+    const mappedBhikkhus = (apiData.resident_bhikkhus || []).map((bhikkhu: any) => ({
+      id: String(bhikkhu.id || bhikkhu.serial_number || Math.random()),
+      serialNumber: bhikkhu.serial_number ?? 0,
+      bhikkhuName: bhikkhu.bhikkhu_name ?? "",
+      registrationNumber: bhikkhu.registration_number ?? "",
+      occupationEducation: bhikkhu.occupation_education ?? "",
+    }));
+
+    return {
+      // Step A: Basic Information
+      temple_name: apiData.vh_vname ?? "",
+      temple_address: apiData.vh_addrs ?? "",
+      telephone_number: apiData.vh_mobile ?? "",
+      whatsapp_number: apiData.vh_whtapp ?? "",
+      email_address: apiData.vh_email ?? "",
+      
+      // Step B: Administrative Divisions
+      province: apiData.vh_province ?? "",
+      district: apiData.vh_district ?? "",
+      divisional_secretariat: apiData.vh_divisional_secretariat ?? "",
+      pradeshya_sabha: apiData.vh_pradeshya_sabha ?? "",
+      grama_niladhari_division: apiData.vh_gndiv ?? "",
+      
+      // Step C: Religious Affiliation
+      nikaya: apiData.vh_nikaya ?? "",
+      parshawaya: apiData.vh_parshawa ?? "",
+      
+      // Step D: Leadership
+      viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
+      period_established: apiData.vh_period_established ?? "",
+      
+      // Step E: Assets & Activities
+      buildings_description: apiData.vh_buildings_description ?? "",
+      dayaka_families_count: apiData.vh_dayaka_families_count ?? "",
+      kulangana_committee: apiData.vh_kulangana_committee ?? "",
+      dayaka_sabha: apiData.vh_dayaka_sabha ?? "",
+      temple_working_committee: apiData.vh_temple_working_committee ?? "",
+      other_associations: apiData.vh_other_associations ?? "",
+      
+      // Step F: Land Information
+      temple_owned_land: JSON.stringify(mappedLand),
+      land_info_certified: apiData.vh_land_info_certified ?? false,
+      
+      // Step G: Resident Bhikkhus
+      resident_bhikkhus: JSON.stringify(mappedBhikkhus),
+      resident_bhikkhus_certified: apiData.vh_resident_bhikkhus_certified ?? false,
+      
+      // Step H: Inspection
+      inspection_report: apiData.vh_inspection_report ?? "",
+      inspection_code: apiData.vh_inspection_code ?? "",
+      
+      // Step I: Ownership
+      grama_niladhari_division_ownership: apiData.vh_grama_niladhari_division_ownership ?? "",
+      sanghika_donation_deed: apiData.vh_sanghika_donation_deed ?? false,
+      government_donation_deed: apiData.vh_government_donation_deed ?? false,
+      government_donation_deed_in_progress: apiData.vh_government_donation_deed_in_progress ?? false,
+      authority_consent_attached: apiData.vh_authority_consent_attached ?? false,
+      recommend_new_center: apiData.vh_recommend_new_center ?? false,
+      recommend_registered_temple: apiData.vh_recommend_registered_temple ?? false,
+      
+      // Step J: Annex II
+      annex2_recommend_construction: apiData.vh_annex2_recommend_construction ?? false,
+      annex2_land_ownership_docs: apiData.vh_annex2_land_ownership_docs ?? false,
+      annex2_chief_incumbent_letter: apiData.vh_annex2_chief_incumbent_letter ?? false,
+      annex2_coordinator_recommendation: apiData.vh_annex2_coordinator_recommendation ?? false,
+      annex2_divisional_secretary_recommendation: apiData.vh_annex2_divisional_secretary_recommendation ?? false,
+      annex2_approval_construction: apiData.vh_annex2_approval_construction ?? false,
+      annex2_referral_resubmission: apiData.vh_annex2_referral_resubmission ?? false,
+    };
+  };
+
   // Load data for update
   useEffect(() => {
     if (!viharaId) {
@@ -75,49 +164,39 @@ function UpdateViharaPageInner() {
     const loadViharaData = async () => {
       try {
         setLoading(true);
-        // TODO: Replace with actual API call to fetch vihara data
-        // const response = await fetch(`/api/vihara/${viharaId}`);
-        // const data = await response.json();
+        // Use READ_ONE API to fetch vihara data
+        const response = await _manageVihara({
+          action: "READ_ONE",
+          payload: {
+            // Try vh_id first (if it's a number), otherwise use as vh_trn
+            ...(isNaN(Number(viharaId)) ? { vh_trn: viharaId } : { vh_id: Number(viharaId) }),
+          },
+        });
+
+        const apiData = (response.data as any)?.data || response.data;
+        console.log("Loading vihara data from API:", apiData);
         
-        // For now, use sample data from updateData.ts
-        const sampleData = updateData.sampleViharaData;
+        // Map API fields to form fields
+        const formData = mapApiToFormFields(apiData);
+        const filledValues = {
+          ...viharaInitialValues,
+          ...formData,
+        };
+        setValues(filledValues);
+        console.log("Form values auto-filled:", filledValues);
         
-        console.log("Loading vihara data:", sampleData);
-        
-        // Auto-fill form with loaded data
-        if (sampleData) {
-          const filledValues = {
-            ...viharaInitialValues,
-            ...sampleData,
-          };
-          setValues(filledValues);
-          console.log("Form values auto-filled:", filledValues);
-          console.log("Location values:", {
-            province: filledValues.province,
-            district: filledValues.district,
-            divisional_secretariat: filledValues.divisional_secretariat,
-            grama_niladhari_division: filledValues.grama_niladhari_division,
-          });
-          console.log("Religious Affiliation values:", {
-            nikaya: filledValues.nikaya,
-            parshawaya: filledValues.parshawaya,
-          });
-          
-          // Update display state for nikaya and parshawaya
-          if (filledValues.nikaya) {
-            const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
-            console.log("Found nikaya item:", nikayaItem);
-            if (nikayaItem) {
-              setDisplay((d) => ({ ...d, nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}` }));
-            }
+        // Update display state for nikaya and parshawaya
+        if (filledValues.nikaya) {
+          const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
+          if (nikayaItem) {
+            setDisplay((d) => ({ ...d, nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}` }));
           }
-          if (filledValues.parshawaya && filledValues.nikaya) {
-            const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
-            const parshawaItem = nikayaItem?.parshawayas.find((p) => p.code === filledValues.parshawaya);
-            console.log("Found parshawa item:", parshawaItem);
-            if (parshawaItem) {
-              setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
-            }
+        }
+        if (filledValues.parshawaya && filledValues.nikaya) {
+          const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
+          const parshawaItem = nikayaItem?.parshawayas.find((p) => p.code === filledValues.parshawaya);
+          if (parshawaItem) {
+            setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
           }
         }
       } catch (error) {
@@ -238,6 +317,94 @@ function UpdateViharaPageInner() {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
+  // Helper function to map form fields to API field names (same as AddVihara)
+  const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
+    // Map temple_owned_land array fields
+    const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
+      serial_number: land.serialNumber ?? land.serial_number,
+      land_name: land.landName ?? land.land_name,
+      village: land.village,
+      district: land.district,
+      extent: land.extent,
+      cultivation_description: land.cultivationDescription ?? land.cultivation_description,
+      ownership_nature: land.ownershipNature ?? land.ownership_nature,
+      deed_number: land.deedNumber ?? land.deed_number,
+      title_registration_number: land.titleRegistrationNumber ?? land.title_registration_number,
+      tax_details: land.taxDetails ?? land.tax_details,
+      land_occupants: land.landOccupants ?? land.land_occupants,
+    }));
+
+    // Map resident_bhikkhus array fields
+    const mappedBhikkhus = parsedResidentBhikkhus.map((bhikkhu: any) => ({
+      serial_number: bhikkhu.serialNumber ?? bhikkhu.serial_number,
+      bhikkhu_name: bhikkhu.bhikkhuName ?? bhikkhu.bhikkhu_name,
+      registration_number: bhikkhu.registrationNumber ?? bhikkhu.registration_number,
+      occupation_education: bhikkhu.occupationEducation ?? bhikkhu.occupation_education,
+    }));
+
+    return {
+      // Step A: Basic Information
+      vh_vname: formData.temple_name,
+      vh_addrs: formData.temple_address,
+      vh_mobile: formData.telephone_number,
+      vh_whtapp: formData.whatsapp_number,
+      vh_email: formData.email_address,
+      
+      // Step B: Administrative Divisions
+      vh_province: formData.province,
+      vh_district: formData.district,
+      vh_divisional_secretariat: formData.divisional_secretariat,
+      vh_pradeshya_sabha: formData.pradeshya_sabha,
+      vh_gndiv: formData.grama_niladhari_division,
+      
+      // Step C: Religious Affiliation
+      vh_nikaya: formData.nikaya,
+      vh_parshawa: formData.parshawaya,
+      
+      // Step D: Leadership
+      vh_viharadhipathi_name: formData.viharadhipathi_name,
+      vh_period_established: formData.period_established,
+      
+      // Step E: Assets & Activities
+      vh_buildings_description: formData.buildings_description,
+      vh_dayaka_families_count: formData.dayaka_families_count,
+      vh_kulangana_committee: formData.kulangana_committee,
+      vh_dayaka_sabha: formData.dayaka_sabha,
+      vh_temple_working_committee: formData.temple_working_committee,
+      vh_other_associations: formData.other_associations,
+      
+      // Step F: Land Information
+      temple_owned_land: mappedLand,
+      vh_land_info_certified: formData.land_info_certified,
+      
+      // Step G: Resident Bhikkhus
+      resident_bhikkhus: mappedBhikkhus,
+      vh_resident_bhikkhus_certified: formData.resident_bhikkhus_certified,
+      
+      // Step H: Inspection
+      vh_inspection_report: formData.inspection_report,
+      vh_inspection_code: formData.inspection_code,
+      
+      // Step I: Ownership
+      vh_grama_niladhari_division_ownership: formData.grama_niladhari_division_ownership,
+      vh_sanghika_donation_deed: formData.sanghika_donation_deed,
+      vh_government_donation_deed: formData.government_donation_deed,
+      vh_government_donation_deed_in_progress: formData.government_donation_deed_in_progress,
+      vh_authority_consent_attached: formData.authority_consent_attached,
+      vh_recommend_new_center: formData.recommend_new_center,
+      vh_recommend_registered_temple: formData.recommend_registered_temple,
+      
+      // Step J: Annex II
+      vh_annex2_recommend_construction: formData.annex2_recommend_construction,
+      vh_annex2_land_ownership_docs: formData.annex2_land_ownership_docs,
+      vh_annex2_chief_incumbent_letter: formData.annex2_chief_incumbent_letter,
+      vh_annex2_coordinator_recommendation: formData.annex2_coordinator_recommendation,
+      vh_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation,
+      vh_annex2_approval_construction: formData.annex2_approval_construction,
+      vh_annex2_referral_resubmission: formData.annex2_referral_resubmission,
+    };
+  };
+
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
@@ -270,14 +437,20 @@ function UpdateViharaPageInner() {
         parsedTempleOwnedLand = [];
       }
       
-      const payload: any = {
-        ...values,
-        id: viharaId,
-        resident_bhikkhus: parsedResidentBhikkhus,
-        temple_owned_land: parsedTempleOwnedLand,
-      };
-      console.log("Vihara Update Payload:", payload);
-      await _manageVihara({ action: "UPDATE", payload: { vihara_id: viharaId, data: payload } } as any);
+      const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
+      // Determine vh_id - try parsing as number, otherwise use as-is
+      const vhId = isNaN(Number(viharaId)) ? undefined : Number(viharaId);
+      const vhTrn = isNaN(Number(viharaId)) ? viharaId : undefined;
+      
+      console.log("Vihara Update Payload:", apiPayload);
+      await _manageVihara({ 
+        action: "UPDATE", 
+        payload: { 
+          vh_id: vhId,
+          vh_trn: vhTrn,
+          data: apiPayload 
+        } 
+      } as any);
 
       toast.success("Vihara updated successfully.", {
         autoClose: 1200,
