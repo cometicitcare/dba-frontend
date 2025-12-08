@@ -21,7 +21,8 @@ import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
 import selectionsData from "@/utils/selectionsData.json";
-
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -326,9 +327,11 @@ export default function RecordList() {
           action: "DELETE",
           payload: { vh_id: item.vh_id },
         });
+        toast.success("Vihara deleted successfully");
         await fetchData(undefined, filters);
       } catch (e) {
         console.error("Delete Error:", e);
+        toast.error("Failed to delete vihara");
       } finally {
         setLoading(false);
       }
@@ -765,6 +768,8 @@ export default function RecordList() {
             </div>
           </div>
         </main>
+        <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
+
     </div>
   );
 }
