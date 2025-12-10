@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboardIcon, UsersIcon } from "lucide-react";
-
+import { LayoutDashboardIcon } from "lucide-react";
+import { getStoredUserData, UserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 interface SidebarProps {
   isOpen: boolean;
 }
@@ -58,27 +59,25 @@ export function Sidebar({ isOpen }: SidebarProps) {
     }
   }, []);
 
-  // ✅ Menu items with roles from config
-  const allItems: Array<{
-    icon: IconComponent;
-    label: string;
-    path: string;
-  }> = [
-    {
-      icon: LayoutDashboardIcon,
-      label: "Dashboard",
-      path: "/",
-    },
-    {
-      icon: MonkIcon, // ✅ use the custom SVG icon here
-      label: "Bhikku & Sirimatha",
-      path: "/bhikkhu",
-    },
-    // If you still need the Lucide UsersIcon elsewhere, you can add it too:
-    // { icon: UsersIcon, label: "Users", path: "/users", roles: [...] },
-  ];
+  const items = useMemo(() => {
+    if (!user) return BASE_SIDEBAR_ITEMS;
+    const primaryDepartment = user.departments?.[0];
+    const primaryRoleLevel = user.roles?.[0]?.ro_level ?? user.roleLevel;
 
-  const items = allItems;
+    if (primaryRoleLevel === "PUBLIC") {
+      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/qr-scan");
+    }
+
+    if (primaryDepartment === "Divisional Secretariat") {
+      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/print-request" || it.path === "/qr-scan");
+    }
+
+    if (primaryDepartment === BHIKKU_MANAGEMENT_DEPARTMENT) {
+      return BASE_SIDEBAR_ITEMS;
+    }
+
+    return BASE_SIDEBAR_ITEMS;
+  }, [user]);
   if (!isOpen) return null;
 
   return (

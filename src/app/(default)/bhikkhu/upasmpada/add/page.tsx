@@ -9,7 +9,8 @@ import { BhikkhuAutocomplete, DateField, TempleAutocomplete, toYYYYMMDD } from "
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { _manageHighBhikku } from "@/services/bhikku";
-
+import { getStoredUserData, UserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
@@ -86,7 +87,9 @@ export default function AddUpasampadaPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const totalSteps = FORM_STEPS.length;
   const currentStepConfig = FORM_STEPS[currentStep - 1];
   const stepRequirements = REQUIRED_BY_STEP[currentStep] ?? [];

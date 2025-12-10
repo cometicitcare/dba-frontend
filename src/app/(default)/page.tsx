@@ -21,7 +21,9 @@ import {
   EditIcon,
   TrashIcon,
 } from "lucide-react";
-
+import { useRouter } from 'next/navigation'
+import { getStoredUserData, type UserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -105,6 +107,7 @@ export default function Dashboard() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [user, setUser] = useState<UserData | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
 
   // Only rotate through images that actually load
   const [slides, setSlides] = useState<string[]>([]);

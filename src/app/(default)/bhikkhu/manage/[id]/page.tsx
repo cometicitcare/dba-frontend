@@ -14,7 +14,8 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-
+import { getStoredUserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from "@/utils/config";
 import {
   DateField,
   LocationPicker,
@@ -61,6 +62,7 @@ const OPTIONAL_LOCATION_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
 const CERTIFICATE_URL_BASE =
   "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = "https://api.dbagovlk.com";
 
 type CertificateMeta = {
   number: string;
