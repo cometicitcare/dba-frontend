@@ -24,7 +24,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { getStoredUserData } from "@/utils/userData";
 import { _manageDirectHighBhikku } from "@/services/bhikku";
-
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
@@ -307,7 +307,6 @@ const STATIC_NIKAYA_DATA = Array.isArray((selectionsData as any)?.nikayas)
 const NOVICE_CATEGORY_CODE = "CAT03";
 const OPTIONAL_LOCATION_FIELDS: Array<string> = ["br_korale", "br_pattu", "br_division", "br_vilage", "br_gndiv"];
 
-const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
 
 export default function DirectAddPage() {
   const router = useRouter();

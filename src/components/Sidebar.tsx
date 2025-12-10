@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboardIcon } from "lucide-react";
 import { getStoredUserData, UserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 interface SidebarProps {
   isOpen: boolean;
 }
@@ -75,7 +76,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
       return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/print-request" || it.path === "/qr-scan");
     }
 
-    if (primaryDepartment === "Bhikku Management") {
+    if (primaryDepartment === BHIKKU_MANAGEMENT_DEPARTMENT) {
       return BASE_SIDEBAR_ITEMS;
     }
 

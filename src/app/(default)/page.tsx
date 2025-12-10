@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useRouter } from 'next/navigation'
 import { getStoredUserData, type UserData } from "@/utils/userData";
-
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -90,11 +90,7 @@ export default function Dashboard() {
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [accessChecked, setAccessChecked] = useState(false);
-  const [accessDenied, setAccessDenied] = useState(false);
   const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
-  const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
-  const ADMIN_ROLE_LEVEL = "ADMIN";
 
   // Only rotate through images that actually load
   const [slides, setSlides] = useState<string[]>([]);

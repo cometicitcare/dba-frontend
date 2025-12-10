@@ -24,7 +24,7 @@ type QrDetailsResponse = {
   }
 }
 
-export default function page({ params }: PageProps) {
+export default function Page({ params }: PageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [details, setDetails] = useState<DetailRow[]>([])
   const [isLoading, setIsLoading] = useState(false)

@@ -8,3 +8,9 @@ export const baseURL: string | undefined =
     : environment === "DEVELOP"
     ? process.env.NEXT_PUBLIC_BASE_URL_DEV
     : process.env.NEXT_PUBLIC_BASE_URL;
+
+export const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
+// export const BHIKKU_MANAGEMENT_DEPARTMENT = "Silmatha Management";
+export const SILMATHA_MANAGEMENT_DEPARTMENT = "Silmatha Management";
+
+export const ADMIN_ROLE_LEVEL = 'ADMIN';

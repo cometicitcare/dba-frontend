@@ -10,7 +10,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { _manageHighBhikku } from "@/services/bhikku";
 import { getStoredUserData, UserData } from "@/utils/userData";
-
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
@@ -89,8 +89,6 @@ export default function AddUpasampadaPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const BHIKKU_MANAGEMENT_DEPARTMENT = 'Bhikku Management';
-  const ADMIN_ROLE_LEVEL = 'ADMIN';
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
