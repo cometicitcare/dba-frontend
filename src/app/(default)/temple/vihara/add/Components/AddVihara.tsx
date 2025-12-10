@@ -119,7 +119,7 @@ function AddViharaPageInner() {
     const nextErrors: Errors<ViharaForm> = { ...errors };
     let valid = true;
     for (const f of step.fields) {
-      if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
+      if (f.name === "temple_lands" || f.name === "resident_bhikkhus") continue; // Skip table fields
       const raw = values[f.name];
       // Handle boolean values for checkboxes
       const stringValue = typeof raw === "boolean" ? String(raw) : (raw as string | undefined);
@@ -138,7 +138,7 @@ function AddViharaPageInner() {
     for (const step of steps) {
       let stepValid = true;
       for (const f of step.fields) {
-        if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
+        if (f.name === "temple_lands" || f.name === "resident_bhikkhus") continue; // Skip table fields
         const raw = values[f.name];
         // Handle boolean values for checkboxes
         const stringValue = typeof raw === "boolean" ? String(raw) : (raw as string | undefined);
@@ -161,6 +161,124 @@ function AddViharaPageInner() {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
+  // Helper function to map form fields to API field names
+  // Backend expects snake_case field names with vh_ prefix for main fields
+  // Array fields use camelCase (serialNumber, bhikkhuName, etc.)
+  const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
+    // Map temple_lands array fields - use camelCase as per API
+    const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
+      serialNumber: land.serialNumber ?? land.serial_number ?? 0,
+      landName: land.landName ?? land.land_name ?? "",
+      village: land.village ?? "",
+      district: land.district ?? "",
+      extent: land.extent ?? "",
+      cultivationDescription: land.cultivationDescription ?? land.cultivation_description ?? "",
+      ownershipNature: land.ownershipNature ?? land.ownership_nature ?? "",
+      deedNumber: land.deedNumber ?? land.deed_number ?? "",
+      titleRegistrationNumber: land.titleRegistrationNumber ?? land.title_registration_number ?? "",
+      taxDetails: land.taxDetails ?? land.tax_details ?? "",
+      landOccupants: land.landOccupants ?? land.land_occupants ?? "",
+    }));
+
+    // Map resident_bhikkhus array fields - use camelCase as per API
+    const mappedBhikkhus = parsedResidentBhikkhus.map((bhikkhu: any) => ({
+      serialNumber: bhikkhu.serialNumber ?? bhikkhu.serial_number ?? 0,
+      bhikkhuName: bhikkhu.bhikkhuName ?? bhikkhu.bhikkhu_name ?? "",
+      registrationNumber: bhikkhu.registrationNumber ?? bhikkhu.registration_number ?? "",
+      occupationEducation: bhikkhu.occupationEducation ?? bhikkhu.occupation_education ?? "",
+    }));
+
+    // Owner code is a constant
+    const ownerCode = "BH2025000001";
+
+    // Parse dayaka_families_count to number for vh_fmlycnt
+    const dayakaCount = formData.dayaka_families_count ? parseInt(formData.dayaka_families_count, 10) : 0;
+    const dayakaCountNum = isNaN(dayakaCount) ? 0 : dayakaCount;
+
+    // Parse period_established (now a date field) to date format for vh_bgndate (YYYY-MM-DD)
+    // Since it's a date field, it should already be in YYYY-MM-DD format
+    let bgndate: string | null = null;
+    if (formData.period_established) {
+      const periodStr = toYYYYMMDD(formData.period_established);
+      if (periodStr) {
+        bgndate = periodStr;
+      }
+    }
+
+    // Return payload with backend field names (snake_case with vh_ prefix)
+    const payload: any = {
+      // Step A: Basic Information
+      vh_mobile: formData.telephone_number ?? "",
+      vh_whtapp: formData.whatsapp_number ?? "",
+      vh_email: formData.email_address ?? "",
+      vh_typ: "VIHARA",
+      vh_gndiv: formData.grama_niladhari_division ?? "",
+      vh_ownercd: ownerCode,
+      vh_parshawa: formData.parshawaya ?? "",
+      vh_vname: formData.temple_name ?? "",
+      vh_addrs: formData.temple_address ?? "",
+      
+      // Step B: Administrative Divisions
+      vh_province: formData.province ?? "",
+      vh_district: formData.district ?? "",
+      vh_divisional_secretariat: formData.divisional_secretariat ?? "",
+      vh_pradeshya_sabha: formData.pradeshya_sabha ?? "",
+      
+      // Step C: Religious Affiliation
+      vh_nikaya: formData.nikaya ?? "",
+      
+      // Step D: Leadership
+      vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
+      vh_period_established: formData.period_established ? toYYYYMMDD(formData.period_established) : "",
+      
+      // Step E: Assets & Activities
+      vh_buildings_description: formData.buildings_description ?? "",
+      vh_dayaka_families_count: formData.dayaka_families_count ?? "",
+      vh_fmlycnt: dayakaCountNum,
+      vh_kulangana_committee: formData.kulangana_committee ?? "",
+      vh_dayaka_sabha: formData.dayaka_sabha ?? "",
+      vh_temple_working_committee: formData.temple_working_committee ?? "",
+      vh_other_associations: formData.other_associations ?? "",
+      
+      // Step F: Land Information
+      temple_lands: mappedLand,
+      vh_land_info_certified: formData.land_info_certified ?? false,
+      
+      // Step G: Resident Bhikkhus
+      resident_bhikkhus: mappedBhikkhus,
+      vh_resident_bhikkhus_certified: formData.resident_bhikkhus_certified ?? false,
+      
+      // Step H: Inspection
+      vh_inspection_report: formData.inspection_report ?? "",
+      vh_inspection_code: formData.inspection_code ?? "",
+      
+      // Step I: Ownership
+      vh_grama_niladhari_division_ownership: formData.grama_niladhari_division_ownership ?? "",
+      vh_sanghika_donation_deed: formData.sanghika_donation_deed ?? false,
+      vh_government_donation_deed: formData.government_donation_deed ?? false,
+      vh_government_donation_deed_in_progress: formData.government_donation_deed_in_progress ?? false,
+      vh_authority_consent_attached: formData.authority_consent_attached ?? false,
+      vh_recommend_new_center: formData.recommend_new_center ?? false,
+      vh_recommend_registered_temple: formData.recommend_registered_temple ?? false,
+      
+      // Step J: Annex II
+      vh_annex2_recommend_construction: formData.annex2_recommend_construction ?? false,
+      vh_annex2_land_ownership_docs: formData.annex2_land_ownership_docs ?? false,
+      vh_annex2_chief_incumbent_letter: formData.annex2_chief_incumbent_letter ?? false,
+      vh_annex2_coordinator_recommendation: formData.annex2_coordinator_recommendation ?? false,
+      vh_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation ?? false,
+      vh_annex2_approval_construction: formData.annex2_approval_construction ?? false,
+      vh_annex2_referral_resubmission: formData.annex2_referral_resubmission ?? false,
+    };
+
+    // Only include vh_bgndate if we have a valid date value
+    if (bgndate) {
+      payload.vh_bgndate = bgndate;
+    }
+
+    return payload;
+  };
+
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
@@ -171,7 +289,7 @@ function AddViharaPageInner() {
 
     try {
       setSubmitting(true);
-      // Parse JSON strings back to objects/arrays for resident_bhikkhus and temple_owned_land
+      // Parse JSON strings back to objects/arrays for resident_bhikkhus and temple_lands
       let parsedResidentBhikkhus: any[] = [];
       let parsedTempleOwnedLand: any[] = [];
       
@@ -185,21 +303,17 @@ function AddViharaPageInner() {
       }
       
       try {
-        parsedTempleOwnedLand = values.temple_owned_land 
-          ? (typeof values.temple_owned_land === 'string' ? JSON.parse(values.temple_owned_land) : values.temple_owned_land)
+        parsedTempleOwnedLand = values.temple_lands 
+          ? (typeof values.temple_lands === 'string' ? JSON.parse(values.temple_lands) : values.temple_lands)
           : [];
       } catch (e) {
-        console.error("Error parsing temple_owned_land:", e);
+        console.error("Error parsing temple_lands:", e);
         parsedTempleOwnedLand = [];
       }
       
-      const payload: any = {
-        ...values,
-        resident_bhikkhus: parsedResidentBhikkhus,
-        temple_owned_land: parsedTempleOwnedLand,
-      };
-      console.log("Vihara Form Payload:", payload);
-      await _manageVihara({ action: "CREATE", payload: { data: payload } } as any);
+      const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
+      console.log("Vihara Form Payload:", apiPayload);
+      await _manageVihara({ action: "CREATE", payload: { data: apiPayload } } as any);
 
       toast.success(viharaId ? "Vihara updated successfully." : "Vihara created successfully.", {
         autoClose: 1200,
@@ -246,12 +360,12 @@ function AddViharaPageInner() {
   // Parse JSON arrays for tables
   const landInfoRows: LandInfoRow[] = useMemo(() => {
     try {
-      const parsed = JSON.parse(values.temple_owned_land || "[]");
+      const parsed = JSON.parse(values.temple_lands || "[]");
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
-  }, [values.temple_owned_land]);
+  }, [values.temple_lands]);
 
   const residentBhikkhuRows: ResidentBhikkhuRow[] = useMemo(() => {
     try {
@@ -263,7 +377,7 @@ function AddViharaPageInner() {
   }, [values.resident_bhikkhus]);
 
   const handleLandInfoChange = (rows: LandInfoRow[]) => {
-    handleInputChange("temple_owned_land", JSON.stringify(rows));
+    handleInputChange("temple_lands", JSON.stringify(rows));
   };
 
   const handleResidentBhikkhuChange = (rows: ResidentBhikkhuRow[]) => {
@@ -313,7 +427,7 @@ function AddViharaPageInner() {
                     <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
                       {currentStep === 6 && (
                         <div className="md:col-span-2">
-                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
+                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_lands} />
                           <div className="mt-4">
                             <label className="flex items-center gap-2">
                               <input
@@ -450,11 +564,12 @@ function AddViharaPageInner() {
 
                       {currentStep !== 6 && currentStep !== 7 && currentStep !== 10 && current.fields.map((f) => {
                         const id = String(f.name);
-                        const val = (values[f.name] as unknown as string) ?? "";
+                        const rawVal = (values[f.name] as unknown as string) ?? "";
+                        const val = f.type === "date" ? toYYYYMMDD(rawVal) : rawVal;
                         const err = errors[f.name];
 
                         // Skip table fields in regular rendering
-                        if (id === "temple_owned_land" || id === "resident_bhikkhus") return null;
+                        if (id === "temple_lands" || id === "resident_bhikkhus") return null;
 
                         // Step B: Administrative Divisions - use LocationPicker
                         if (currentStep === 2 && id === "district") {
@@ -675,6 +790,7 @@ function AddViharaPageInner() {
                               type={f.type}
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
+                              max={f.type === "date" ? today : undefined}
                               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                               placeholder={f.placeholder}
                             />
@@ -724,7 +840,7 @@ function AddViharaPageInner() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {s.fields.map((f) => {
                               const key = String(f.name);
-                              if (key === "temple_owned_land" || key === "resident_bhikkhus") return null;
+                              if (key === "temple_lands" || key === "resident_bhikkhus") return null;
                               const v0 = (values[f.name] as unknown as string | boolean) ?? "";
                               const v = typeof v0 === "boolean" ? (v0 ? "Yes" : "No") : String(v0);
                               const shown =

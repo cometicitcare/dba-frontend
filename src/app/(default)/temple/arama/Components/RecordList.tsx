@@ -13,26 +13,25 @@ import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
-import { _manageBhikku } from "@/services/bhikku";
-import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
+import { _manageArama } from "@/services/arama";
 import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
-import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
-import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
 import selectionsData from "@/utils/selectionsData.json";
-import dummyBhikkuData from "./Records.json";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-type BhikkuRow = {
-  regNo: string;
+type AramaRow = {
+  ar_id: number;
+  ar_trn: string;
   name: string;
-  fatherName?: string;
   mobile?: string;
   email?: string;
-  mahanayaka?: string;
-  remarks?: string;
-  category?: string;
-  status?: string;
+  address?: string;
+  province?: string;
+  district?: string;
+  nikaya?: string;
+  workflow_status?: string;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -78,20 +77,12 @@ function Spinner() {
 type FilterState = {
   province: string;
   district: string;
-  // temple fields (TRN + display)
-  templeTrn: string;
-  templeDisplay: string;
-  // child temple fields (TRN + display)
-  childTempleTrn: string;
-  childTempleDisplay: string;
-
   nikaya: string;
   parchawa: string;
   divisionSecretariat: string;
   gn: string;
-  vhTrn: string;
-  status: string;
-  category: string;
+  arTrn: string;
+  workflow_status: string;
   dateFrom: string; // yyyy-mm-dd
   dateTo: string; // yyyy-mm-dd
   searchKey: string;
@@ -124,46 +115,35 @@ const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
 const DEFAULT_FILTERS: FilterState = {
   province: "",
   district: "",
-  templeTrn: "",
-  templeDisplay: "",
-  childTempleTrn: "",
-  childTempleDisplay: "",
   nikaya: "",
   parchawa: "",
   divisionSecretariat: "",
   gn: "",
-  vhTrn: "",
-  status: "",
-  category: "",
+  arTrn: "",
+  workflow_status: "",
   dateFrom: "",
   dateTo: "",
   searchKey: "",
   page: 1,
-  limit: 5,
+  limit: 10,
 };
 
 // Only include set values (why: back-end may reject empty keys)
 function buildFilterPayload(f: FilterState) {
-  const skip = Math.max(0, (f.page - 1) * f.limit);
   const payload: Record<string, unknown> = {
-    skip,
-    limit: f.limit,
     page: f.page,
-    search_key: f.searchKey ?? "",
-    vh_trn: f.vhTrn ?? "",
+    page_size: f.limit,
   };
 
+  if (f.arTrn) payload.ar_trn = f.arTrn;
   if (f.province) payload.province = f.province;
   if (f.district) payload.district = f.district;
-  if (f.divisionSecretariat)
-    payload.divisional_secretariat = f.divisionSecretariat;
+  if (f.divisionSecretariat) payload.divisional_secretariat = f.divisionSecretariat;
   if (f.gn) payload.gn_division = f.gn;
-  if (f.templeTrn) payload.temple = f.templeTrn;
-  if (f.childTempleTrn) payload.child_temple = f.childTempleTrn;
   if (f.nikaya) payload.nikaya = f.nikaya;
   if (f.parchawa) payload.parshawaya = f.parchawa;
-  if (f.category.length) payload.category = [f.category];
-  if (f.status.length) payload.status = [f.status];
+  if (f.workflow_status) payload.status = f.workflow_status;
+  if (f.searchKey) payload.search_key = f.searchKey;
   const from = toYYYYMMDD(f.dateFrom);
   if (from) payload.date_from = from;
   const to = toYYYYMMDD(f.dateTo);
@@ -176,9 +156,10 @@ export default function RecordList() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [records, setRecords] = useState<BhikkuRow[]>([]);
+  const [records, setRecords] = useState<AramaRow[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -229,11 +210,11 @@ export default function RecordList() {
 
   const columns: Column[] = useMemo(
     () => [
-      { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "name", label: "Name", sortable: true },
+      { key: "ar_trn", label: "TRN", sortable: true },
+      { key: "name", label: "Arama Name", sortable: true },
       { key: "mobile", label: "Mobile" },
       { key: "email", label: "Email" },
-      { key: "status", label: "Status", sortable: true },
+      { key: "workflow_status", label: "Status", sortable: true },
     ],
     []
   );
@@ -242,30 +223,37 @@ export default function RecordList() {
   async (signal?: AbortSignal, f: FilterState = filters) => {
     setLoading(true);
     try {
-      const raw = dummyBhikkuData.data;
+      const payload = buildFilterPayload(f);
+      const response = await _manageArama({
+        action: "READ_ALL",
+        payload,
+      });
 
-      const cleaned: BhikkuRow[] = raw.map((row: any) => ({
-        regNo: String(row?.br_regn ?? ""),
-        name: String(row?.br_gihiname ?? ""),
-        fatherName: row?.br_fathrname ?? "",
-        mobile: row?.br_mobile ?? "",
-        email: row?.br_email ?? "",
-        mahanayaka: row?.br_mahananame ?? "",
-        remarks: row?.br_remarks ?? "",
-        category: row?.br_cat ?? "",
-        status: row?.br_currstat?.st_descr ?? "",
+      const apiData = pickRows<any>(response.data);
+      const total = (response.data as any)?.totalRecords ?? apiData.length;
+
+      const cleaned: AramaRow[] = apiData.map((row: any) => ({
+        ar_id: row?.ar_id ?? 0,
+        ar_trn: String(row?.ar_trn ?? ""),
+        name: String(row?.ar_vname ?? ""),
+        mobile: row?.ar_mobile ?? "",
+        email: row?.ar_email ?? "",
+        address: row?.ar_addrs ?? "",
+        province: row?.ar_province ?? "",
+        district: row?.ar_district ?? "",
+        nikaya: row?.ar_nikaya ?? "",
+        workflow_status: row?.ar_workflow_status ?? "",
       }));
 
-      // --- PAGINATION LOGIC ---
-      const start = (f.page - 1) * f.limit;
-      const end = start + f.limit;
-
-      const pageData = cleaned.slice(start, end);
-
-      setRecords(pageData);
-
-      // There are more results if end < total
-      setHasMoreResults(end < cleaned.length);
+      setRecords(cleaned);
+      setTotalRecords(total);
+      setHasMoreResults((f.page * f.limit) < total);
+    } catch (error) {
+      console.error("Error fetching arama data:", error);
+      toast.error("Failed to load arama records");
+      setRecords([]);
+      setTotalRecords(0);
+      setHasMoreResults(false);
     } finally {
       setLoading(false);
     }
@@ -274,12 +262,13 @@ export default function RecordList() {
 );
 
 
+  // Fetch data when page or limit changes (initial load and pagination)
   useEffect(() => {
     const ac = new AbortController();
     fetchData(ac.signal, filters);
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // initial load only
+  }, [filters.page, filters.limit]);
 
   const handleAdd = useCallback(() => {
     router.push("/temple/arama/add");
@@ -294,28 +283,32 @@ export default function RecordList() {
   }, [router]);
 
   const handleEdit = useCallback(
-    (item: BhikkuRow) => {
-      router.push(`/bhikkhu/manage/${encodeURIComponent(item.regNo)}`);
+    (item: AramaRow) => {
+      // Use ar_id if available, otherwise use ar_trn
+      const id = item.ar_id ? String(item.ar_id) : item.ar_trn;
+      router.push(`/temple/arama/${encodeURIComponent(id)}/update`);
     },
     [router]
   );
 
   const handleDelete = useCallback(
-    async (item: BhikkuRow) => {
+    async (item: AramaRow) => {
       const ok =
         typeof window !== "undefined"
-          ? window.confirm(`Delete Bhikku ${item.regNo}?`)
+          ? window.confirm(`Delete Arama ${item.ar_trn}?`)
           : true;
       if (!ok) return;
       setLoading(true);
       try {
-        await _manageBhikku({
+        await _manageArama({
           action: "DELETE",
-          payload: { br_regn: item.regNo },
+          payload: { ar_id: item.ar_id },
         });
+        toast.success("Arama deleted successfully");
         await fetchData(undefined, filters);
       } catch (e) {
         console.error("Delete Error:", e);
+        toast.error("Failed to delete arama");
       } finally {
         setLoading(false);
       }
@@ -438,7 +431,7 @@ export default function RecordList() {
                 className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
                 style={{ width: "min(90vw, 900px)" }}
                 role="dialog"
-                aria-label="Bhikku filters"
+                aria-label="Arama filters"
               >
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-lg font-semibold text-slate-800">
@@ -466,86 +459,28 @@ export default function RecordList() {
                             searchKey: e.target.value,
                           }))
                         }
-                        placeholder="Search by name, reg. no, etc."
+                        placeholder="Search by name, TRN, etc."
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </label>
                   </div>
 
-                  {/* Temple Autocomplete (uses TRN) */}
                   <div className="lg:col-span-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-temple"
-                          label="Temples"
-                          initialDisplay={filters.templeDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: trn ?? "",
-                              templeDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search temple"
-                        />
-                      </div>
-                      {filters.templeTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: "",
-                              templeDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Child Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-child-temple"
-                          label="Child Temple"
-                          initialDisplay={filters.childTempleDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: trn ?? "",
-                              childTempleDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search child temple"
-                        />
-                      </div>
-                      {filters.childTempleTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear child temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: "",
-                              childTempleDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-sm text-gray-600">Arama TRN</span>
+                      <input
+                        type="text"
+                        value={filters.arTrn}
+                        onChange={(e) =>
+                          setFilters((s) => ({
+                            ...s,
+                            arTrn: e.target.value,
+                          }))
+                        }
+                        placeholder="ARN0000001"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
                   </div>
 
                   <div className="flex flex-col gap-1">
@@ -617,26 +552,22 @@ export default function RecordList() {
                     />
                   </div>
 
-                  <div>
-                    <BhikkhuCategorySelect
-                      id="flt-category"
-                      label="Category"
-                      value={filters.category}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, category: code }))
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm text-gray-600">Workflow Status</span>
+                    <select
+                      value={filters.workflow_status}
+                      onChange={(e) =>
+                        setFilters((s) => ({ ...s, workflow_status: e.target.value }))
                       }
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuStatusSelect
-                      id="flt-status"
-                      label="Current Status"
-                      value={filters.status}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, status: code }))
-                      }
-                    />
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="PENDING">PENDING</option>
+                      <option value="PRINTED">PRINTED</option>
+                      <option value="PEND-APPROVAL">PEND-APPROVAL</option>
+                      <option value="COMPLETED">COMPLETED</option>
+                      <option value="REJECTED">REJECTED</option>
+                    </select>
                   </div>
 
                   <LabeledDate
@@ -694,12 +625,12 @@ export default function RecordList() {
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-slate-600">
-              {records.length
+              {totalRecords > 0
                 ? `Showing ${
                     (filters.page - 1) * filters.limit + 1
                   } to ${
-                    (filters.page - 1) * filters.limit + records.length
-                  }`
+                    Math.min((filters.page - 1) * filters.limit + records.length, totalRecords)
+                  } of ${totalRecords} records`
                 : "No records to display"}
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -752,6 +683,7 @@ export default function RecordList() {
             </div>
           </div>
         </main>
+      <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
   );
 }

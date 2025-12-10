@@ -142,7 +142,7 @@ export const aramaSteps = (): StepConfig<AramaForm>[] => [
     fields: [
       { name: "chief_nun_name", label: "Current Chief Nun (Aramādhipathi)", type: "text", rules: { required: true } },
       { name: "chief_nun_registration_number", label: "Chief Nun's Registration Number (Dept. of Buddhist Affairs)", type: "text", rules: { required: true } },
-      { name: "established_period", label: "Established Period / Year of the Aramaya", type: "text", rules: { required: true } },
+      { name: "established_period", label: "Established Period / Year of the Aramaya", type: "date", rules: { required: true } },
     ],
   },
   {

@@ -143,6 +143,125 @@ function AddAramaPageInner() {
     if (currentStep > 1) setCurrentStep((s) => s - 1);
   };
 
+  // Helper function to map form fields to API field names
+  // Backend expects snake_case field names with ar_ prefix for main fields
+  // Array fields use camelCase (serialNumber, landName, etc.)
+  const mapFormToApiFields = (formData: Partial<AramaForm>, parsedAramaOwnedLand: any[], parsedResidentSilmathas: any[]) => {
+    // Map temple_owned_land array fields - use camelCase as per API
+    const mappedLand = parsedAramaOwnedLand.map((land: any) => ({
+      serialNumber: land.serialNumber ?? land.serial_number ?? 0,
+      landName: land.landName ?? land.land_name ?? "",
+      village: land.village ?? "",
+      district: land.district ?? "",
+      extent: land.extent ?? "",
+      cultivationDescription: land.cultivationDescription ?? land.cultivation_description ?? "",
+      ownershipNature: land.ownershipNature ?? land.ownership_nature ?? "",
+      deedNumber: land.deedNumber ?? land.deed_number ?? "",
+      titleRegistrationNumber: land.titleRegistrationNumber ?? land.title_registration_number ?? "",
+      taxDetails: land.taxDetails ?? land.tax_details ?? "",
+      landOccupants: land.landOccupants ?? land.land_occupants ?? "",
+    }));
+
+    // Map resident_silmathas array fields - convert form structure to API structure
+    const mappedSilmathas = parsedResidentSilmathas.map((silmatha: any) => ({
+      name: silmatha.silmathaName ?? silmatha.name ?? "",
+      national_id: silmatha.registrationNumber ?? silmatha.national_id ?? "",
+      date_of_birth: "", // Not in form, set empty
+      ordination_date: "", // Not in form, set empty
+      position: silmatha.occupationEducation?.split(',')[0]?.trim() ?? "",
+      is_head_nun: silmatha.serialNumber === 1,
+      notes: silmatha.occupationEducation?.split(',').slice(1).join(', ').trim() ?? "",
+    }));
+
+    // Owner code is a constant
+    const ownerCode = "SL2025001";
+
+    // Parse donor_families_count to number for ar_fmlycnt
+    const donorCount = formData.donor_families_count ? parseInt(formData.donor_families_count, 10) : 0;
+    const donorCountNum = isNaN(donorCount) ? 0 : donorCount;
+
+    // Parse established_period to date format for ar_bgndate (YYYY-MM-DD)
+    let bgndate: string | null = null;
+    if (formData.established_period) {
+      const periodStr = toYYYYMMDD(formData.established_period);
+      if (periodStr) {
+        bgndate = periodStr;
+      }
+    }
+
+    // Return payload with backend field names (snake_case with ar_ prefix)
+    const payload: any = {
+      // Step 1: Basic Information
+      ar_mobile: formData.telephone_number ?? "",
+      ar_whtapp: formData.whatsapp_number ?? "",
+      ar_email: formData.email_address ?? "",
+      ar_typ: "ARAMA",
+      ar_gndiv: formData.grama_niladhari_division ?? "",
+      ar_ownercd: ownerCode,
+      ar_parshawa: "PR005", // Constant as per user request
+      ar_vname: formData.arama_name ?? "",
+      ar_addrs: formData.arama_address ?? "",
+      
+      // Step 2: Administrative Divisions
+      ar_province: formData.province ?? "",
+      ar_district: formData.district ?? "",
+      ar_divisional_secretariat: formData.divisional_secretariat ?? "",
+      ar_pradeshya_sabha: formData.provincial_sasanaarakshaka_council ?? "",
+      
+      // Step 3: Administrative Details
+      ar_nikaya: "", // Not in form, set empty
+      ar_viharadhipathi_name: formData.chief_nun_name ?? "",
+      ar_period_established: formData.established_period ? toYYYYMMDD(formData.established_period) : "",
+      
+      // Step 4: Assets & Activities
+      ar_buildings_description: formData.existing_buildings_facilities ?? "",
+      ar_dayaka_families_count: formData.donor_families_count ?? "",
+      ar_fmlycnt: donorCountNum,
+      ar_bgndate: bgndate,
+      ar_kulangana_committee: formData.committees ?? "",
+      ar_dayaka_sabha: "", // Not in form
+      ar_temple_working_committee: "", // Not in form
+      ar_other_associations: "", // Not in form
+      
+      // Step 5: Land Information
+      temple_owned_land: mappedLand,
+      ar_land_info_certified: formData.land_info_certified ?? false,
+      
+      // Step 6: Resident Silmathas
+      resident_silmathas: mappedSilmathas,
+      ar_resident_silmathas_certified: formData.resident_silmathas_certified ?? false,
+      
+      // Step 7: Inspection
+      ar_inspection_report: formData.inspection_report ?? "",
+      ar_inspection_code: formData.inspection_code ?? "",
+      
+      // Step 8: Ownership
+      ar_grama_niladhari_division_ownership: formData.ownership_grama_niladhari_division ?? "",
+      ar_sanghika_donation_deed: formData.pooja_deed_obtained ?? false,
+      ar_government_donation_deed: formData.government_pooja_deed_obtained ?? false,
+      ar_government_donation_deed_in_progress: formData.government_pooja_deed_in_progress ?? false,
+      ar_authority_consent_attached: formData.institution_consent_obtained ?? false,
+      ar_recommend_new_center: formData.recommend_new_center ?? false,
+      ar_recommend_registered_temple: formData.recommend_registered_arama ?? false,
+      
+      // Step 9: Annex II
+      ar_annex2_recommend_construction: false, // Not in form
+      ar_annex2_land_ownership_docs: formData.annex2_land_ownership_docs ?? false,
+      ar_annex2_chief_incumbent_letter: formData.annex2_chief_nun_registered ?? false,
+      ar_annex2_coordinator_recommendation: formData.annex2_district_association_recommendation ?? false,
+      ar_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation ?? false,
+      ar_annex2_approval_construction: false, // Not in form
+      ar_annex2_referral_resubmission: false, // Not in form
+    };
+
+    // Only include ar_bgndate if we have a valid date value
+    if (bgndate) {
+      payload.ar_bgndate = bgndate;
+    }
+
+    return payload;
+  };
+
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
@@ -154,17 +273,8 @@ function AddAramaPageInner() {
     try {
       setSubmitting(true);
       // Parse JSON strings back to objects/arrays
-      let parsedResidentSilmathas: any[] = [];
       let parsedAramaOwnedLand: any[] = [];
-      
-      try {
-        parsedResidentSilmathas = values.resident_silmathas 
-          ? (typeof values.resident_silmathas === 'string' ? JSON.parse(values.resident_silmathas) : values.resident_silmathas)
-          : [];
-      } catch (e) {
-        console.error("Error parsing resident_silmathas:", e);
-        parsedResidentSilmathas = [];
-      }
+      let parsedResidentSilmathas: any[] = [];
       
       try {
         parsedAramaOwnedLand = values.arama_owned_land 
@@ -175,13 +285,18 @@ function AddAramaPageInner() {
         parsedAramaOwnedLand = [];
       }
       
-      const payload: any = {
-        ...values,
-        resident_silmathas: parsedResidentSilmathas,
-        arama_owned_land: parsedAramaOwnedLand,
-      };
-      console.log("Arama Form Payload:", payload);
-      await _manageArama({ action: "CREATE", payload: { data: payload } } as any);
+      try {
+        parsedResidentSilmathas = values.resident_silmathas 
+          ? (typeof values.resident_silmathas === 'string' ? JSON.parse(values.resident_silmathas) : values.resident_silmathas)
+          : [];
+      } catch (e) {
+        console.error("Error parsing resident_silmathas:", e);
+        parsedResidentSilmathas = [];
+      }
+      
+      const apiPayload = mapFormToApiFields(values, parsedAramaOwnedLand, parsedResidentSilmathas);
+      console.log("Arama Form Payload:", apiPayload);
+      await _manageArama({ action: "CREATE", payload: { data: apiPayload } } as any);
 
       toast.success(aramaId ? "Arama updated successfully." : "Arama created successfully.", {
         autoClose: 1200,
@@ -353,7 +468,8 @@ function AddAramaPageInner() {
                       {/* Step 4: Land & Facilities */}
                       {currentStep === 4 && current.fields.map((f) => {
                         const id = String(f.name);
-                        const val = (values[f.name] as unknown as string) ?? "";
+                        const rawVal = (values[f.name] as unknown as string) ?? "";
+                        const val = f.type === "date" ? toYYYYMMDD(rawVal) : rawVal;
                         const err = errors[f.name];
                         
                         if (id === "land_ownership") {
@@ -403,6 +519,7 @@ function AddAramaPageInner() {
                               type={f.type}
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
+                              max={f.type === "date" ? today : undefined}
                               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                               placeholder={f.placeholder}
                             />
@@ -413,7 +530,7 @@ function AddAramaPageInner() {
 
                       {/* Step 8: Ownership Statement - Special handling */}
                       {currentStep === 8 && (
-                        <div className="md:col-span-2 space-y-4">
+                        <div className="md:col-span-2 space-y-1">
                           <div className="text-sm text-slate-700 mb-4">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <span>In the</span>
@@ -635,7 +752,8 @@ function AddAramaPageInner() {
                         <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                           {current.fields.map((f) => {
                             const id = String(f.name);
-                            const val = (values[f.name] as unknown as string) ?? "";
+                            const rawVal = (values[f.name] as unknown as string) ?? "";
+                            const val = f.type === "date" ? toYYYYMMDD(rawVal) : rawVal;
                             const err = errors[f.name];
 
                             if (f.type === "textarea") {
@@ -664,6 +782,7 @@ function AddAramaPageInner() {
                                   type={f.type}
                                   value={val}
                                   onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                  max={f.type === "date" ? today : undefined}
                                   className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                   placeholder={f.placeholder}
                                 />
@@ -677,7 +796,8 @@ function AddAramaPageInner() {
                       {/* Regular fields for other steps */}
                       {currentStep !== 1 && currentStep !== 2 && currentStep !== 4 && currentStep !== 5 && currentStep !== 6 && currentStep !== 8 && currentStep !== 9 && currentStep !== 10 && current.fields.map((f) => {
                         const id = String(f.name);
-                        const val = (values[f.name] as unknown as string) ?? "";
+                        const rawVal = (values[f.name] as unknown as string) ?? "";
+                        const val = f.type === "date" ? toYYYYMMDD(rawVal) : rawVal;
                         const err = errors[f.name];
 
                         // Skip table fields in regular rendering
@@ -710,6 +830,7 @@ function AddAramaPageInner() {
                               type={f.type}
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
+                              max={f.type === "date" ? today : undefined}
                               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                               placeholder={f.placeholder}
                             />
