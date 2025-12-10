@@ -278,8 +278,3 @@
 .animate-chatbot-wiggle {
   animation: chatbot-wiggle 0.5s ease-in-out;
 }
-
-/* Ensure page content stays above the fixed footer */
-main {
-  padding-bottom: 8rem;
-}

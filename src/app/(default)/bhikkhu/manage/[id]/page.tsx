@@ -9,12 +9,11 @@ import React, {
   Suspense,
 } from "react";
 import { useRouter } from "next/navigation";
-import { _manageBhikku, _approveBhikkhu, _rejectBhikkhu, _markPrintedBhikkhu, _uploadScannedDocument } from "@/services/bhikku";
+import { _manageBhikku } from "@/services/bhikku";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-import { getStoredUserData } from "@/utils/userData";
 
 import {
   DateField,
@@ -39,22 +38,12 @@ import type {
 
 import QRCode from "react-qr-code";
 import { Tabs } from "@/components/ui/Tabs";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button as MuiButton,
-  TextField,
-} from "@mui/material";
-import { Worker, Viewer } from "@react-pdf-viewer/core";
-import "@react-pdf-viewer/core/lib/styles/index.css";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const HIDDEN_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
+  "br_fathrname",
   "br_email",
   "br_fathrsaddrs",
   "br_mobile",
@@ -72,9 +61,6 @@ const OPTIONAL_LOCATION_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
 const CERTIFICATE_URL_BASE =
   "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
-const API_BASE_URL = "https://api.dbagovlk.com";
-const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
-const ADMIN_ROLE_LEVEL = "ADMIN";
 
 type CertificateMeta = {
   number: string;
@@ -168,8 +154,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [printingMarking, setPrintingMarking] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const certificatePaperRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -177,25 +161,14 @@ function ManageBhikkhuInner({ params }: PageProps) {
     number: "",
     url: "",
   });
-  const [existingScanUrl, setExistingScanUrl] = useState<string | null>(null);
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
-  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [accessChecked, setAccessChecked] = useState(false);
-  const [accessDenied, setAccessDenied] = useState(false);
-  const [canAdminActions, setCanAdminActions] = useState(false);
-  
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
-  const isUploadTab = stepTitle === "Upload Scanned Files";
 
   const fieldLabels: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
@@ -249,18 +222,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
       return next;
     });
   };
-
-  useEffect(() => {
-    const stored = getStoredUserData();
-    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
-      setAccessDenied(true);
-      router.replace("/");
-      setAccessChecked(true);
-      return;
-    }
-    setCanAdminActions(stored.roleLevel === ADMIN_ROLE_LEVEL);
-    setAccessChecked(true);
-  }, [router]);
 
   const validateTab = (tabIndex: number): boolean => {
     const step = steps[tabIndex - 1];
@@ -316,115 +277,28 @@ function ManageBhikkhuInner({ params }: PageProps) {
     }
   };
 
-  const collectApprovalErrors = (source: any) => {
-    const container = source?.data ?? source;
-    const rawErrors =
-      container?.errors ??
-      container?.[""] ??
-      container?.data?.errors ??
-      container?.data?.[""];
-    const messages = Array.isArray(rawErrors)
-      ? rawErrors
-          .map((err) => {
-            if (!err) return "";
-            const msg = err.message ?? err.msg ?? "";
-            const field = err.field ?? err.name ?? "";
-            if (field && msg) return `${field}: ${msg}`;
-            if (msg) return msg;
-            return field ? `${field}: Validation failed.` : "";
-          })
-          .filter(Boolean)
-      : [];
-    const fallback =
-      container?.message ??
-      container?.data?.message ??
-      "Failed to approve. Please try again.";
-    return { messages, fallback };
-  };
-
-  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
-  const handleCloseApproveDialog = () => {
-    if (approving) return;
-    setApproveDialogOpen(false);
-  };
-  const handleOpenPrintDialog = () => setPrintDialogOpen(true);
-  const handleClosePrintDialog = () => {
-    if (printingMarking) return;
-    setPrintDialogOpen(false);
-  };
-  const handleOpenRejectDialog = () => {
-    setRejectionReason("");
-    setRejectDialogOpen(true);
-  };
-  const handleCloseRejectDialog = () => {
-    if (rejecting) return;
-    setRejectDialogOpen(false);
-  };
-
   const handleApprove = async () => {
+    if (
+      !window.confirm(
+        "Approve this registration? This action may be irreversible."
+      )
+    )
+      return;
     try {
       setApproving(true);
-      setApproveDialogOpen(false);
-      const res = await _approveBhikkhu(editId);
-      const payload = (res as any)?.data ?? res;
-      const success =
-        (payload as any)?.success ??
-        true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
-      }
+      await _manageBhikku({
+        action: "APPROVE",
+        payload: { br_regn: editId },
+      } as any);
       toast.success("Approved successfully.", { autoClose: 1200 });
     } catch (e: unknown) {
-      const data = (e as any)?.response?.data ?? (e as any)?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
+      const msg =
+        e instanceof Error
           ? e.message
-          : "Failed to approve. Please try again.");
-      toast.error(errMsg);
+          : "Failed to approve. Please try again.";
+      toast.error(msg);
     } finally {
       setApproving(false);
-    }
-  };
-
-  const handleReject = async () => {
-    try {
-      setRejecting(true);
-      const reason = rejectionReason.trim();
-      if (!reason) {
-        toast.error("Please enter a rejection reason.");
-        setRejecting(false);
-        return;
-      }
-      setRejectDialogOpen(false);
-      const res = await _rejectBhikkhu(editId, {
-        rejection_reason: reason,
-      });
-      const payload = (res as any)?.data ?? res;
-      const success = (payload as any)?.success ?? true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
-      }
-      toast.success("Rejected successfully.", { autoClose: 1200 });
-      setRejectionReason("");
-    } catch (e: unknown) {
-      const data = (e as any)?.response?.data ?? (e as any)?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
-          ? e.message
-          : "Failed to reject. Please try again.");
-      toast.error(errMsg);
-    } finally {
-      setRejecting(false);
     }
   };
 
@@ -661,8 +535,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
           ? `${CERTIFICATE_URL_BASE}/${encodeURIComponent(certificateNumber)}`
           : "";
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
-        const scanUrl = resolveScanUrl(api?.br_scanned_document_path);
-        setExistingScanUrl(scanUrl);
 
         if (formPatch.br_nikaya && formPatch.br_parshawaya) {
           const p = parshawaOptions(formPatch.br_nikaya).find(
@@ -693,79 +565,29 @@ function ManageBhikkhuInner({ params }: PageProps) {
     certificateMeta.url || "Not assigned yet";
   const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
   const hasCertificateUrl = Boolean(certificateMeta.url);
-  const MAX_SCAN_BYTES = 5 * 1024 * 1024;
-  const resolveScanUrl = (path?: string | null) => {
-    if (!path) return null;
-    const trimmed = String(path).trim();
-    if (!trimmed) return null;
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-    return `${API_BASE_URL}${normalizedPath}`;
-  };
-  const formatFileSize = (bytes: number) => {
-    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${bytes} B`;
-  };
   const handlePrintCertificate = () => {
     window.print();
-  };
-  const handleConfirmPrintCertificate = async () => {
-    try {
-      setPrintingMarking(true);
-      const res = await _markPrintedBhikkhu(editId);
-      const payload = (res as any)?.data ?? res;
-      const success = (payload as any)?.success ?? true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
-      }
-    } catch (e: unknown) {
-      const data = (e as any)?.response?.data ?? (e as any)?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
-          ? e.message
-          : "Failed to mark as printed. Please try again.");
-      toast.error(errMsg);
-    } finally {
-      setPrintDialogOpen(false);
-      setShowUploadModal(true);
-      handlePrintCertificate();
-      setPrintingMarking(false);
-    }
+    setShowUploadModal(true);
   };
 
   const handleScanFileChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      setScannedFile(null);
-      setScanPreviewUrl(null);
-      return;
-    }
-    if (file.size > MAX_SCAN_BYTES) {
-      toast.error("File too large. Maximum allowed size is 5 MB.");
-      setScannedFile(null);
-      setScanPreviewUrl(null);
-      e.target.value = "";
-      return;
-    }
-    setScannedFile(file);
-    if (file.type?.startsWith("image/")) {
-      const url = URL.createObjectURL(file);
-      setScanPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return url;
-      });
-    } else {
-      setScanPreviewUrl(null);
-    }
+    setScannedFile(file ?? null);
   };
+
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") resolve(result.split(",")[1] ?? "");
+        else reject(new Error("Failed to read file"));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const handleUploadScannedCertificate = async () => {
     if (!scannedFile) {
@@ -774,40 +596,20 @@ function ManageBhikkhuInner({ params }: PageProps) {
     }
     try {
       setUploadingScan(true);
-      const res = await _uploadScannedDocument(editId, scannedFile);
-      const payload = (res as any)?.data ?? res;
-      const success = (payload as any)?.success ?? true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
-      }
+      const base64 = await fileToBase64(scannedFile);
+      await _manageBhikku({
+        action: "CERTIFICATES_UPLOAD_SCAN",
+        payload: {
+          br_regn: editId,
+          file_name: scannedFile.name,
+          file_content: base64,
+        },
+      } as any);
       toast.success("Scan uploaded successfully.");
       setShowUploadModal(false);
       setScannedFile(null);
-      const newPath =
-        (payload as any)?.data?.br_scanned_document_path ??
-        (payload as any)?.br_scanned_document_path ??
-        null;
-      const resolvedNew = newPath ? resolveScanUrl(newPath) : null;
-      if (resolvedNew) {
-        setExistingScanUrl(resolvedNew);
-      } else if (scanPreviewUrl) {
-        setExistingScanUrl(scanPreviewUrl);
-      }
-      if (scanPreviewUrl && resolvedNew) {
-        URL.revokeObjectURL(scanPreviewUrl);
-        setScanPreviewUrl(null);
-      }
     } catch (err: any) {
-      const data = err?.response?.data ?? err?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const msg =
-        messages.join("\n") ||
-        fallback ||
-        err?.message ||
-        "Failed to upload scan.";
-      toast.error(msg);
+      toast.error(err?.message || "Failed to upload scan.");
     } finally {
       setUploadingScan(false);
     }
@@ -815,77 +617,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const handleCloseUploadModal = () => {
     setShowUploadModal(false);
     setScannedFile(null);
-    if (scanPreviewUrl) {
-      URL.revokeObjectURL(scanPreviewUrl);
-      setScanPreviewUrl(null);
-    }
   };
-  const renderExistingScan = () => {
-    if (!existingScanUrl) return null;
-    const lower = existingScanUrl.toLowerCase();
-    const isImage =
-      lower.endsWith(".png") ||
-      lower.endsWith(".jpg") ||
-      lower.endsWith(".jpeg") ||
-      lower.endsWith(".gif") ||
-      lower.endsWith(".webp");
-    const isPdf = lower.includes(".pdf");
-    return (
-      <div className="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Current scanned document
-            </p>
-            <a
-              href={existingScanUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-slate-600 underline"
-            >
-              {existingScanUrl}
-            </a>
-          </div>
-          <div className="text-xs rounded-full bg-green-100 px-3 py-1 text-green-700">
-            Latest upload
-          </div>
-        </div>
-        {isImage ? (
-          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-            <img
-              src={existingScanUrl}
-              alt="Scanned certificate"
-              className="w-full max-h-96 object-contain"
-            />
-          </div>
-        ) : isPdf ? (
-          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-            <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
-              <Viewer fileUrl={existingScanUrl} withCredentials={false} />
-            </Worker>
-          </div>
-        ) : null}
-      </div>
-    );
-  };
-
-  if (!accessChecked) {
-    return (
-      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm text-gray-500">Checking access...</p>
-      </div>
-    );
-  }
-
-  if (accessDenied) {
-    return (
-      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-sm font-medium text-red-600">
-          You do not have access to this section.
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -907,38 +639,22 @@ function ManageBhikkhuInner({ params }: PageProps) {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {editId}</p>
                   </div>
-                  {canAdminActions && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleOpenRejectDialog}
-                        disabled={loading || saving || rejecting}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all
-                          ${
-                            loading || saving || rejecting
-                              ? "bg-red-700/60 text-white cursor-not-allowed"
-                              : "bg-red-600 text-white hover:bg-red-700"
-                          }`}
-                        aria-label="Reject registration"
-                        title="Reject registration"
-                      >
-                      {rejecting ? "Rejecting..." : "Reject"}
-                      </button>
-                      <button
-                        onClick={handleOpenApproveDialog}
-                        disabled={loading || saving || approving}
-                        className={`px-4 py-2 rounded-lg font-medium transition-all
-                          ${
-                            loading || saving || approving
-                              ? "bg-green-700/60 text-white cursor-not-allowed"
-                              : "bg-green-600 text-white hover:bg-green-700"
-                          }`}
-                        aria-label="Approve registration"
-                        title="Approve registration"
-                      >
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleApprove}
+                      disabled={loading || saving || approving}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all
+                        ${
+                          loading || saving || approving
+                            ? "bg-green-700/60 text-white cursor-not-allowed"
+                            : "bg-green-600 text-white hover:bg-green-700"
+                        }`}
+                      aria-label="Approve registration"
+                      title="Approve registration"
+                    >
                       {approving ? "Approving…" : "Approve"}
-                      </button>
-                    </div>
-                  )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -982,11 +698,10 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                     </p>
                                   </div>
                                   <button
-                                    onClick={handleOpenPrintDialog}
-                                    disabled={printingMarking}
-                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    onClick={handlePrintCertificate}
+                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400"
                                   >
-                                    {printingMarking ? "Please wait..." : "Print QR on Certificate"}
+                                    Print QR on Certificate
                                   </button>
                                 </div>
                                 <p className="text-xs text-slate-500">
@@ -1042,14 +757,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                   }
                                 }
                               `}</style>
-                            </div>
-                          ) : isUploadTab ? (
-                            <div className="space-y-6">
-                              {renderExistingScan() ?? (
-                                <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-500">
-                                  No scanned document uploaded yet.
-                                </div>
-                              )}
                             </div>
                           ) : (
                             <>
@@ -1680,21 +1387,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
                   onChange={handleScanFileChange}
                 />
                 {scannedFile ? (
-                  <div className="mt-3 text-xs text-slate-600 space-y-1">
-                    <p>Selected: {scannedFile.name}</p>
-                    <p>Size: {formatFileSize(scannedFile.size)}</p>
-                  </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    Selected: {scannedFile.name}
+                  </p>
                 ) : null}
               </div>
-              {scanPreviewUrl ? (
-                <div className="overflow-hidden rounded-xl border border-slate-200">
-                  <img
-                    src={scanPreviewUrl}
-                    alt="Selected scan preview"
-                    className="w-full max-h-80 object-contain bg-slate-50"
-                  />
-                </div>
-              ) : null}
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
@@ -1717,97 +1414,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
           </div>
         </div>
       ) : null}
-
-      <Dialog
-        open={approveDialogOpen}
-        onClose={handleCloseApproveDialog}
-        aria-labelledby="approve-dialog-title"
-      >
-        <DialogTitle id="approve-dialog-title">
-          Approve registration?
-        </DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Approving will finalize this record. This action may be irreversible.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <MuiButton onClick={handleCloseApproveDialog} disabled={approving}>
-            Cancel
-          </MuiButton>
-          <MuiButton
-            onClick={handleApprove}
-            disabled={approving}
-            color="primary"
-            variant="contained"
-          >
-            {approving ? "Approving..." : "Approve"}
-          </MuiButton>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={printDialogOpen}
-        onClose={handleClosePrintDialog}
-        aria-labelledby="print-dialog-title"
-      >
-        <DialogTitle id="print-dialog-title">Print QR on Certificate?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            This will mark the certificate as printed and open the print dialog for the QR. Continue?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <MuiButton onClick={handleClosePrintDialog} disabled={printingMarking}>
-            Cancel
-          </MuiButton>
-          <MuiButton
-            onClick={handleConfirmPrintCertificate}
-            disabled={printingMarking}
-            variant="contained"
-          >
-            {printingMarking ? "Marking..." : "Confirm & Print"}
-          </MuiButton>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={rejectDialogOpen}
-        onClose={handleCloseRejectDialog}
-        aria-labelledby="reject-dialog-title"
-      >
-        <DialogTitle id="reject-dialog-title">Reject registration?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Rejecting will mark this registration as declined.
-          </DialogContentText>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="rejection-reason"
-            label="Rejection reason"
-            type="text"
-            fullWidth
-            multiline
-            minRows={2}
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <MuiButton onClick={handleCloseRejectDialog} disabled={rejecting}>
-            Cancel
-          </MuiButton>
-          <MuiButton
-            onClick={handleReject}
-            disabled={rejecting}
-            color="error"
-            variant="contained"
-          >
-            {rejecting ? "Rejecting..." : "Reject"}
-          </MuiButton>
-        </DialogActions>
-      </Dialog>
 
       <ToastContainer
         position="top-right"

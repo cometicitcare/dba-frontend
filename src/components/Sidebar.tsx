@@ -1,10 +1,27 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboardIcon } from "lucide-react";
-import { getStoredUserData, UserData } from "@/utils/userData";
+import { LayoutDashboardIcon, UsersIcon } from "lucide-react";
+
 interface SidebarProps {
   isOpen: boolean;
+}
+
+interface UserData {
+  ua_user_id: string;
+  ua_username: string;
+  ua_email: string;
+  ua_first_name: string;
+  ua_last_name: string;
+  ua_phone: string;
+  ua_status: string;
+  ro_role_id: string;
+  role_ids: string[];
+  role: {
+    ro_role_id: string;
+    ro_role_name: string;
+    ro_description: string;
+  };
 }
 
 /** ✅ Icon component type so both Lucide icons and our custom image work */
@@ -20,37 +37,6 @@ const MonkIcon: IconComponent = ({ className }) => (
   />
 );
 
-type SidebarItem = {
-  icon: IconComponent;
-  label: string;
-  path: string;
-};
-
-const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
-  {
-    icon: LayoutDashboardIcon,
-    label: "Dashboard",
-    path: "/",
-  },
-  {
-    icon: MonkIcon,
-    label: "Bhikku",
-    path: "/bhikkhu",
-  },
-  {
-    icon: MonkIcon,
-    label: "Re Print",
-    path: "/print-request",
-  },
-  {
-    icon: MonkIcon,
-    label: "QR Scan",
-    path: "/qr-scan",
-  },
-];
-
-
-
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -58,29 +44,41 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // ✅ Load user data from localStorage
   useEffect(() => {
-    const stored = getStoredUserData();
-    if (stored) setUser(stored);
+    const stored = localStorage.getItem("user");
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      const normalized: UserData | null =
+        parsed && typeof parsed === "object"
+          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
+          : null;
+      if (normalized) setUser(normalized);
+    } catch (err) {
+      console.error("Invalid user data in localStorage", err);
+    }
   }, []);
 
-  const items = useMemo(() => {
-    if (!user) return BASE_SIDEBAR_ITEMS;
-    const primaryDepartment = user.departments?.[0];
-    const primaryRoleLevel = user.roles?.[0]?.ro_level ?? user.roleLevel;
+  // ✅ Menu items with roles from config
+  const allItems: Array<{
+    icon: IconComponent;
+    label: string;
+    path: string;
+  }> = [
+    {
+      icon: LayoutDashboardIcon,
+      label: "Dashboard",
+      path: "/",
+    },
+    {
+      icon: MonkIcon, // ✅ use the custom SVG icon here
+      label: "Bhikku & Sirimatha",
+      path: "/bhikkhu",
+    },
+    // If you still need the Lucide UsersIcon elsewhere, you can add it too:
+    // { icon: UsersIcon, label: "Users", path: "/users", roles: [...] },
+  ];
 
-    if (primaryRoleLevel === "PUBLIC") {
-      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/qr-scan");
-    }
-
-    if (primaryDepartment === "Divisional Secretariat") {
-      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/print-request" || it.path === "/qr-scan");
-    }
-
-    if (primaryDepartment === "Bhikku Management") {
-      return BASE_SIDEBAR_ITEMS;
-    }
-
-    return BASE_SIDEBAR_ITEMS;
-  }, [user]);
+  const items = allItems;
   if (!isOpen) return null;
 
   return (

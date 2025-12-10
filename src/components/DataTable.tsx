@@ -13,15 +13,14 @@ import {
   ChevronsRightIcon,
 } from "lucide-react";
 
-export interface Column<T extends Record<string, unknown> = any> {
-  key: keyof T | string;
+export interface Column {
+  key: string;
   label: string;
   sortable?: boolean;
-  render?: (item: T) => React.ReactNode;
 }
 
 interface DataTableProps<T extends Record<string, unknown> = any> {
-  columns: Column<T>[];
+  columns: Column[];
   data: T[];
   onEdit?: (item: T) => void;
   onDelete?: (item: T) => void;
@@ -195,16 +194,16 @@ export function DataTable<T extends Record<string, unknown> = any>({
             <tr>
               {columns.map((c) => (
                 <th
-                  key={String(c.key)}
+                  key={c.key}
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
                 >
                   {c.sortable ? (
                     <button
-                      onClick={() => handleSort(String(c.key))}
+                      onClick={() => handleSort(c.key)}
                       className="flex items-center gap-2 hover:text-gray-700"
                     >
                       {c.label}
-                      {sortColumn === String(c.key) &&
+                      {sortColumn === c.key &&
                         (sortDirection === "asc" ? (
                           <ChevronUpIcon className="w-4 h-4" />
                         ) : (
@@ -227,26 +226,11 @@ export function DataTable<T extends Record<string, unknown> = any>({
           <tbody className="bg-white divide-y divide-gray-200">
             {displayedRows.map((item, idx) => (
               <tr key={idx} className="hover:bg-gray-50">
-                {columns.map((c) => {
-                  const colKey = String(c.key);
-                  const rawValue = c.render ? c.render(item) : (item as any)?.[colKey];
-                  const content =
-                    rawValue === null || rawValue === undefined
-                      ? ""
-                      : React.isValidElement(rawValue)
-                      ? rawValue
-                      : typeof rawValue === "string" ||
-                        typeof rawValue === "number" ||
-                        typeof rawValue === "boolean"
-                      ? String(rawValue)
-                      : String(rawValue);
-
-                  return (
-                    <td key={colKey} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {content}
-                    </td>
-                  );
-                })}
+                {columns.map((c) => (
+                  <td key={c.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {String(item[c.key] ?? "")}
+                  </td>
+                ))}
                 {(onEdit || onDelete) && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex gap-2">
