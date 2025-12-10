@@ -15,11 +15,10 @@ import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageBhikku } from "@/services/bhikku";
 import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
-import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
-import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
+import LocationPickerStacked from "@/components/Bhikku/Filter/LocationPickerStacked";
 import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
-import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
+import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerStacked";
 import selectionsData from "@/utils/selectionsData.json";
 
 type BhikkuRow = {
@@ -27,11 +26,16 @@ type BhikkuRow = {
   name: string;
   fatherName?: string;
   mobile?: string;
-  email?: string;
   mahanayaka?: string;
   remarks?: string;
   category?: string;
   status?: string;
+  workflowStatus?: string;
+  workflowStatusCode?: string;
+};
+
+type BhikkhuListProps = {
+  canDelete?: boolean;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -90,7 +94,6 @@ type FilterState = {
   gn: string;
   vhTrn: string;
   status: string;
-  category: string;
   dateFrom: string; // yyyy-mm-dd
   dateTo: string; // yyyy-mm-dd
   searchKey: string;
@@ -107,6 +110,62 @@ type RawNikayaEntry = {
   nikaya: { code: string; name: string };
   parshawayas?: Array<{ code: string; name: string }>;
 };
+
+type WorkflowStatusMeta = {
+  label: string;
+  textColor: string;
+  bgColor: string;
+};
+
+// Normalize codes/labels to a single key so slight spelling or spacing differences still match colors
+function normalizeWorkflowKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
+const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
+  (selectionsData as any)?.workflowStatuses
+)
+  ? ((selectionsData as any).workflowStatuses as any[]).reduce(
+      (acc: Record<string, WorkflowStatusMeta>, item) => {
+        const meta: WorkflowStatusMeta = {
+          label: item?.label ?? item?.code ?? "-",
+          textColor: item?.textColor ?? "#1f2937",
+          bgColor: item?.bgColor ?? "#e5e7eb",
+        };
+        const keys = [
+          normalizeWorkflowKey(item?.code),
+          normalizeWorkflowKey(item?.label),
+        ].filter(Boolean) as string[];
+
+        keys.forEach((key) => {
+          if (!acc[key]) acc[key] = meta;
+        });
+
+        return acc;
+      },
+      {}
+    )
+  : {};
+
+function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
+  const code = normalizeWorkflowKey(statusCode);
+  const meta =
+    (code ? WORKFLOW_STATUS_META[code] : undefined) ||
+    (fallbackLabel ? WORKFLOW_STATUS_META[normalizeWorkflowKey(fallbackLabel)] : undefined);
+  const label = meta?.label ?? fallbackLabel ?? statusCode ?? "-";
+
+  if (!meta) return label || "-";
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
 
 const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
   (selectionsData as any)?.nikayas
@@ -133,7 +192,6 @@ const DEFAULT_FILTERS: FilterState = {
   gn: "",
   vhTrn: "",
   status: "",
-  category: "",
   dateFrom: "",
   dateTo: "",
   searchKey: "",
@@ -161,7 +219,6 @@ function buildFilterPayload(f: FilterState) {
   if (f.childTempleTrn) payload.child_temple = f.childTempleTrn;
   if (f.nikaya) payload.nikaya = f.nikaya;
   if (f.parchawa) payload.parshawaya = f.parchawa;
-  if (f.category.length) payload.category = [f.category];
   if (f.status.length) payload.status = [f.status];
   const from = toYYYYMMDD(f.dateFrom);
   if (from) payload.date_from = from;
@@ -171,7 +228,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function BhikkhuList() {
+export default function BhikkhuList({ canDelete = false }: BhikkhuListProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -226,13 +283,17 @@ export default function BhikkhuList() {
     }));
   }, []);
 
-  const columns: Column[] = useMemo(
+  const columns: Column<BhikkuRow>[] = useMemo(
     () => [
-      { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "name", label: "Name", sortable: true },
-      { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
-      { key: "status", label: "Status", sortable: true },
+      { key: "regNo", label: "REG.NO", sortable: true },
+      { key: "name", label: "SAMANERA NAME", sortable: true },
+      {
+        key: "workflowStatus",
+        label: "Workflow Status",
+        render: (row) =>
+          renderWorkflowStatusBadge(row.workflowStatusCode, row.workflowStatus),
+      },
+      { key: "status", label: "STATUS", sortable: true },
     ],
     []
   );
@@ -248,17 +309,45 @@ export default function BhikkhuList() {
         // @ts-expect-error: service typing may be loose
         const res = await _manageBhikku(body, { signal });
         const raw = pickRows<any>(res);
-        const cleaned: BhikkuRow[] = raw.map((row: any) => ({
-          regNo: String(row?.br_regn ?? ""),
-          name: String(row?.br_gihiname ?? ""),
-          fatherName: row?.br_fathrname ?? "",
-          mobile: row?.br_mobile ?? "",
-          email: row?.br_email ?? "",
-          mahanayaka: row?.br_mahananame ?? "",
-          remarks: row?.br_remarks ?? "",
-          category: row?.br_cat ?? "",
-          status: row?.br_currstat?.st_descr ?? "",
-        }));
+        const cleaned: BhikkuRow[] = raw.map((row: any) => {
+          const workflowRaw = row?.br_workflow_status;
+          const workflowStatusCode = normalizeWorkflowKey(
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.code ??
+                  workflowRaw?.status ??
+                  workflowRaw?.st_statcd ??
+                  workflowRaw?.st_code ??
+                  workflowRaw?.status_code ??
+                  workflowRaw?.statusCode ??
+                  ""
+          );
+          const workflowLabel =
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.st_descr ??
+                workflowRaw?.description ??
+                workflowRaw?.label ??
+                workflowRaw?.name ??
+                "";
+          const workflowStatus =
+            WORKFLOW_STATUS_META[workflowStatusCode]?.label ||
+            workflowLabel ||
+            workflowStatusCode;
+
+          return {
+            regNo: String(row?.br_regn ?? ""),
+            name: String(row?.br_mahananame ?? ""),
+            fatherName: row?.br_fathrname ?? "",
+            mobile: row?.br_mobile ?? "",
+            workflowStatus,
+            workflowStatusCode,
+            mahanayaka: row?.br_mahananame ?? "",
+            remarks: row?.br_remarks ?? "",
+            category: row?.br_cat ?? "",
+            status: row?.br_currstat?.st_descr ?? "",
+          };
+        });
         setRecords(cleaned);
         setHasMoreResults(cleaned.length === f.limit);
       } catch (e: any) {
@@ -360,7 +449,8 @@ export default function BhikkhuList() {
     if (!filterPanelOpen) return undefined;
 
     const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
+      const target = event.target as HTMLElement;
+      if (target?.closest('[data-filter-keepopen="true"]')) return;
       if (
         filterPanelRef.current &&
         !filterPanelRef.current.contains(target) &&
@@ -385,10 +475,10 @@ export default function BhikkhuList() {
 
   return (
     <div >
-      <main className="p-6">
+      <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Bhikku List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">SAMANERA LIST</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -434,8 +524,8 @@ export default function BhikkhuList() {
             {filterPanelOpen && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-                style={{ width: "min(90vw, 900px)" }}
+                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
+                style={{ width: "300px", height: "400px" }}
                 role="dialog"
                 aria-label="Bhikku filters"
               >
@@ -452,8 +542,8 @@ export default function BhikkhuList() {
                     <XIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <label className="flex flex-col gap-1">
                       <span className="text-sm text-gray-600">Search</span>
                       <input
@@ -472,7 +562,7 @@ export default function BhikkhuList() {
                   </div>
 
                   {/* Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -510,7 +600,7 @@ export default function BhikkhuList() {
                   </div>
 
                   {/* Child Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -608,22 +698,11 @@ export default function BhikkhuList() {
                     </select>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                    <LocationPicker
+                  <div>
+                    <LocationPickerStacked
                       value={locationSelection}
                       onChange={(sel) => handleLocationChange(sel)}
                       className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuCategorySelect
-                      id="flt-category"
-                      label="Category"
-                      value={filters.category}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, category: code }))
-                      }
                     />
                   </div>
 
@@ -678,7 +757,7 @@ export default function BhikkhuList() {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
             {loading && (

@@ -25,4 +25,4 @@ export const _uploadScannedDocument = async (arId: number, file: File) => {
   return response.data;
 };
 
-
+export const _aramaManage = (body: any) => BackendClient.post(`${baseURL}/silmatha-regist/arama-list`, body);
