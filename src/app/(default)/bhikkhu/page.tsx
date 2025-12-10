@@ -9,6 +9,7 @@ import { Tabs } from '@/components/ui/Tabs'
 import { useRouter } from 'next/navigation'
 import React, { useEffect, useState } from 'react'
 import { getStoredUserData, type UserData } from '@/utils/userData'
+import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from '@/utils/config'
 
 const tabItems = [
     { id: 'bhikkhu', label: 'Bhikkhu List' },
@@ -16,8 +17,6 @@ const tabItems = [
 
   ];
 
-const BHIKKU_MANAGEMENT_DEPARTMENT = 'Bhikku Management';
-const ADMIN_ROLE_LEVEL = 'ADMIN';
 
 export default function Page() {
   const router = useRouter();

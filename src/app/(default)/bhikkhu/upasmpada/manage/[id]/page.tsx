@@ -36,6 +36,8 @@ import { Worker, Viewer } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 import { getStoredUserData } from "@/utils/userData";
 
+import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from "@/utils/config"
+
 type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
@@ -106,13 +108,10 @@ const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
   3: ["currentStatus", "declarationDate"],
 };
 
-const UPASAMPADA_CATEGORY_CODE = "CAT02";
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const API_BASE_URL = "https://api.dbagovlk.com";
 const FALLBACK_PDF_URL =
   "https://api.dbagovlk.com/storage/bhikku_regist/2025/11/23/BH2025000051/scanned_document_20251123_191251_5aa366eb.pdf";
-const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
-const ADMIN_ROLE_LEVEL = "ADMIN";
 
 
 type PageProps = { params: { id: string } };

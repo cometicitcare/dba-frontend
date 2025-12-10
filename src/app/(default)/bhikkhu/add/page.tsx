@@ -8,7 +8,7 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 import {
   DateField,
   LocationPicker,
@@ -87,8 +87,6 @@ function AddBhikkhuPageInner() {
   const [submitting, setSubmitting] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const BHIKKU_MANAGEMENT_DEPARTMENT = 'Bhikku Management';
-  const ADMIN_ROLE_LEVEL = 'ADMIN';
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
