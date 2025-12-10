@@ -190,8 +190,6 @@ export default function Dashboard() {
     setUserData(stored ?? null);
   }, []);
 
-  
-
   const currentImage = useMemo(() => {
     if (!slides.length) return null;
     return slides[currentImageIndex % slides.length];
@@ -217,6 +215,12 @@ export default function Dashboard() {
             },
           ]
         : []),
+      {
+        icon: BuildingIcon,
+        label: "Arama",
+        color: "from-blue-400 to-blue-500",
+        path: "/temple/arama",
+      },  
       {
         icon: UsersIcon,
         label: "Re Print",

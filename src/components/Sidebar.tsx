@@ -50,8 +50,6 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   },
 ];
 
-
-
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();

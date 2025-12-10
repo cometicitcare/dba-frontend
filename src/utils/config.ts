@@ -12,5 +12,6 @@ export const baseURL: string | undefined =
 export const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
 // export const BHIKKU_MANAGEMENT_DEPARTMENT = "Silmatha Management";
 export const SILMATHA_MANAGEMENT_DEPARTMENT = "Silmatha Management";
+export const VIHARA_MANAGEMENT_DEPARTMENT = "Vihara Management";
 
 export const ADMIN_ROLE_LEVEL = 'ADMIN';
