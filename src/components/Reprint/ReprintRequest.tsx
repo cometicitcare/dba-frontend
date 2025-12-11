@@ -24,7 +24,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { _getReprintUrl, _searchId } from "@/services/rePrint";
+import { ReprintResponse, _advanceSearch, _getReprintUrl, _searchId } from "@/services/rePrint";
 import { baseURL } from "@/utils/config";
 import { toast } from "react-toastify";
 
@@ -34,6 +34,24 @@ type Mode = "list" | "create";
 type RecordField = {
   titel: string;
   text: string;
+};
+
+type AdvancedSearchRecord = {
+  entity_type?: string;
+  registration_number?: string;
+  form_id?: string | null;
+  ordained_name?: string;
+  birth_name?: string;
+  date_of_birth?: string;
+  birth_place?: string;
+  mobile?: string | null;
+  email?: string | null;
+  temple_name?: string;
+  temple_address?: string;
+  current_status?: string;
+  workflow_status?: string;
+  ordination_date?: string;
+  request_date?: string;
 };
 
 type RequestStatus = "PENDING" | "APPROVED" | "COMPLETED" | "CANCELLED" | "REJECTED";
@@ -146,6 +164,30 @@ function RecordSummaryCard({ fields, onEdit, onNext }: RecordSummaryCardProps) {
   );
 }
 
+const formatFieldValue = (value?: string | null) => {
+  if (!value) {
+    return "-";
+  }
+  const trimmed = value.trim();
+  return trimmed || "-";
+};
+
+const mapAdvancedRecordToFields = (record: AdvancedSearchRecord): RecordField[] => [
+  { titel: "Registration Number", text: formatFieldValue(record.registration_number) },
+  { titel: "Name", text: formatFieldValue(record.ordained_name) },
+  { titel: "Birth Name", text: formatFieldValue(record.birth_name) },
+  { titel: "Current Status", text: formatFieldValue(record.current_status) },
+  { titel: "Workflow Status", text: formatFieldValue(record.workflow_status) },
+  { titel: "Birth Date", text: formatFieldValue(record.date_of_birth) },
+  { titel: "Birth Place", text: formatFieldValue(record.birth_place) },
+  { titel: "Temple", text: formatFieldValue(record.temple_name) },
+  { titel: "Temple Address", text: formatFieldValue(record.temple_address) },
+  { titel: "Ordination Date", text: formatFieldValue(record.ordination_date) },
+  { titel: "Request Date", text: formatFieldValue(record.request_date) },
+  { titel: "Mobile", text: formatFieldValue(record.mobile) },
+  { titel: "Email", text: formatFieldValue(record.email) },
+];
+
 function StatusPill({ status }: { status: RequestStatus }) {
   const styles: Record<RequestStatus, { color: string; bg: string }> = {
     PENDING: { color: "#b45309", bg: "rgba(251, 191, 36, 0.15)" },
@@ -211,10 +253,17 @@ export default function ReprintRequest() {
   const [mode, setMode] = useState<Mode>("list");
   const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [step, setStep] = useState<Step>("select");
-  const [search, setSearch] = useState("");
   const [recordFields, setRecordFields] = useState<RecordField[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [advSearchInputs, setAdvSearchInputs] = useState({
+    registration_number: "",
+    name: "",
+    birth_date: "",
+    entity_type: "",
+  });
+  const [advancedSearchResults, setAdvancedSearchResults] = useState<AdvancedSearchRecord[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<AdvancedSearchRecord | null>(null);
+  const [advSearchLoading, setAdvSearchLoading] = useState(false);
+  const [advSearchError, setAdvSearchError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
@@ -228,7 +277,12 @@ export default function ReprintRequest() {
     Boolean(formValues.receiptNo) &&
     Boolean(formValues.amount) &&
     Boolean(formValues.requestReason);
-  const canTriggerSearch = search.trim().length > 0 && !searching;
+  const hasAdvancedSearchInput =
+    advSearchInputs.registration_number.trim().length > 0 ||
+    advSearchInputs.name.trim().length > 0 ||
+    advSearchInputs.birth_date.trim().length > 0 ||
+    advSearchInputs.entity_type.trim().length > 0;
+  const canTriggerAdvancedSearch = hasAdvancedSearchInput && !advSearchLoading;
   const [flowStatusInput, setFlowStatusInput] = useState("");
   const [requestTypeInput, setRequestTypeInput] = useState("");
   const [regnInput, setRegnInput] = useState("");
@@ -247,15 +301,22 @@ export default function ReprintRequest() {
   const [rejectingRequestId, setRejectingRequestId] = useState<number | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [markingPrinted, setMarkingPrinted] = useState(false);
 
   const resetFlow = () => {
     setStep("select");
     setRecordFields(null);
-    setSearch("");
-    setSearchError(null);
+    setAdvSearchInputs({
+      registration_number: "",
+      name: "",
+      birth_date: "",
+      entity_type: "",
+    });
+    setAdvancedSearchResults([]);
+    setSelectedCandidate(null);
+    setAdvSearchError(null);
     setSubmitError(null);
-    setSearching(false);
     setSubmitting(false);
     setFormValues({ receiptNo: "", amount: "", remarks: "", requestReason: "" });
   };
@@ -272,6 +333,18 @@ export default function ReprintRequest() {
     setCurrentPage(target);
   };
 
+  const clearViewer = () => {
+    setSelectedRequest(null);
+    setPdfUrl(null);
+    setPdfError(null);
+    if (pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
+    }
+    setApproveError(null);
+    setRejectError(null);
+  };
+
   const handleView = (item: PrintRequest) => {
     setSelectedRequest(item);
     fetchPdf(item.regn);
@@ -281,11 +354,13 @@ export default function ReprintRequest() {
     setRejectingRequestId(Number(id));
     setRejectReason("");
     setRejectError(null);
+    setApproveError(null);
     setRejectDialogOpen(true);
   };
 
   const handleApproveRequest = async (id: number | string) => {
     setRejectError(null);
+    setApproveError(null);
     try {
       const response = await _searchId<{ flow_status?: string }>({
         action: "APPROVE",
@@ -301,8 +376,9 @@ export default function ReprintRequest() {
           "Unable to approve the request.";
         throw new Error(message);
       }
-      fetchRequests();
       toast.success(payload?.message ?? "Reprint request approved.");
+      await fetchRequests();
+      clearViewer();
     } catch (error: any) {
       const message =
         error?.response?.data?.errors?.[0]?.message ||
@@ -310,6 +386,7 @@ export default function ReprintRequest() {
         error?.message ||
         "Unable to approve the request.";
       setRejectError(message);
+      setApproveError(message);
       toast.error(message);
     }
   };
@@ -349,7 +426,8 @@ export default function ReprintRequest() {
         throw new Error(message);
       }
       closeRejectDialog();
-      fetchRequests();
+      await fetchRequests();
+      clearViewer();
       toast.success(payload?.message ?? "Reprint request rejected.");
     } catch (error: any) {
       const message =
@@ -522,36 +600,55 @@ export default function ReprintRequest() {
     }
   };
 
-  const handleSearch = async () => {
-    if (!search.trim()) {
-      setSearchError("Please enter an ID number.");
+  const handleAdvancedSearch = async () => {
+    if (!hasAdvancedSearchInput) {
+      setAdvSearchError("Please fill at least one search field.");
       return;
     }
-    setSearching(true);
-    setSearchError(null);
+    setAdvSearchLoading(true);
+    setAdvSearchError(null);
+    setAdvancedSearchResults([]);
     try {
-      const response = await _searchId<RecordField[]>({
-        action: "READ_ONE",
-        request_id: search.trim(),
-      });
-      const payload = response?.data;
-      const details = payload?.data;
-      if (payload?.status !== "success" || !Array.isArray(details) || details.length === 0) {
-        throw new Error(payload?.message || "Record not found.");
+      const payloadBody: Record<string, string | number> = {
+        skip: 0,
+        limit: 200,
+      };
+      if (advSearchInputs.registration_number.trim()) {
+        payloadBody.registration_number = advSearchInputs.registration_number.trim();
       }
-      setRecordFields(details);
-      setSubmitError(null);
-      setStep("verify");
+      if (advSearchInputs.name.trim()) {
+        payloadBody.name = advSearchInputs.name.trim();
+      }
+      if (advSearchInputs.birth_date) {
+        payloadBody.birth_date = advSearchInputs.birth_date;
+      }
+      if (advSearchInputs.entity_type) {
+        payloadBody.entity_type = advSearchInputs.entity_type;
+      }
+      const response = await _advanceSearch(payloadBody);
+      const payload = response?.data as ReprintResponse<AdvancedSearchRecord[]>;
+      const results = Array.isArray(payload?.data) ? payload.data : [];
+      if (payload?.status !== "success" || results.length === 0) {
+        throw new Error(payload?.message || "No matching records were found.");
+      }
+      setAdvancedSearchResults(results);
+      setAdvSearchError(null);
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Unable to load record details.";
-      setSearchError(message);
-      setRecordFields(null);
+        "Unable to search for records.";
+      setAdvSearchError(message);
+      setAdvancedSearchResults([]);
     } finally {
-      setSearching(false);
+      setAdvSearchLoading(false);
     }
+  };
+
+  const handleSelectCandidate = (candidate: AdvancedSearchRecord) => {
+    setSelectedCandidate(candidate);
+    setRecordFields(mapAdvancedRecordToFields(candidate));
+    setStep("verify");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -567,7 +664,9 @@ export default function ReprintRequest() {
       return;
     }
 
-    const regn = getRecordFieldValue("Registration Number")?.trim() || search.trim();
+    const regn =
+      selectedCandidate?.registration_number?.trim() ||
+      getRecordFieldValue("Registration Number")?.trim();
     if (!regn) {
       setSubmitError("Registration number is missing.");
       return;
@@ -897,11 +996,7 @@ export default function ReprintRequest() {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => {
-                    setSelectedRequest(null);
-                    setPdfUrl(null);
-                    setPdfError(null);
-                  }}
+                  onClick={clearViewer}
                   disabled={markingPrinted}
                 >
                   Close viewer
@@ -917,6 +1012,11 @@ export default function ReprintRequest() {
                   </Button>
                 )}
               </Box>
+              {approveError && (
+                <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+                  {approveError}
+                </Typography>
+              )}
             </Box>
             {!isApprovedRequest && (
               <Box mt={2} display="flex" gap={1} flexWrap="wrap">
@@ -960,48 +1060,178 @@ export default function ReprintRequest() {
 
       {mode === "create" && step === "select" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        
-          <div>
-          <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-            Enter ID Number
-          </label>
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setSearchError(null);
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "16px",
             }}
-              placeholder="ID Number"
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-              }}
-            />
-            {searchError && (
-              <p style={{ marginTop: "8px", color: "#b91c1c", fontSize: "13px" }}>{searchError}</p>
-            )}
+          >
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Registration Number
+              </label>
+              <input
+                value={advSearchInputs.registration_number}
+                onChange={(e) =>
+                  setAdvSearchInputs((prev) => ({ ...prev, registration_number: e.target.value }))
+                }
+                placeholder="Registration number"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Name
+              </label>
+              <input
+                value={advSearchInputs.name}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Name"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Birth Date
+              </label>
+              <input
+                type="date"
+                value={advSearchInputs.birth_date}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, birth_date: e.target.value }))}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Entity Type
+              </label>
+              <select
+                value={advSearchInputs.entity_type}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, entity_type: e.target.value }))}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              >
+                <option value="">All</option>
+                <option value="bhikku">Bhikku</option>
+                <option value="silmatha">Silmatha</option>
+                <option value="high_bhikku">High Bhikku</option>
+                <option value="direct_high_bhikku">Direct High Bhikku</option>
+                <option value="vihara">Vihara</option>
+                <option value="arama">Arama</option>
+                <option value="devala">Devala</option>
+              </select>
+            </div>
           </div>
-
+          {advSearchError && (
+            <p style={{ margin: 0, color: "#b91c1c", fontSize: "13px" }}>{advSearchError}</p>
+          )}
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
-              disabled={!canTriggerSearch}
-              onClick={handleSearch}
+              disabled={!canTriggerAdvancedSearch}
+              onClick={handleAdvancedSearch}
               style={{
                 padding: "10px 16px",
                 borderRadius: "10px",
                 border: "none",
-                background: canTriggerSearch ? "#0ea5e9" : "#cbd5e1",
+                background: canTriggerAdvancedSearch ? "#0ea5e9" : "#cbd5e1",
                 color: "white",
-                cursor: canTriggerSearch ? "pointer" : "not-allowed",
+                cursor: canTriggerAdvancedSearch ? "pointer" : "not-allowed",
                 fontWeight: 600,
               }}
             >
-              {searching ? "Searching..." : "Next"}
+              {advSearchLoading ? "Searching..." : "Search"}
             </button>
           </div>
+          {advancedSearchResults.length > 0 && (
+            <div
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "16px",
+                background: "#f8fafc",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}
+            >
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>
+                Search results ({advancedSearchResults.length})
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {advancedSearchResults.map((record, index) => (
+                  <div
+                    key={`${record.registration_number ?? index}-${index}`}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "10px",
+                      padding: "12px",
+                      background: "white",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ minWidth: "200px" }}>
+                      <div style={{ fontWeight: 600, color: "#0f172a" }}>
+                        {record.ordained_name || record.birth_name || "Unknown"}
+                      </div>
+                      <div style={{ color: "#475569", fontSize: "12px" }}>
+                        {record.registration_number ?? "-"} | {record.current_status ?? "-"}
+                      </div>
+                      <div style={{ color: "#475569", fontSize: "12px" }}>
+                        {record.temple_name ?? "-"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <button
+                        onClick={() => handleSelectCandidate(record)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "#0ea5e9",
+                          color: "white",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Select
+                      </button>
+                      <div style={{ fontSize: "12px", color: "#475569" }}>
+                        Workflow: {record.workflow_status ?? "-"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1010,6 +1240,8 @@ export default function ReprintRequest() {
           fields={recordFields}
           onEdit={() => {
             setRecordFields(null);
+            setSelectedCandidate(null);
+            setAdvSearchError(null);
             setStep("select");
           }}
           onNext={() => setStep("form")}

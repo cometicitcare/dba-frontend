@@ -1,7 +1,6 @@
 ﻿"use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -26,7 +25,6 @@ import {
 } from "@mui/material";
 import { _getReprintUrl, _searchId } from "@/services/rePrint";
 import { baseURL } from "@/utils/config";
-import { toast } from "react-toastify";
 
 type Step = "select" | "verify" | "form";
 type Mode = "list" | "create";
@@ -56,6 +54,41 @@ type PrintRequest = {
   requestedAt: string;
   subject?: SubjectInfo;
 };
+
+const INITIAL_REQUESTS: PrintRequest[] = [
+  {
+    id: "REQ-001",
+    regn: "BHK-001",
+    requestType: "BHIKKU",
+    formNo: "F-101",
+    requestReason: "Duplicate certificate",
+    amount: 1200,
+    remarks: "Urgent delivery",
+    flowStatus: "PENDING",
+    requestedAt: new Date().toISOString(),
+    subject: {
+      name: "Ananda Thero",
+      gihi_name: "Venerable Ananda",
+      phone: "077 123 4567",
+    },
+  },
+  {
+    id: "REQ-002",
+    regn: "H-BHK-024",
+    requestType: "HIGH_BHIKKU",
+    formNo: "F-202",
+    requestReason: "Missing pages",
+    amount: 2500,
+    remarks: "Review required",
+    flowStatus: "APPROVED",
+    requestedAt: new Date(Date.now() - 86400000).toISOString(),
+    subject: {
+      name: "Mahananda Thero",
+      gihi_name: "Gihi Mahananda",
+      phone: "077 987 6543",
+    },
+  },
+];
 
 const SEARCH_SCOPE_OPTIONS = [
   { label: "Vihara", value: "VIHARA" },
@@ -215,9 +248,8 @@ function SubjectInfoCard({ subject }: { subject?: SubjectInfo }) {
 }
 
 export default function Obections() {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>("list");
-  const [requests, setRequests] = useState<PrintRequest[]>([]);
+  const [requests, setRequests] = useState<PrintRequest[]>(INITIAL_REQUESTS);
   const [step, setStep] = useState<Step>("select");
   const [search, setSearch] = useState("");
   const [searchScope, setSearchScope] = useState<SearchScope>(SEARCH_SCOPE_OPTIONS[0].value);
@@ -232,6 +264,12 @@ export default function Obections() {
     remarks: "",
     requestReason: "",
   });
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   const canSubmitForm =
     Boolean(formValues.receiptNo) &&
@@ -243,14 +281,7 @@ export default function Obections() {
   const [regnInput, setRegnInput] = useState("");
   const [filters, setFilters] = useState({ flowStatus: "", requestType: "", regn: "", searchKey: "" });
   const [searchKeyInput, setSearchKeyInput] = useState("");
-  const [tableLoading, setTableLoading] = useState(true);
-  const [tableError, setTableError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PrintRequest | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const pdfIframeRef = React.useRef<HTMLIFrameElement | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingRequestId, setRejectingRequestId] = useState<number | null>(null);
@@ -272,19 +303,19 @@ export default function Obections() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 5;
-  const [totalRecords, setTotalRecords] = useState(0);
-  const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
-  const startEntry = totalRecords === 0 ? 0 : (currentPage - 1) * limit + 1;
-  const endEntry = Math.min(currentPage * limit, totalRecords);
-
-  const goToPage = (page: number) => {
-    const target = Math.min(Math.max(page, 1), totalPages);
-    setCurrentPage(target);
-  };
-
   const handleView = (item: PrintRequest) => {
     setSelectedRequest(item);
-    fetchPdf(item.regn);
+    setRejectError(null);
+  };
+
+  const updateRequestStatus = (targetId: number | string, status: RequestStatus) => {
+    const idKey = String(targetId);
+    setRequests((prev) =>
+      prev.map((req) => (String(req.id) === idKey ? { ...req, flowStatus: status } : req))
+    );
+    setSelectedRequest((prev) =>
+      prev && String(prev.id) === idKey ? { ...prev, flowStatus: status } : prev
+    );
   };
 
   const openRejectDialog = (id: number | string) => {
@@ -294,34 +325,9 @@ export default function Obections() {
     setRejectDialogOpen(true);
   };
 
-  const handleApproveRequest = async (id: number | string) => {
+  const handleApproveRequest = (id: number | string) => {
     setRejectError(null);
-    try {
-      const response = await _searchId<{ flow_status?: string }>({
-        action: "APPROVE",
-        request_id: id,
-      });
-      const payload = response?.data;
-      const success = payload?.status === "success" && (payload?.data?.flow_status || payload?.success);
-      if (!success) {
-        const errors = payload?.errors ?? [];
-        const message =
-          errors.find((err: any) => err?.message)?.message ??
-          payload?.message ??
-          "Unable to approve the request.";
-        throw new Error(message);
-      }
-      fetchRequests();
-      toast.success(payload?.message ?? "Reprint request approved.");
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.errors?.[0]?.message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to approve the request.";
-      setRejectError(message);
-      toast.error(message);
-    }
+    updateRequestStatus(id, "APPROVED");
   };
 
   const closeRejectDialog = () => {
@@ -331,7 +337,7 @@ export default function Obections() {
     setRejectingRequestId(null);
   };
 
-  const submitRejection = async () => {
+  const submitRejection = () => {
     if (!rejectingRequestId) {
       setRejectError("Missing request ID.");
       return;
@@ -342,89 +348,23 @@ export default function Obections() {
     }
     setRejectLoading(true);
     setRejectError(null);
-    try {
-      const response = await _searchId<{ flow_status?: string }>({
-        action: "REJECT",
-        request_id: rejectingRequestId,
-        rejection_reason: rejectReason.trim(),
-      });
-      const payload = response?.data;
-      const success = payload?.status === "success" && (payload?.data?.flow_status || payload?.success);
-      if (!success) {
-        const errors = payload?.errors ?? [];
-        const message =
-          errors.find((err: any) => err?.message)?.message ??
-          payload?.message ??
-          "Unable to reject the request.";
-        throw new Error(message);
-      }
-      closeRejectDialog();
-      fetchRequests();
-      toast.success(payload?.message ?? "Reprint request rejected.");
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.errors?.[0]?.message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to reject the request.";
-      setRejectError(message);
-      toast.error(message);
-    } finally {
-      setRejectLoading(false);
-    }
+    updateRequestStatus(rejectingRequestId, "REJECTED");
+    setRejectLoading(false);
+    closeRejectDialog();
   };
 
-  const handleMarkPrinted = async () => {
+  const handleMarkPrinted = () => {
     if (!selectedRequest) return;
     setMarkingPrinted(true);
     setRejectError(null);
-    try {
-      const response = await _searchId<{ flow_status?: string }>({
-        action: "MARK_PRINTED",
-        request_id: selectedRequest.id,
-      });
-      const payload = response?.data;
-      const success = payload?.status === "success" && (payload?.data?.flow_status || payload?.success);
-      if (!success) {
-        const errors = payload?.errors ?? [];
-        const message =
-          errors.find((err: any) => err?.message)?.message ??
-          payload?.message ??
-          "Unable to mark the request as printed.";
-        throw new Error(message);
-      }
-      toast.success(payload?.message ?? "Reprint request marked as completed.");
-      fetchRequests();
-      if (pdfBlobUrl) {
-        const printWindow = window.open(pdfBlobUrl, "_blank");
-        if (printWindow) {
-          printWindow.onload = () => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-          };
-        }
-      }
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.errors?.[0]?.message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to mark the request as printed.";
-      setRejectError(message);
-      toast.error(message);
-    } finally {
-      setMarkingPrinted(false);
-    }
+    updateRequestStatus(selectedRequest.id, "COMPLETED");
+    setMarkingPrinted(false);
   };
 
   const getRecordFieldValue = (label: string) =>
     recordFields?.find((field) => field.titel === label)?.text;
 
   const allowedStatuses: RequestStatus[] = ["PENDING", "APPROVED", "COMPLETED", "CANCELLED", "REJECTED"];
-  const parseFlowStatus = (value?: string): RequestStatus =>
-    value && allowedStatuses.includes(value as RequestStatus) ? (value as RequestStatus) : "PENDING";
-
   const formatAmount = (value?: number | string) =>
     typeof value === "number" ? value.toFixed(2) : value ? value.toString() : "-";
 
@@ -437,63 +377,6 @@ export default function Obections() {
     return date.toLocaleString();
   };
 
-  const fetchRequests = useCallback(async () => {
-    setTableLoading(true);
-    setTableError(null);
-    try {
-      const response = await _searchId<Array<Record<string, unknown>>>({
-        action: "READ_ALL",
-        flow_status: filters.flowStatus || null,
-        request_type: filters.requestType || null,
-        regn: filters.regn || "",
-        page: currentPage,
-        limit,
-        search_key: filters.searchKey || "",
-      });
-      const payload = response?.data;
-      const data = payload?.data;
-      if (payload?.status !== "success" || !Array.isArray(data)) {
-        throw new Error(payload?.message || "Unable to load requests.");
-      }
-      const formatted = data.map((item: any) => ({
-        id: item.id,
-        regn: item.regn ?? item.bhikku_regn ?? item.bhikku_high_regn ?? "",
-        requestType: item.request_type ?? "",
-        formNo: item.form_no,
-        requestReason: item.request_reason,
-        amount: item.amount,
-        remarks: item.remarks,
-        flowStatus: parseFlowStatus(item.flow_status),
-        requestedAt: item.requested_at ?? "",
-        subject: {
-          name: item.subject?.name,
-          gihi_name: item.subject?.gihi_name,
-          phone: item.subject?.phone,
-        },
-      }));
-      setRequests(formatted);
-      setTotalRecords(payload?.totalRecords ?? 0);
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || "Unable to load requests.";
-      setRequests([]);
-      setTableError(message);
-      setTotalRecords(0);
-    } finally {
-      setTableLoading(false);
-    }
-  }, [
-    filters.flowStatus,
-    filters.requestType,
-    filters.regn,
-    filters.searchKey,
-    currentPage,
-    limit,
-  ]);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
   const applyFilters = () => {
     setFilters({
       flowStatus: flowStatusInput,
@@ -502,6 +385,44 @@ export default function Obections() {
       searchKey: searchKeyInput,
     });
     setCurrentPage(1);
+  };
+
+  const filteredRequests = requests.filter((item) => {
+    const matchesFlow = filters.flowStatus ? item.flowStatus === filters.flowStatus : true;
+    const matchesType = filters.requestType ? item.requestType === filters.requestType : true;
+    const regnFilter = filters.regn?.trim().toLowerCase();
+    const matchesRegn = regnFilter ? item.regn.toLowerCase().includes(regnFilter) : true;
+    const searchKey = filters.searchKey?.trim().toLowerCase();
+    const searchTargets = [
+      item.id?.toString(),
+      item.regn,
+      item.requestReason,
+      item.remarks,
+      item.subject?.name,
+      item.subject?.gihi_name,
+    ]
+      .filter(Boolean)
+      .map((value) => value!.toLowerCase());
+    const matchesSearchKey = !searchKey || searchTargets.some((value) => value.includes(searchKey));
+    return matchesFlow && matchesType && matchesRegn && matchesSearchKey;
+  });
+
+  const totalRecords = filteredRequests.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
+  const currentPageSafe = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedRequests = filteredRequests.slice((currentPageSafe - 1) * limit, currentPageSafe * limit);
+  const startEntry = totalRecords === 0 ? 0 : (currentPageSafe - 1) * limit + 1;
+  const endEntry = Math.min(currentPageSafe * limit, totalRecords);
+
+  const goToPage = (page: number) => {
+    const target = Math.min(Math.max(page, 1), totalPages);
+    setCurrentPage(target);
+  };
+
+  const fetchRequests = async () => {
+    // Placeholder for future fetch logic; kept for parity with the reprint workflow.
+    setTableLoading(false);
+    setTableError(null);
   };
 
   const fetchPdf = async (regn: string) => {

@@ -15,3 +15,5 @@ export const _searchId = <T = unknown>(body: any) =>
 
 export const _getReprintUrl = <T = unknown>(body: any) =>
   BackendClient.post<ReprintResponse<T>>(`${baseURL}/reprint/reprint_url`, body);
+
+export const _advanceSearch = (body: any) => BackendClient.post(`${baseURL}/advance-search`, body);
