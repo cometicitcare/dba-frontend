@@ -41,8 +41,8 @@ const SERVICE_MAP: Record<
   // -------------------------
   // 2. Arama
   // -------------------------
-  "/temples": [
-    { icon: EyeIcon, label: "View", action: "view-arama", route: "/temple/view" },
+  "/temple/arama": [
+    { icon: EyeIcon, label: "View", action: "view-arama", route: "/temple/arama" },
     { icon: PlusIcon, label: "Add", action: "add-arama", route: "/temple/add" },
     { icon: SearchIcon, label: "Search", action: "search-arama", route: "/temple/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-arama", route: "/temple/reports" },
@@ -52,8 +52,8 @@ const SERVICE_MAP: Record<
   // -------------------------
   // 3. Devala
   // -------------------------
-  "/dhamma-school": [
-    { icon: EyeIcon, label: "View", action: "view-devala", route: "/school/view" },
+  "/temple/dewala": [
+    { icon: EyeIcon, label: "View", action: "view-devala", route: "/temple/dewala" },
     { icon: PlusIcon, label: "Add", action: "add-devala", route: "/school/add" },
     { icon: SearchIcon, label: "Search", action: "search-devala", route: "/school/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-devala", route: "/school/reports" },
@@ -97,13 +97,13 @@ const modules = [
     icon: BuildingIcon, 
     label: "Arama", 
     color: "from-purple-400 to-purple-500", 
-    path: "/temples" 
+    path: "/temple/arama" 
   },
   { 
     icon: GraduationCapIcon, 
     label: "Devala", 
     color: "from-blue-400 to-blue-500", 
-    path: "/dhamma-school" 
+    path: "/temple/dewala" 
   },
   { 
     icon: BookOpenIcon, 

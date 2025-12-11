@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useRouter } from 'next/navigation'
 import { getStoredUserData, type UserData } from "@/utils/userData";
-import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+import { BHIKKU_MANAGEMENT_DEPARTMENT, VIHARA_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -190,8 +190,6 @@ export default function Dashboard() {
     setUserData(stored ?? null);
   }, []);
 
-  
-
   const currentImage = useMemo(() => {
     if (!slides.length) return null;
     return slides[currentImageIndex % slides.length];
@@ -206,6 +204,7 @@ export default function Dashboard() {
   const modules = useMemo(() => {
     if (userData === undefined) return [];
     const shouldShowBhikkuModule = userData?.department === BHIKKU_MANAGEMENT_DEPARTMENT;
+    const shouldShowViharaModule = userData?.department === VIHARA_MANAGEMENT_DEPARTMENT;
     return [
       ...(shouldShowBhikkuModule
         ? [
@@ -214,6 +213,40 @@ export default function Dashboard() {
               label: "Bhikku",
               color: "from-orange-400 to-orange-500",
               path: "/bhikkhu",
+            },
+            {
+              icon: BuildingIcon,
+              label: "Arama",
+              color: "from-blue-400 to-blue-500",
+              path: "/temple/arama",
+            },  
+          ]
+        : []),
+      ...(shouldShowViharaModule
+        ? [
+            {
+              icon: BuildingIcon,
+              label: "Vihara",
+              color: "from-purple-400 to-purple-500",
+              path: "/temple/vihara",
+            },
+            { 
+              icon: GraduationCapIcon, 
+              label: "Devala", 
+              color: "from-blue-400 to-blue-500", 
+              path: "/temple/dewala" 
+            },
+            { 
+              icon: BookOpenIcon, 
+              label: "Donations", 
+              color: "from-green-400 to-green-500", 
+              path: "/teachers" 
+            },
+            { 
+              icon: SettingsIcon, 
+              label: "Sasanarakshaka Bala Mandala (Security Councils)", 
+              color: "from-red-400 to-red-500", 
+              path: "/admin" 
             },
           ]
         : []),
