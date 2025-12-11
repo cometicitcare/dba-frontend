@@ -119,7 +119,7 @@ function AddViharaPageInner() {
     const nextErrors: Errors<ViharaForm> = { ...errors };
     let valid = true;
     for (const f of step.fields) {
-      if (f.name === "temple_lands" || f.name === "resident_bhikkhus") continue; // Skip table fields
+      if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
       const raw = values[f.name];
       // Handle boolean values for checkboxes
       const stringValue = typeof raw === "boolean" ? String(raw) : (raw as string | undefined);
@@ -138,7 +138,7 @@ function AddViharaPageInner() {
     for (const step of steps) {
       let stepValid = true;
       for (const f of step.fields) {
-        if (f.name === "temple_lands" || f.name === "resident_bhikkhus") continue; // Skip table fields
+        if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
         const raw = values[f.name];
         // Handle boolean values for checkboxes
         const stringValue = typeof raw === "boolean" ? String(raw) : (raw as string | undefined);
@@ -165,7 +165,7 @@ function AddViharaPageInner() {
   // Backend expects snake_case field names with vh_ prefix for main fields
   // Array fields use camelCase (serialNumber, bhikkhuName, etc.)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
-    // Map temple_lands array fields - use camelCase as per API
+    // Map temple_owned_land array fields - use camelCase as per API
     const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
       serialNumber: land.serialNumber ?? land.serial_number ?? 0,
       landName: land.landName ?? land.land_name ?? "",
@@ -241,7 +241,7 @@ function AddViharaPageInner() {
       vh_other_associations: formData.other_associations ?? "",
       
       // Step F: Land Information
-      temple_lands: mappedLand,
+      temple_owned_land: mappedLand,
       vh_land_info_certified: formData.land_info_certified ?? false,
       
       // Step G: Resident Bhikkhus
@@ -289,7 +289,7 @@ function AddViharaPageInner() {
 
     try {
       setSubmitting(true);
-      // Parse JSON strings back to objects/arrays for resident_bhikkhus and temple_lands
+      // Parse JSON strings back to objects/arrays for resident_bhikkhus and temple_owned_land
       let parsedResidentBhikkhus: any[] = [];
       let parsedTempleOwnedLand: any[] = [];
       
@@ -303,11 +303,11 @@ function AddViharaPageInner() {
       }
       
       try {
-        parsedTempleOwnedLand = values.temple_lands 
-          ? (typeof values.temple_lands === 'string' ? JSON.parse(values.temple_lands) : values.temple_lands)
+        parsedTempleOwnedLand = values.temple_owned_land 
+          ? (typeof values.temple_owned_land === 'string' ? JSON.parse(values.temple_owned_land) : values.temple_owned_land)
           : [];
       } catch (e) {
-        console.error("Error parsing temple_lands:", e);
+        console.error("Error parsing temple_owned_land:", e);
         parsedTempleOwnedLand = [];
       }
       
@@ -360,12 +360,12 @@ function AddViharaPageInner() {
   // Parse JSON arrays for tables
   const landInfoRows: LandInfoRow[] = useMemo(() => {
     try {
-      const parsed = JSON.parse(values.temple_lands || "[]");
+      const parsed = JSON.parse(values.temple_owned_land || "[]");
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
-  }, [values.temple_lands]);
+  }, [values.temple_owned_land]);
 
   const residentBhikkhuRows: ResidentBhikkhuRow[] = useMemo(() => {
     try {
@@ -377,7 +377,7 @@ function AddViharaPageInner() {
   }, [values.resident_bhikkhus]);
 
   const handleLandInfoChange = (rows: LandInfoRow[]) => {
-    handleInputChange("temple_lands", JSON.stringify(rows));
+    handleInputChange("temple_owned_land", JSON.stringify(rows));
   };
 
   const handleResidentBhikkhuChange = (rows: ResidentBhikkhuRow[]) => {
@@ -427,7 +427,7 @@ function AddViharaPageInner() {
                     <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
                       {currentStep === 6 && (
                         <div className="md:col-span-2">
-                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_lands} />
+                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
                             <label className="flex items-center gap-2">
                               <input
@@ -569,7 +569,7 @@ function AddViharaPageInner() {
                         const err = errors[f.name];
 
                         // Skip table fields in regular rendering
-                        if (id === "temple_lands" || id === "resident_bhikkhus") return null;
+                        if (id === "temple_owned_land" || id === "resident_bhikkhus") return null;
 
                         // Step B: Administrative Divisions - use LocationPicker
                         if (currentStep === 2 && id === "district") {
@@ -840,7 +840,7 @@ function AddViharaPageInner() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {s.fields.map((f) => {
                               const key = String(f.name);
-                              if (key === "temple_lands" || key === "resident_bhikkhus") return null;
+                              if (key === "temple_owned_land" || key === "resident_bhikkhus") return null;
                               const v0 = (values[f.name] as unknown as string | boolean) ?? "";
                               const v = typeof v0 === "boolean" ? (v0 ? "Yes" : "No") : String(v0);
                               const shown =
