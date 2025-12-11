@@ -55,7 +55,9 @@ export default function Page() {
     );
   }
 
-  const canDelete = userData?.roleLevel === ADMIN_ROLE_LEVEL;
+  const isAdmin = userData?.roleLevel === ADMIN_ROLE_LEVEL;
+  const canDelete = isAdmin;
+  const canAdd = !isAdmin;
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -68,10 +70,12 @@ export default function Page() {
               contentClassName="pt-8"
               renderContent={(activeId) => {
                 if (activeId === 'upasampada') {
-                  return <UpasampadaList canDelete={canDelete} />
+                  return (
+                    <UpasampadaList canDelete={canDelete} canAdd={canAdd} />
+                  )
                 }
 
-                return <BhikkhuList canDelete={canDelete} />
+                return <BhikkhuList canDelete={canDelete} canAdd={canAdd} />
               }}
             />
         </main>
