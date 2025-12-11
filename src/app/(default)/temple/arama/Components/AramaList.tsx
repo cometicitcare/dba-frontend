@@ -10,11 +10,11 @@ import RecordList from './RecordList'
 
 const tabItems = [
     { id: 'records', label: 'Records' },
-    { id: 'sub-sections', label: 'Sub Sections' },
+    // { id: 'sub-sections', label: 'Sub Sections' },
 
   ];
 
-export default function AramaList() {
+export default function AramaList({canDelete}: {canDelete: boolean}) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   return (
@@ -31,7 +31,7 @@ export default function AramaList() {
                 return <SubsectionsList />
               }
               else{
-                return <RecordList />
+                return <RecordList canDelete={canDelete} />
               }
             }}
           />
