@@ -36,6 +36,7 @@ type BhikkuRow = {
 
 type BhikkhuListProps = {
   canDelete?: boolean;
+  canAdd?: boolean;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -228,7 +229,10 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function BhikkhuList({ canDelete = false }: BhikkhuListProps) {
+export default function BhikkhuList({
+  canDelete = false,
+  canAdd = true,
+}: BhikkhuListProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -480,14 +484,16 @@ export default function BhikkhuList({ canDelete = false }: BhikkhuListProps) {
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <h1 className="text-2xl font-bold text-gray-800">SAMANERA LIST</h1>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={handleAdd}
-                  disabled={loading}
-                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  Add Bhikku
-                </button>
+                {canAdd && (
+                  <button
+                    onClick={handleAdd}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    <PlusIcon className="w-5 h-5" />
+                    Add Bhikku
+                  </button>
+                )}
                 {/* <button
                   onClick={handleAddSilmatha}
                   disabled={loading}

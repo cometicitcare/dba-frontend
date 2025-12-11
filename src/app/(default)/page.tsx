@@ -24,7 +24,10 @@ import {
 } from "lucide-react";
 import { useRouter } from 'next/navigation'
 import { getStoredUserData, type UserData } from "@/utils/userData";
-import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+import {
+  PUBLIC_MANAGEMENT_DEPARTMENT,
+  SIDEBAR_ACCESS_MAP,
+} from "@/utils/config";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -33,41 +36,87 @@ const SERVICE_MAP: Record<
   "/bhikkhu": [
     { icon: EyeIcon, label: "View", action: "view-bhikku", route: "/bhikkhu" },
     { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/bhikkhu/add" },
-    { icon: SearchIcon, label: "Search", action: "search-bhikku", route: "/bhikkhu/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-bhikku", route: "/bhikkhu/reports" },
   ],
   "/temples": [
     { icon: EyeIcon, label: "View", action: "view-temple", route: "/temple/view" },
     { icon: PlusIcon, label: "Add", action: "add-temple", route: "/temple/add" },
-    { icon: SearchIcon, label: "Search", action: "search-temple", route: "/temple/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-temple", route: "/temple/reports" },
-    { icon: EditIcon, label: "Manage", action: "manage-temple", route: "/temple/manage" },
   ],
   "/dhamma-school": [
     { icon: EyeIcon, label: "View", action: "view-school", route: "/school/view" },
     { icon: PlusIcon, label: "Add", action: "add-school", route: "/school/add" },
-    { icon: SearchIcon, label: "Search", action: "search-school", route: "/school/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-school", route: "/school/reports" },
-    { icon: UsersIcon, label: "Students", action: "students-school", route: "/school/students" },
   ],
-  "/teachers": [
-    { icon: EyeIcon, label: "View", action: "view-teachers", route: "/teachers/view" },
-    { icon: PlusIcon, label: "Add", action: "add-teachers", route: "/teachers/add" },
-    { icon: SearchIcon, label: "Search", action: "search-teachers", route: "/teachers/search" },
-    { icon: FileTextIcon, label: "Reports", action: "reports-teachers", route: "/teachers/reports" },
-    { icon: EditIcon, label: "Update", action: "update-teachers", route: "/teachers/update" },
+  "/silmatha": [
+    { icon: EyeIcon, label: "View", action: "view-bhikku", route: "/silmatha" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/silmatha/add" },
   ],
-  "/admin": [
-    { icon: UsersIcon, label: "Users", action: "users-admin", route: "/admin/users" },
-    { icon: SettingsIcon, label: "Settings", action: "settings-admin", route: "/admin/settings" },
-    { icon: FileTextIcon, label: "Logs", action: "logs-admin", route: "/admin/logs" },
-    { icon: EditIcon, label: "Config", action: "config-admin", route: "/admin/config" },
-    { icon: TrashIcon, label: "Cleanup", action: "cleanup-admin", route: "/admin/cleanup" },
+  "/vihara": [
+    { icon: BuildingIcon, label: "View Viharas", action: "view-vihara", route: "/vihara" },
+    { icon: BarChartIcon, label: "Reports", action: "reports-vihara", route: "/vihara/reports" },
   ],
-  "/analytics": [{ icon: EyeIcon, label: "View", action: "view-analytics", route: "/analytics" }],
-
+  "/arama": [
+    { icon: BuildingIcon, label: "View Arama", action: "view-arama", route: "/arama" },
+    { icon: SettingsIcon, label: "Manage Arama", action: "manage-arama", route: "/arama/manage" },
+  ],
+    "/ojections": [
+    { icon: EyeIcon, label: "View Ojections", action: "view-ojections", route: "/ojections" },
+  ],
+  "/print-request": [
+    { icon: EyeIcon, label: "View Requests", action: "view-print", route: "/print-request" },
+  ],
+  "/qr-scan": [
+    { icon: EyeIcon, label: "Scan Codes", action: "scan-qr", route: "/qr-scan" },
+    { icon: SearchIcon, label: "History", action: "history-qr", route: "/qr-scan/history" },
+  ]
 
 };
+
+const MODULE_CARD_DEFINITIONS: { path: string; label: string; icon: any; color: string }[] = [
+  {
+    path: "/bhikkhu",
+    label: "Bhikku",
+    icon: UsersIcon,
+    color: "from-orange-400 to-orange-500",
+  },
+  {
+    path: "/silmatha",
+    label: "Silmatha",
+    icon: GraduationCapIcon,
+    color: "from-purple-500 to-indigo-600",
+  },
+  {
+    path: "/vihara",
+    label: "Vihara",
+    icon: BuildingIcon,
+    color: "from-sky-400 to-blue-600",
+  },
+  {
+    path: "/arama",
+    label: "Arama",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/ojections",
+    label: "Ojections",
+    icon: EyeIcon,
+    color: "from-emerald-400 to-emerald-600",
+  },
+  {
+    path: "/print-request",
+    label: "Re Print",
+    icon: BookOpenIcon,
+    color: "from-amber-400 to-yellow-500",
+  },
+  {
+    path: "/qr-scan",
+    label: "QR Scan",
+    icon: SearchIcon,
+    color: "from-cyan-400 to-blue-500",
+  },
+];
 
 
 
@@ -205,31 +254,20 @@ export default function Dashboard() {
 
   const modules = useMemo(() => {
     if (userData === undefined) return [];
-    const shouldShowBhikkuModule = userData?.department === BHIKKU_MANAGEMENT_DEPARTMENT;
-    return [
-      ...(shouldShowBhikkuModule
-        ? [
-            {
-              icon: UsersIcon,
-              label: "Bhikku",
-              color: "from-orange-400 to-orange-500",
-              path: "/bhikkhu",
-            },
-          ]
-        : []),
-      {
-        icon: UsersIcon,
-        label: "Re Print",
-        color: "from-orange-400 to-orange-500",
-        path: "/print-request",
-      },
-      {
-        icon: UsersIcon,
-        label: "QR Scan",
-        color: "from-orange-400 to-orange-500",
-        path: "/qr-scan",
-      },
-    ];
+    const departmentValues = Array.from(
+      new Set([
+        ...(userData?.departments ?? []),
+        ...(userData?.department ? [userData.department] : []),
+      ].filter(Boolean) as string[])
+    );
+    const effectiveDepartments =
+      departmentValues.length > 0 ? departmentValues : [PUBLIC_MANAGEMENT_DEPARTMENT];
+
+    return MODULE_CARD_DEFINITIONS.filter((m) => {
+      const allowedDepartments = SIDEBAR_ACCESS_MAP[m.path];
+      if (!allowedDepartments) return false;
+      return effectiveDepartments.some((dep) => allowedDepartments.includes(dep));
+    });
   }, [userData]);
 
 
