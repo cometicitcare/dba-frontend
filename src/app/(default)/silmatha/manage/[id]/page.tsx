@@ -25,7 +25,7 @@ import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
 import TempleAutocomplete from "@/components/silmatha/AutocompleteArama";
 import BhikkhuStatusSelect from "@/components/silmatha/StatusSelect";
 import { getStoredUserData } from "@/utils/userData";
-import { SILMATHA_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from "@/utils/config";
+import { SILMATHA_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL, DATAENTRY_ROLE_LEVEL } from "@/utils/config";
 import QRCode from "react-qr-code";
 import { Worker, Viewer } from "@react-pdf-viewer/core";
 
@@ -107,6 +107,9 @@ const toSafeString = (value: unknown): string => {
       obj.display,
       obj.label,
       obj.name,
+      obj.sil_mahananame,
+      obj.sil_gihiname,
+      obj.sil_name,
       obj.trn,
       obj.regn,
       obj.code,
@@ -129,6 +132,29 @@ const toSafeString = (value: unknown): string => {
     ];
     for (const candidate of candidates) {
       if (candidate != null) return toSafeString(candidate);
+    }
+  }
+  return "";
+};
+
+const toIdentifierString = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [
+      obj.sil_regn,
+      obj.ar_trn,
+      obj.trn,
+      obj.regn,
+      obj.code,
+      obj.value,
+    ];
+    for (const candidate of candidates) {
+      const normalized = toIdentifierString(candidate);
+      if (normalized) return normalized;
     }
   }
   return "";
@@ -182,20 +208,24 @@ const normalizeSilmathaRecord = (api: any): NormalizeResult => {
     sm_korale: toSafeString(api?.sil_korale ?? api?.sm_korale),
     sm_pattu: toSafeString(api?.sil_pattu ?? api?.sm_pattu),
     sm_village: toSafeString(api?.sil_vilage ?? api?.sm_village),
-    sm_viharadhipathi: toSafeString(api?.sil_aramadhipathi ?? api?.sm_viharadhipathi),
+    sm_viharadhipathi: toIdentifierString(api?.sil_aramadhipathi ?? api?.sm_viharadhipathi),
     sm_robing_date: convertDate(api?.sil_mahanadate ?? api?.sm_robing_date),
     sm_robing_name: toSafeString(api?.sil_mahananame ?? api?.sm_robing_name),
-    sm_robing_tutor: toSafeString(api?.sil_mahanaacharyacd ?? api?.sm_robing_tutor),
-    sm_robing_tutor_residence: toSafeString(api?.sil_robing_tutor_residence ?? api?.sm_robing_tutor_residence),
-    sm_robing_temple: toSafeString(api?.sil_mahanatemple ?? api?.sm_robing_temple),
-    sm_post_robing_temple: toSafeString(
+    sm_robing_tutor: toIdentifierString(api?.sil_mahanaacharyacd ?? api?.sm_robing_tutor),
+    sm_robing_tutor_residence: toIdentifierString(
+      api?.sil_robing_tutor_residence ?? api?.sm_robing_tutor_residence
+    ),
+    sm_robing_temple: toIdentifierString(api?.sil_mahanatemple ?? api?.sm_robing_temple),
+    sm_post_robing_temple: toIdentifierString(
       api?.sil_robing_after_residence_temple ?? api?.sm_post_robing_temple
     ),
     sil_declaration_date: convertDate(
       api?.sil_declaration_date ?? api?.sil_declarationdate ?? api?.sm_declaration_date
     ),
     sil_remarks: toSafeString(api?.sil_remarks ?? api?.sm_remarks),
-    sil_currstat: toSafeString(api?.sil_currstat?.st_statcd ?? api?.sil_currstat),
+    sil_currstat: toSafeString(
+      api?.sil_currstat?.st_statcd ?? api?.sil_currstat?.st_code ?? api?.sil_currstat
+    ),
     sil_student_signature: toCheckboxString(api?.sil_student_signature),
     sil_acharya_signature: toCheckboxString(api?.sil_acharya_signature),
     sil_aramadhipathi_signature: toCheckboxString(api?.sil_aramadhipathi_signature),
@@ -324,7 +354,9 @@ export default function ManageSilmathaPage({ params }: PageProps) {
       router.replace("/");
       return;
     }
-    setCanAdminActions(stored.roleLevel === ADMIN_ROLE_LEVEL);
+    const isAdmin = stored.roleLevel === ADMIN_ROLE_LEVEL;
+    const isDataEntry = stored.roleLevel === DATAENTRY_ROLE_LEVEL;
+    setCanAdminActions(isAdmin && !isDataEntry);
     setAccessChecked(true);
   }, [router]);
 

@@ -1492,14 +1492,15 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                             values.br_residence_at_declaration ??
                                             ""
                                           }
-                                          onPick={({
-                                            address,
-                                            display: disp,
-                                          }) => {
-                                            handleInputChange(
-                                              "br_residence_at_declaration",
-                                              address ?? ""
-                                            );
+                                            onPick={({
+                                              address,
+                                              trn,
+                                              display: disp,
+                                            }) => {
+                                              handleInputChange(
+                                                "br_residence_at_declaration",
+                                                disp ?? address ?? ""
+                                              );
                                             setDisplay((d) => ({
                                               ...d,
                                               br_residence_at_declaration: disp,

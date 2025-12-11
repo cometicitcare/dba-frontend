@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LayoutDashboardIcon } from "lucide-react";
 import { getStoredUserData, UserData } from "@/utils/userData";
-import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+import { SIDEBAR_ACCESS_MAP } from "@/utils/config";
 interface SidebarProps {
   isOpen: boolean;
 }
@@ -40,6 +40,40 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   },
   {
     icon: MonkIcon,
+    label: "Silmatha",
+    path: "/silmatha",
+  },
+  {
+    icon: MonkIcon,
+    label: "Vihara",
+    path: "/temple/vihara",
+  },
+  {
+    icon: MonkIcon,
+    label: "Devala",
+    path: "/temple/dewala",
+  },
+  {
+    icon: MonkIcon,
+    label: "Donations",
+    path: "/teachers",
+  },
+  {
+    icon: MonkIcon,
+    label: "Security Councils",
+    path: "/admin",
+  },
+  {
+    icon: MonkIcon,
+    label: "Arama",
+    path: "/temple/arama",
+  },
+  {
+    icon: MonkIcon,
+    label: "Ojections",
+    path: "/ojections",
+  },  {
+    icon: MonkIcon,
     label: "Re Print",
     path: "/print-request",
   },
@@ -47,8 +81,10 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
     icon: MonkIcon,
     label: "QR Scan",
     path: "/qr-scan",
-  },
+  }
 ];
+
+const PUBLIC_ONLY_PATHS = ["/", "/ojections", "/print-request", "/qr-scan"];
 
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
@@ -63,22 +99,25 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   const items = useMemo(() => {
     if (!user) return BASE_SIDEBAR_ITEMS;
-    const primaryDepartment = user.departments?.[0];
     const primaryRoleLevel = user.roles?.[0]?.ro_level ?? user.roleLevel;
-
     if (primaryRoleLevel === "PUBLIC") {
-      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/qr-scan");
+      return BASE_SIDEBAR_ITEMS.filter((it) => PUBLIC_ONLY_PATHS.includes(it.path));
     }
 
-    if (primaryDepartment === "Divisional Secretariat") {
-      return BASE_SIDEBAR_ITEMS.filter((it) => it.path === "/print-request" || it.path === "/qr-scan");
-    }
+    const dedupDepartments = Array.from(
+      new Set([
+        ...(user.departments ?? []),
+        ...(user.department ? [user.department] : []),
+      ].filter(Boolean) as string[])
+    );
 
-    if (primaryDepartment === BHIKKU_MANAGEMENT_DEPARTMENT) {
-      return BASE_SIDEBAR_ITEMS;
-    }
+    if (!dedupDepartments.length) return BASE_SIDEBAR_ITEMS;
 
-    return BASE_SIDEBAR_ITEMS;
+    return BASE_SIDEBAR_ITEMS.filter((it) => {
+      const allowedDepartments = SIDEBAR_ACCESS_MAP[it.path];
+      if (!allowedDepartments) return false;
+      return dedupDepartments.some((dep) => allowedDepartments.includes(dep));
+    });
   }, [user]);
   if (!isOpen) return null;
 
@@ -105,7 +144,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-auto">
         {items.map((it) => {
           const Icon = it.icon;
           const active = pathname === it.path;

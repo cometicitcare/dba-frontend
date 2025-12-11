@@ -602,8 +602,8 @@ function AddBhikkhuPageInner() {
                                 required={!!f.rules?.required}
                                 placeholder="Type any address or pick a temple address…"
                                 initialDisplay={display.br_residence_at_declaration ?? values.br_residence_at_declaration ?? ""}
-                                onPick={({ address, display: disp }) => {
-                                  handleInputChange("br_residence_at_declaration", address ?? "");
+                                onPick={({ address, trn, display: disp }) => {
+                                  handleInputChange("br_residence_at_declaration", disp ?? address ?? "");
                                   setDisplay((d) => ({ ...d, br_residence_at_declaration: disp }));
                                 }}
                               />

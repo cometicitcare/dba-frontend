@@ -909,8 +909,8 @@ export default function DirectAddPage() {
                   label={field.label}
                   placeholder="Type or pick a temple address"
                   initialDisplay={display[name] ?? values.br_residence_at_declaration ?? ""}
-                  onPick={({ address, display: disp }) => {
-                    handleInputChange("br_residence_at_declaration", address ?? "");
+                    onPick={({ address, trn, display: disp }) => {
+                      handleInputChange("br_residence_at_declaration", disp ?? address ?? "");
                     setDisplay((prev) => ({ ...prev, br_residence_at_declaration: disp }));
                   }}
                 />
