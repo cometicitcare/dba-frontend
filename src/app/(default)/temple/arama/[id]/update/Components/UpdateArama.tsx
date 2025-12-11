@@ -41,7 +41,7 @@ type CertificateMeta = {
 
 export const dynamic = "force-dynamic";
 
-function UpdateAramaPageInner() {
+function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const router = useRouter();
   const params = useParams();
   const aramaId = params?.id as string | undefined;
@@ -617,22 +617,26 @@ function UpdateAramaPageInner() {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {aramaId}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleApprove}
-                      disabled={loading || saving || approving}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all
-                        ${
-                          loading || saving || approving
-                            ? "bg-green-700/60 text-white cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
-                      aria-label="Approve registration"
-                      title="Approve registration"
-                    >
-                      {approving ? "Approving…" : "Approve"}
-                    </button>
-                  </div>
+                  {
+                    isAdmin && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleApprove}
+                          disabled={loading || saving || approving}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all
+                            ${
+                              loading || saving || approving
+                                ? "bg-green-700/60 text-white cursor-not-allowed"
+                                : "bg-green-600 text-white hover:bg-green-700"
+                            }`}
+                          aria-label="Approve registration"
+                          title="Approve registration"
+                        >
+                          {approving ? "Approving…" : "Approve"}
+                        </button>
+                      </div>
+                    )
+                  }
                 </div>
               </div>
 
@@ -922,10 +926,10 @@ function UpdateAramaPageInner() {
   );
 }
 
-export default function UpdateArama() {
+export default function UpdateArama({isAdmin}: {isAdmin: boolean}) {
   return (
     <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
-      <UpdateAramaPageInner />
+      <UpdateAramaPageInner isAdmin={isAdmin} />
     </Suspense>
   );
 }

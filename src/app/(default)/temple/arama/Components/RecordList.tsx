@@ -152,7 +152,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function RecordList() {
+export default function RecordList({canDelete}: {canDelete: boolean}) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -610,7 +610,7 @@ export default function RecordList() {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
             {loading && (
