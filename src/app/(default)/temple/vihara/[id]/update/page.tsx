@@ -19,8 +19,10 @@ const Page = () => {
       setUserData(stored);
     }, []);
 
+    const roleLevel = userData?.roleLevel || '';
+
   return (
-    <div><UpdateVihara role={userData?.roleLevel} /></div>
+    <div><UpdateVihara role={roleLevel} /></div>
   )
 }
 export default Page
