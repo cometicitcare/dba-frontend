@@ -52,15 +52,21 @@ const SERVICE_MAP: Record<
     { icon: EyeIcon, label: "View", action: "view-bhikku", route: "/silmatha" },
     { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/silmatha/add" },
   ],
-  "/vihara": [
-    { icon: BuildingIcon, label: "View Viharas", action: "view-vihara", route: "/vihara" },
-    { icon: BarChartIcon, label: "Reports", action: "reports-vihara", route: "/vihara/reports" },
+  "/temple/vihara": [
+    { icon: BuildingIcon, label: "View Viharas", action: "view-vihara", route: "/temple/vihara" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/temple/vihara/add" },
   ],
-  "/arama": [
-    { icon: BuildingIcon, label: "View Arama", action: "view-arama", route: "/arama" },
-    { icon: SettingsIcon, label: "Manage Arama", action: "manage-arama", route: "/arama/manage" },
+  "/temple/arama": [
+    { icon: BuildingIcon, label: "View Arama", action: "view-arama", route: "/temple/arama" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/temple/arama/add" },
   ],
-    "/ojections": [
+  "/teachers": [
+    { icon: BuildingIcon, label: "View Donations", action: "view-Donations", route: "/teachers" },
+  ],
+  "/admin": [
+    { icon: BuildingIcon, label: "View Security Councils", action: "view-Security-Councils", route: "/admin" },
+  ],
+  "/ojections": [
     { icon: EyeIcon, label: "View Ojections", action: "view-ojections", route: "/ojections" },
   ],
   "/print-request": [
@@ -87,14 +93,32 @@ const MODULE_CARD_DEFINITIONS: { path: string; label: string; icon: any; color: 
     color: "from-purple-500 to-indigo-600",
   },
   {
-    path: "/vihara",
+    path: "/temple/vihara",
     label: "Vihara",
     icon: BuildingIcon,
     color: "from-sky-400 to-blue-600",
   },
   {
-    path: "/arama",
+    path: "/temple/arama",
     label: "Arama",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/temple/dewala",
+    label: "Devala",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/teachers",
+    label: "Donations",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/admin",
+    label: "Security Councils",
     icon: BuildingIcon,
     color: "from-rose-400 to-pink-600",
   },

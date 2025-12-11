@@ -46,12 +46,27 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   {
     icon: MonkIcon,
     label: "Vihara",
-    path: "/vihara",
+    path: "/temple/vihara",
+  },
+  {
+    icon: MonkIcon,
+    label: "Devala",
+    path: "/temple/dewala",
+  },
+  {
+    icon: MonkIcon,
+    label: "Donations",
+    path: "/teachers",
+  },
+  {
+    icon: MonkIcon,
+    label: "Security Councils",
+    path: "/admin",
   },
   {
     icon: MonkIcon,
     label: "Arama",
-    path: "/arama",
+    path: "/temple/arama",
   },
   {
     icon: MonkIcon,
@@ -68,6 +83,8 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
     path: "/qr-scan",
   }
 ];
+
+const PUBLIC_ONLY_PATHS = ["/", "/ojections", "/print-request", "/qr-scan"];
 
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
