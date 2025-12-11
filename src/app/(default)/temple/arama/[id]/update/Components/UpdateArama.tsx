@@ -30,6 +30,7 @@ import { Tabs } from "@/components/ui/Tabs";
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField,  Button as MuiButton } from "@mui/material";
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/arama/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
@@ -78,6 +79,9 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -577,6 +581,16 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       </div>
     );
   }
+
+  const handleOpenRejectDialog = () => {
+    setRejectionReason("");
+    setRejectDialogOpen(true);
+  };
+  const handleCloseRejectDialog = () => {
+    if (rejecting) return;
+    setRejectDialogOpen(false);
+  };
+
   const handleApprove = async () => {
     if (
       !window.confirm(
@@ -601,6 +615,71 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       setApproving(false);
     }
   };
+
+   const handleReject= async () => {
+      try {
+        setRejecting(true);
+        const reason = rejectionReason.trim();
+        if (!reason) {
+          toast.error("Please enter a rejection reason.");
+          setRejecting(false);
+          return;
+        }
+        setRejectDialogOpen(false);
+        const res = await _manageArama({
+          action: "REJECT",
+          payload: { ar_id: aramaId, rejection_reason: reason },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
+        toast.success("Rejected successfully.", { autoClose: 1200 });
+        setRejectionReason("");
+      } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to reject. Please try again.");
+      toast.error(errMsg);
+      } finally {
+        setRejecting(false);
+      }
+    };
+
+  const collectApprovalErrors = (source: any) => {
+    const container = source?.data ?? source;
+    const rawErrors =
+      container?.errors ??
+      container?.[""] ??
+      container?.data?.errors ??
+      container?.data?.[""];
+    const messages = Array.isArray(rawErrors)
+      ? rawErrors
+          .map((err) => {
+            if (!err) return "";
+            const msg = err.message ?? err.msg ?? "";
+            const field = err.field ?? err.name ?? "";
+            if (field && msg) return `${field}: ${msg}`;
+            if (msg) return msg;
+            return field ? `${field}: Validation failed.` : "";
+          })
+          .filter(Boolean)
+      : [];
+    const fallback =
+      container?.message ??
+      container?.data?.message ??
+      "Failed to approve. Please try again.";
+    return { messages, fallback };
+  };
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
@@ -633,6 +712,20 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                           title="Approve registration"
                         >
                           {approving ? "Approving…" : "Approve"}
+                        </button>
+                        <button
+                          onClick={handleOpenRejectDialog}
+                          disabled={loading || saving || rejecting}
+                          className={`px-4 py-2 rounded-lg font-medium transition-all
+                            ${
+                              loading || saving || rejecting
+                                ? "bg-red-700/60 text-white cursor-not-allowed"
+                                : "bg-red-600 text-white hover:bg-red-700"
+                            }`}
+                          aria-label="Reject registration"
+                          title="Reject registration"
+                        >
+                          {rejecting ? "Rejecting…" : "Reject"}
                         </button>
                       </div>
                     )
@@ -920,6 +1013,44 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
         </main>
         <FooterBar />
       </div>
+
+            <Dialog
+              open={rejectDialogOpen}
+              onClose={handleCloseRejectDialog}
+              aria-labelledby="reject-dialog-title"
+            >
+              <DialogTitle id="reject-dialog-title">Reject registration?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Rejecting will mark this registration as declined.
+                </DialogContentText>
+                <TextField
+                  autoFocus
+                  margin="dense"
+                  id="rejection-reason"
+                  label="Rejection reason"
+                  type="text"
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                />
+              </DialogContent>
+              <DialogActions>
+                <MuiButton onClick={handleCloseRejectDialog} disabled={rejecting}>
+                  Cancel
+                </MuiButton>
+                <MuiButton
+                  onClick={handleReject}
+                  disabled={rejecting}
+                  color="error"
+                  variant="contained"
+                >
+                  {rejecting ? "Rejecting..." : "Reject"}
+                </MuiButton>
+              </DialogActions>
+            </Dialog>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>

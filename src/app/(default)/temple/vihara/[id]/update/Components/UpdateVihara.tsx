@@ -32,6 +32,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ADMIN_ROLE_LEVEL } from "@/utils/config";
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Button as MuiButton } from "@mui/material";
 
 // Types local to page
 type NikayaAPIItem = {
@@ -94,6 +95,9 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -685,6 +689,16 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       </div>
     );
   }
+
+  const handleOpenRejectDialog = () => {
+    setRejectionReason("");
+    setRejectDialogOpen(true);
+  };
+  const handleCloseRejectDialog = () => {
+    if (rejecting) return;
+    setRejectDialogOpen(false);
+  };
+
   const handleApprove = async () => {
     if (
       !window.confirm(
@@ -709,6 +723,96 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       setApproving(false);
     }
   };
+
+  // const handleReject= async () => {
+  //   if (
+  //     !window.confirm(
+  //       "Reject this registration? This action may be irreversible."
+  //     )
+  //   )
+  //     return;
+  //   try {
+  //     setRejecting(true);
+  //     await _manageVihara({
+  //       action: "REJECT",
+  //       payload: { vh_id: viharaId },
+  //     } as any);
+  //     toast.success("Rejected successfully.", { autoClose: 1200 });
+  //   } catch (e: unknown) {
+  //     const msg =
+  //       e instanceof Error
+  //         ? e.message
+  //         : "Failed to reject. Please try again.";
+  //     toast.error(msg);
+  //   } finally {
+  //     setRejecting(false);
+  //   }
+  // };
+
+    const handleReject= async () => {
+      try {
+        setRejecting(true);
+        const reason = rejectionReason.trim();
+        if (!reason) {
+          toast.error("Please enter a rejection reason.");
+          setRejecting(false);
+          return;
+        }
+        setRejectDialogOpen(false);
+        const res = await _manageVihara({
+          action: "REJECT",
+          payload: { vh_id: viharaId, rejection_reason: reason },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
+        toast.success("Rejected successfully.", { autoClose: 1200 });
+        setRejectionReason("");
+      } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to reject. Please try again.");
+      toast.error(errMsg);
+      } finally {
+        setRejecting(false);
+      }
+    };
+
+  const collectApprovalErrors = (source: any) => {
+    const container = source?.data ?? source;
+    const rawErrors =
+      container?.errors ??
+      container?.[""] ??
+      container?.data?.errors ??
+      container?.data?.[""];
+    const messages = Array.isArray(rawErrors)
+      ? rawErrors
+          .map((err) => {
+            if (!err) return "";
+            const msg = err.message ?? err.msg ?? "";
+            const field = err.field ?? err.name ?? "";
+            if (field && msg) return `${field}: ${msg}`;
+            if (msg) return msg;
+            return field ? `${field}: Validation failed.` : "";
+          })
+          .filter(Boolean)
+      : [];
+    const fallback =
+      container?.message ??
+      container?.data?.message ??
+      "Failed to approve. Please try again.";
+    return { messages, fallback };
+  };
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
@@ -742,6 +846,20 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                       title="Approve registration"
                     >
                       {approving ? "Approving…" : "Approve"}
+                    </button>
+                    <button
+                      onClick={handleOpenRejectDialog}
+                      disabled={loading || saving || rejecting}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all
+                        ${
+                          loading || saving || rejecting
+                            ? "bg-red-700/60 text-white cursor-not-allowed"
+                            : "bg-red-600 text-white hover:bg-red-700"
+                        }`}
+                      aria-label="Reject registration"
+                      title="Reject registration"
+                    >
+                      {rejecting ? "Rejecting…" : "Reject"}
                     </button>
                   </div>}
                 </div>
@@ -1377,6 +1495,44 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
           </div>
         </div>
       ) : null}
+
+                  <Dialog
+                    open={rejectDialogOpen}
+                    onClose={handleCloseRejectDialog}
+                    aria-labelledby="reject-dialog-title"
+                  >
+                    <DialogTitle id="reject-dialog-title">Reject registration?</DialogTitle>
+                    <DialogContent>
+                      <DialogContentText>
+                        Rejecting will mark this registration as declined.
+                      </DialogContentText>
+                      <TextField
+                        autoFocus
+                        margin="dense"
+                        id="rejection-reason"
+                        label="Rejection reason"
+                        type="text"
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                      />
+                    </DialogContent>
+                    <DialogActions>
+                      <MuiButton onClick={handleCloseRejectDialog} disabled={rejecting}>
+                        Cancel
+                      </MuiButton>
+                      <MuiButton
+                        onClick={handleReject}
+                        disabled={rejecting}
+                        color="error"
+                        variant="contained"
+                      >
+                        {rejecting ? "Rejecting..." : "Reject"}
+                      </MuiButton>
+                    </DialogActions>
+                  </Dialog>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
