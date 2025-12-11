@@ -58,7 +58,7 @@ export type ViharaForm = {
   other_associations: string;
 
   // Step F: Temple-Owned Land Information (stored as JSON array)
-  temple_lands: string; // JSON string of LandInfoRow[]
+  temple_owned_land: string; // JSON string of LandInfoRow[]
   land_info_certified: boolean;
 
   // Step G: Resident Bhikkhus (stored as JSON array)
@@ -231,7 +231,7 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   dayaka_sabha: "",
   temple_working_committee: "",
   other_associations: "",
-  temple_lands: "[]",
+  temple_owned_land: "[]",
   land_info_certified: false,
   resident_bhikkhus: "[]",
   resident_bhikkhus_certified: false,

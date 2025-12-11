@@ -31,6 +31,7 @@ import { Tabs } from "@/components/ui/Tabs";
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { ADMIN_ROLE_LEVEL } from "@/utils/config";
 
 // Types local to page
 type NikayaAPIItem = {
@@ -56,7 +57,7 @@ type CertificateMeta = {
 
 export const dynamic = "force-dynamic";
 
-function UpdateViharaPageInner() {
+function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const router = useRouter();
   const params = useParams();
   const viharaId = params?.id as string | undefined;
@@ -102,7 +103,7 @@ function UpdateViharaPageInner() {
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
-    // Map temple_lands array fields - handle both camelCase and snake_case from API
+    // Map temple_owned_land array fields - handle both camelCase and snake_case from API
     const mappedLand = (apiData.temple_lands || []).map((land: any) => ({
       id: String(land.id || land.serial_number || land.serialNumber || Math.random()),
       serialNumber: land.serialNumber ?? land.serial_number ?? 0,
@@ -159,7 +160,7 @@ function UpdateViharaPageInner() {
       other_associations: apiData.vh_other_associations ?? "",
       
       // Step F: Land Information
-      temple_lands: JSON.stringify(mappedLand),
+      temple_owned_land: JSON.stringify(mappedLand),
       land_info_certified: apiData.vh_land_info_certified ?? false,
       
       // Step G: Resident Bhikkhus
@@ -301,7 +302,7 @@ function UpdateViharaPageInner() {
     const nextErrors: Errors<ViharaForm> = { ...errors };
     let valid = true;
     for (const f of step.fields) {
-      if (f.name === "temple_lands" || f.name === "resident_bhikkhus") continue; // Skip table fields
+      if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
       const raw = values[f.name];
       // Handle boolean values for checkboxes
       const stringValue = typeof raw === "boolean" ? String(raw) : (raw as string | undefined);
@@ -330,8 +331,8 @@ function UpdateViharaPageInner() {
     // Handle special cases for table fields
     if (tabIndex === 6) { // Land Information tab
       try {
-        const parsedLand = values.temple_lands 
-          ? (typeof values.temple_lands === 'string' ? JSON.parse(values.temple_lands) : values.temple_lands)
+        const parsedLand = values.temple_owned_land 
+          ? (typeof values.temple_owned_land === 'string' ? JSON.parse(values.temple_owned_land) : values.temple_owned_land)
           : [];
         const mappedLand = parsedLand.map((land: any) => ({
           serial_number: land.serialNumber ?? land.serial_number,
@@ -346,10 +347,10 @@ function UpdateViharaPageInner() {
           tax_details: land.taxDetails ?? land.tax_details,
           land_occupants: land.landOccupants ?? land.land_occupants,
         }));
-        payload.temple_lands = mappedLand;
+        payload.temple_owned_land = mappedLand;
         payload.vh_land_info_certified = values.land_info_certified ?? false;
       } catch (e) {
-        console.error("Error parsing temple_lands:", e);
+        console.error("Error parsing temple_owned_land:", e);
       }
       return payload;
     }
@@ -375,7 +376,7 @@ function UpdateViharaPageInner() {
     
     // Handle regular fields
     s.fields.forEach((f) => {
-      if (f.name === "temple_lands" || f.name === "resident_bhikkhus") return;
+      if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") return;
       const v = values[f.name];
       if (v == null) return;
       
@@ -433,6 +434,8 @@ function UpdateViharaPageInner() {
       const partial = buildPartialPayloadForTab(activeTab);
       const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
       const vhTrn = viharaId && isNaN(Number(viharaId)) ? viharaId : undefined;
+
+      console.log("Saving partial payload for tab:", partial);
       
       await _manageVihara({
         action: "UPDATE",
@@ -453,7 +456,7 @@ function UpdateViharaPageInner() {
 
   // Helper function to map form fields to API field names (same as AddVihara)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
-    // Map temple_lands array fields - use camelCase as per API
+    // Map temple_owned_land array fields - use camelCase as per API
     const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
       serialNumber: land.serialNumber ?? land.serial_number ?? 0,
       landName: land.landName ?? land.land_name ?? "",
@@ -508,7 +511,7 @@ function UpdateViharaPageInner() {
       vh_other_associations: formData.other_associations,
       
       // Step F: Land Information
-      temple_lands: mappedLand,
+      temple_owned_land: mappedLand,
       vh_land_info_certified: formData.land_info_certified,
       
       // Step G: Resident Bhikkhus
@@ -588,12 +591,12 @@ function UpdateViharaPageInner() {
   // Parse JSON arrays for tables
   const landInfoRows: LandInfoRow[] = useMemo(() => {
     try {
-      const parsed = JSON.parse(values.temple_lands || "[]");
+      const parsed = JSON.parse(values.temple_owned_land || "[]");
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
-  }, [values.temple_lands]);
+  }, [values.temple_owned_land]);
 
   const residentBhikkhuRows: ResidentBhikkhuRow[] = useMemo(() => {
     try {
@@ -605,7 +608,7 @@ function UpdateViharaPageInner() {
   }, [values.resident_bhikkhus]);
 
   const handleLandInfoChange = (rows: LandInfoRow[]) => {
-    handleInputChange("temple_lands", JSON.stringify(rows));
+    handleInputChange("temple_owned_land", JSON.stringify(rows));
   };
 
   const handleResidentBhikkhuChange = (rows: ResidentBhikkhuRow[]) => {
@@ -722,6 +725,9 @@ function UpdateViharaPageInner() {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
                   </div>
+                  {
+                    role === ADMIN_ROLE_LEVEL &&
+                  
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleApprove}
@@ -737,7 +743,7 @@ function UpdateViharaPageInner() {
                     >
                       {approving ? "Approving…" : "Approve"}
                     </button>
-                  </div>
+                  </div>}
                 </div>
               </div>
 
@@ -895,7 +901,7 @@ function UpdateViharaPageInner() {
                             <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
                             {activeTab === 6 && (
                               <div className="md:col-span-2">
-                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_lands} />
+                          <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
                             <label className="flex items-center gap-2">
                               <input
@@ -1036,7 +1042,7 @@ function UpdateViharaPageInner() {
                               const err = errors[f.name];
 
                               // Skip table fields in regular rendering
-                              if (id === "temple_lands" || id === "resident_bhikkhus") return null;
+                              if (id === "temple_owned_land" || id === "resident_bhikkhus") return null;
 
                               // Step B: Administrative Divisions - use LocationPicker
                               if (activeTab === 2 && id === "district") {
@@ -1377,10 +1383,10 @@ function UpdateViharaPageInner() {
   );
 }
 
-export default function UpdateVihara() {
+export default function UpdateVihara({ role }: { role: string | undefined }) {
   return (
     <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
-      <UpdateViharaPageInner />
+      <UpdateViharaPageInner role={role} />
     </Suspense>
   );
 }

@@ -23,6 +23,7 @@ import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicke
 import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { VIHARA } from "../../constants";
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -176,7 +177,7 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function RecordList() {
+export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -695,8 +696,9 @@ export default function RecordList() {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
               hidePagination
+              onDelete={canDelete ? handleDelete : undefined}
+              activePage={VIHARA}
             />
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm rounded-lg">

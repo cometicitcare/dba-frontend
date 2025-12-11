@@ -4,17 +4,17 @@ import { FooterBar } from '@/components/FooterBar'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Tabs } from '@/components/ui/Tabs'
-import React,{useState} from 'react'
-import SubsectionsList from './SubsectionsList'
+import React,{ useState} from 'react'
+// import SubsectionsList from './SubsectionsList'
 import RecordList from './RecordList'
 
 const tabItems = [
     { id: 'records', label: 'Records' },
-    { id: 'sub-sections', label: 'Sub Sections' },
+    // { id: 'sub-sections', label: 'Sub Sections' },
 
   ];
 
-export default function ViharaList() {
+export default function ViharaList({ canDelete }: { canDelete: boolean }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   
   return (
@@ -26,14 +26,15 @@ export default function ViharaList() {
           <Tabs
             tabs={tabItems}
             contentClassName="pt-8"
-            renderContent={(activeId) => {
-              if (activeId === 'sub-sections') {
-                return <SubsectionsList />
-              }
-              else{
-                return <RecordList />
-              }
-            }}
+            // renderContent={(activeId) => {
+            //   if (activeId === 'sub-sections') {
+            //     return <SubsectionsList />
+            //   }
+            //   else{
+            //     return <RecordList />
+            //   }
+            // }}
+            renderContent={() => <RecordList canDelete={canDelete} />}
           />
         </main>
       </div>

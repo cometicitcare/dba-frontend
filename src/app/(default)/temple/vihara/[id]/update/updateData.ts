@@ -22,7 +22,7 @@ export const updateData: { sampleViharaData: Partial<ViharaForm> } = {
     dayaka_sabha: "Regular meetings held monthly",
     temple_working_committee: "5 member committee",
     other_associations: "Buddhist Youth Association",
-    temple_lands: JSON.stringify([{
+    temple_owned_land: JSON.stringify([{
       id: "land-1",
       serialNumber: 1,
       landName: "Main Land",

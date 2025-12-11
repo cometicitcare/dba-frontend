@@ -12,7 +12,7 @@ import {
   ChevronRightIcon,
   ChevronsRightIcon,
 } from "lucide-react";
-import { DEWALA, NILAME } from "@/app/(default)/temple/constants";
+import { ARAMA, DEWALA, NILAME, VIHARA } from "@/app/(default)/temple/constants";
 
 export interface Column<T extends Record<string, unknown> = any> {
   key: keyof T | string;
@@ -33,6 +33,7 @@ interface DataTableProps<T extends Record<string, unknown> = any> {
   };
   hidePagination?: boolean;
   activePage?: string;
+  haveAccess?: boolean;
 }
 
 function isNumberLike(v: unknown): v is number {
@@ -111,6 +112,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
   paginationConfig,
   hidePagination = false,
   activePage,
+  haveAccess,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -175,6 +177,11 @@ export function DataTable<T extends Record<string, unknown> = any>({
     [totalPages, safeCurrentPage, siblingCount, boundaryCount]
   );
 
+  console.log('haveAccess in DataTable:', haveAccess);
+  console.log('activePage in DataTable:', activePage);
+  console.log('onEdit in DataTable:', !!onEdit);  
+  console.log('onDelete in DataTable:', !!onDelete);
+
   return (
     <div className="bg-white rounded-lg shadow">
       {/* <div className="p-4 border-b border-gray-200">
@@ -219,7 +226,9 @@ export function DataTable<T extends Record<string, unknown> = any>({
                   )}
                 </th>
               ))}
-              {(onEdit || onDelete) && (activePage !== NILAME && activePage !== DEWALA) && (
+              {(onEdit || onDelete) && 
+              (activePage !== NILAME && activePage !== DEWALA) && 
+              (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Action
                 </th>
@@ -250,7 +259,9 @@ export function DataTable<T extends Record<string, unknown> = any>({
                     </td>
                   );
                 })}
-                {(onEdit || onDelete) && (activePage !== NILAME && activePage !== DEWALA) && (
+                {(onEdit || onDelete) && 
+                (activePage !== NILAME && activePage !== DEWALA)
+                 && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex gap-2">
                       {onEdit && (
