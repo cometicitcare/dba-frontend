@@ -10,6 +10,7 @@ export type BhikkhuForm = {
   br_mobile: string;
   br_fathrsaddrs: string;
   br_fathrsmobile: string;
+  br_form_id: string;
 
   br_birthpls: string;
   br_province: string;
@@ -132,6 +133,7 @@ export const bhikkhuInitialValues: Partial<BhikkhuForm> = {
   br_mobile: "",
   br_fathrsaddrs: "",
   br_fathrsmobile: "",
+  br_form_id: "",
 
   br_birthpls: "",
   br_province: "",

@@ -590,6 +590,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
       br_mobile: s(api?.br_mobile),
       br_fathrsaddrs: s(api?.br_fathrsaddrs),
       br_fathrsmobile: s(api?.br_fathrsmobile),
+      br_form_id: s(api?.br_form_id),
 
       br_birthpls: s(api?.br_birthpls),
       br_province: province_code,
@@ -1825,4 +1826,3 @@ export default function ManageBhikkhuPage(props: PageProps) {
     </Suspense>
   );
 }
-

@@ -91,7 +91,6 @@ function AddBhikkhuPageInner() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
 
-
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
