@@ -12,6 +12,7 @@ import {
   ChevronRightIcon,
   ChevronsRightIcon,
 } from "lucide-react";
+import { DEWALA, NILAME } from "@/app/(default)/temple/constants";
 
 export interface Column<T extends Record<string, unknown> = any> {
   key: keyof T | string;
@@ -31,6 +32,7 @@ interface DataTableProps<T extends Record<string, unknown> = any> {
     boundaryCount?: number; // pages at start/end
   };
   hidePagination?: boolean;
+  activePage?: string;
 }
 
 function isNumberLike(v: unknown): v is number {
@@ -108,6 +110,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
   onDelete,
   paginationConfig,
   hidePagination = false,
+  activePage,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -216,7 +219,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                   )}
                 </th>
               ))}
-              {(onEdit || onDelete) && (
+              {(onEdit || onDelete) && (activePage !== NILAME && activePage !== DEWALA) && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Action
                 </th>
@@ -247,7 +250,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                     </td>
                   );
                 })}
-                {(onEdit || onDelete) && (
+                {(onEdit || onDelete) && (activePage !== NILAME && activePage !== DEWALA) && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex gap-2">
                       {onEdit && (

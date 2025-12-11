@@ -13,7 +13,7 @@ import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
-import { _manageVihara } from "@/services/vihara";
+import { _manageBhikku } from "@/services/bhikku";
 import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
 import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
 import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
@@ -21,19 +21,18 @@ import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
 import selectionsData from "@/utils/selectionsData.json";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-type ViharaRow = {
-  vh_id: number;
-  vh_trn: string;
+import dummyBhikkuData from "./Records.json";
+
+type BhikkuRow = {
+  regNo: string;
   name: string;
+  fatherName?: string;
   mobile?: string;
   email?: string;
-  address?: string;
-  province?: string;
-  district?: string;
-  nikaya?: string;
-  workflow_status?: string;
+  mahanayaka?: string;
+  remarks?: string;
+  category?: string;
+  status?: string;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -93,7 +92,6 @@ type FilterState = {
   vhTrn: string;
   status: string;
   category: string;
-  workflow_status: string;
   dateFrom: string; // yyyy-mm-dd
   dateTo: string; // yyyy-mm-dd
   searchKey: string;
@@ -137,7 +135,6 @@ const DEFAULT_FILTERS: FilterState = {
   vhTrn: "",
   status: "",
   category: "",
-  workflow_status: "",
   dateFrom: "",
   dateTo: "",
   searchKey: "",
@@ -165,9 +162,8 @@ function buildFilterPayload(f: FilterState) {
   if (f.childTempleTrn) payload.child_temple = f.childTempleTrn;
   if (f.nikaya) payload.nikaya = f.nikaya;
   if (f.parchawa) payload.parshawaya = f.parchawa;
-  if (f.category.length) payload.category = f.category;
-  if (f.status.length) payload.status = f.status;
-  if (f.workflow_status) payload.workflow_status = f.workflow_status;
+  if (f.category.length) payload.category = [f.category];
+  if (f.status.length) payload.status = [f.status];
   const from = toYYYYMMDD(f.dateFrom);
   if (from) payload.date_from = from;
   const to = toYYYYMMDD(f.dateTo);
@@ -176,14 +172,13 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function RecordList() {
+export default function SubsectionsList () {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [records, setRecords] = useState<ViharaRow[]>([]);
+  const [records, setRecords] = useState<BhikkuRow[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
-  const [totalRecords, setTotalRecords] = useState(0);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
@@ -234,11 +229,11 @@ export default function RecordList() {
 
   const columns: Column[] = useMemo(
     () => [
-      { key: "vh_trn", label: "TRN", sortable: true },
+      { key: "regNo", label: "Reg. No", sortable: true },
       { key: "name", label: "Name", sortable: true },
       { key: "mobile", label: "Mobile" },
       { key: "email", label: "Email" },
-      { key: "workflow_status", label: "Status", sortable: true },
+      { key: "status", label: "Status", sortable: true },
     ],
     []
   );
@@ -247,54 +242,45 @@ export default function RecordList() {
   async (signal?: AbortSignal, f: FilterState = filters) => {
     setLoading(true);
     try {
-      const payload = buildFilterPayload(f);
-      const response = await _manageVihara({
-        action: "READ_ALL",
-        payload,
-      });
+      const raw = dummyBhikkuData.data;
 
-      const apiData = pickRows<any>(response.data);
-      const total = (response.data as any)?.totalRecords ?? apiData.length;
-
-      const cleaned: ViharaRow[] = apiData.map((row: any) => ({
-        vh_id: row?.vh_id ?? 0,
-        vh_trn: String(row?.vh_trn ?? ""),
-        name: String(row?.vh_vname ?? ""),
-        mobile: row?.vh_mobile ?? "",
-        email: row?.vh_email ?? "",
-        address: row?.vh_addrs ?? "",
-        province: row?.vh_province ?? "",
-        district: row?.vh_district ?? "",
-        nikaya: row?.vh_nikaya ?? "",
-        workflow_status: row?.vh_workflow_status ?? "",
+      const cleaned: BhikkuRow[] = raw.map((row: any) => ({
+        regNo: String(row?.br_regn ?? ""),
+        name: String(row?.br_gihiname ?? ""),
+        fatherName: row?.br_fathrname ?? "",
+        mobile: row?.br_mobile ?? "",
+        email: row?.br_email ?? "",
+        mahanayaka: row?.br_mahananame ?? "",
+        remarks: row?.br_remarks ?? "",
+        category: row?.br_cat ?? "",
+        status: row?.br_currstat?.st_descr ?? "",
       }));
 
-      setRecords(cleaned);
-      setTotalRecords(total);
-      setHasMoreResults((f.page * f.limit) < total);
-    } catch (error) {
-      console.error("Error fetching vihara data:", error);
-      setRecords([]);
-      setTotalRecords(0);
-      setHasMoreResults(false);
+      // --- PAGINATION LOGIC ---
+      const start = (f.page - 1) * f.limit;
+      const end = start + f.limit;
+
+      const pageData = cleaned.slice(start, end);
+
+      setRecords(pageData);
+
+      // There are more results if end < total
+      setHasMoreResults(end < cleaned.length);
     } finally {
       setLoading(false);
     }
   },
   [filters]
 );
-
-
-  // Fetch data when page or limit changes (initial load and pagination)
   useEffect(() => {
     const ac = new AbortController();
     fetchData(ac.signal, filters);
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.page, filters.limit]);
+  }, []); // initial load only
 
   const handleAdd = useCallback(() => {
-    router.push("/temple/vihara/add");
+    router.push("/temple/arama/add");
   }, [router]);
 
   const handleAddSilmatha = useCallback(() => {
@@ -306,32 +292,28 @@ export default function RecordList() {
   }, [router]);
 
   const handleEdit = useCallback(
-    (item: ViharaRow) => {
-      // Use vh_id if available, otherwise use vh_trn
-      const id = item.vh_id ? String(item.vh_id) : item.vh_trn;
-      router.push(`/temple/vihara/${encodeURIComponent(id)}/update`);
+    (item: BhikkuRow) => {
+      router.push(`/bhikkhu/manage/${encodeURIComponent(item.regNo)}`);
     },
     [router]
   );
 
   const handleDelete = useCallback(
-    async (item: ViharaRow) => {
+    async (item: BhikkuRow) => {
       const ok =
         typeof window !== "undefined"
-          ? window.confirm(`Delete Vihara ${item.vh_trn}?`)
+          ? window.confirm(`Delete Bhikku ${item.regNo}?`)
           : true;
       if (!ok) return;
       setLoading(true);
       try {
-        await _manageVihara({
+        await _manageBhikku({
           action: "DELETE",
-          payload: { vh_id: item.vh_id },
+          payload: { br_regn: item.regNo },
         });
-        toast.success("Vihara deleted successfully");
         await fetchData(undefined, filters);
       } catch (e) {
         console.error("Delete Error:", e);
-        toast.error("Failed to delete vihara");
       } finally {
         setLoading(false);
       }
@@ -405,7 +387,7 @@ export default function RecordList() {
       <main className="p-6">
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Records</h1>
+              <h1 className="text-2xl font-bold text-gray-800">Sub Sections</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -413,7 +395,7 @@ export default function RecordList() {
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
-                  Add Vihara
+                  Add Arama 
                 </button>
                 {/* <button
                   onClick={handleAddSilmatha}
@@ -690,7 +672,7 @@ export default function RecordList() {
             )}
           </div>
 
-<div className="relative overflow-y-auto max-h-[400px]">
+          <div className="relative">
             <DataTable
               columns={columns}
               data={records}
@@ -710,12 +692,12 @@ export default function RecordList() {
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-slate-600">
-              {totalRecords > 0
+              {records.length
                 ? `Showing ${
                     (filters.page - 1) * filters.limit + 1
                   } to ${
-                    Math.min((filters.page - 1) * filters.limit + records.length, totalRecords)
-                  } of ${totalRecords}`
+                    (filters.page - 1) * filters.limit + records.length
+                  }`
                 : "No records to display"}
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -768,8 +750,6 @@ export default function RecordList() {
             </div>
           </div>
         </main>
-        <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
-
     </div>
   );
 }

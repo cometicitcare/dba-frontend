@@ -58,7 +58,7 @@ export type ViharaForm = {
   other_associations: string;
 
   // Step F: Temple-Owned Land Information (stored as JSON array)
-  temple_owned_land: string; // JSON string of LandInfoRow[]
+  temple_lands: string; // JSON string of LandInfoRow[]
   land_info_certified: boolean;
 
   // Step G: Resident Bhikkhus (stored as JSON array)
@@ -141,7 +141,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     fields: [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
       // { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text", rules: { required: true } },
-      { name: "period_established", label: "Period Temple Was Established", type: "text", rules: { required: true } },
+      { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
     ],
   },
   {
@@ -161,7 +161,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Temple-Owned Land Information",
     fields: [
       // This step will be handled specially with an editable table
-      { name: "temple_owned_land", label: "Land Information Table", type: "text", rules: { required: false } },
+      { name: "temple_lands", label: "Land Information Table", type: "text", rules: { required: false } },
       { name: "land_info_certified", label: "I certify that the above information is true and correct", type: "text", rules: { required: true } },
     ],
   },
@@ -231,7 +231,7 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   dayaka_sabha: "",
   temple_working_committee: "",
   other_associations: "",
-  temple_owned_land: "[]",
+  temple_lands: "[]",
   land_info_certified: false,
   resident_bhikkhus: "[]",
   resident_bhikkhus_certified: false,

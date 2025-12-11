@@ -14,7 +14,6 @@ import {
   LocationPicker,
   BhikkhuAutocomplete,
   TempleAutocomplete,
-  TempleAutocompleteAddress,
   BhikkhuCategorySelect,
   BhikkhuStatusSelect,
   bhikkhuSteps,
@@ -23,6 +22,7 @@ import {
   validateField,
   Errors,
 } from "@/components/Bhikku/Add";
+import AutocompleteTempleAddress from "@/components/Bhikku/Add/AutocompleteTempleAddress";
 
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
@@ -596,7 +596,7 @@ function AddBhikkhuPageInner() {
                         if (id === "br_residence_at_declaration") {
                           return (
                             <div key={id}>
-                              <TempleAutocompleteAddress
+                              <AutocompleteTempleAddress
                                 id={id}
                                 label={f.label}
                                 required={!!f.rules?.required}

@@ -16,7 +16,7 @@ export const SYSTEM_ADMIN_MANAGEMENT_DEPARTMENT = "System Administration";
 export const DAMMA_SCHOOL_MANAGEMENT_DEPARTMENT = "Damma School";
 export const DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT = "Divisional Secretariat";
 export const PUBLIC_MANAGEMENT_DEPARTMENT = "Public Services";
-export const VIHARA_MANAGEMENT_DEPARTMENT = "Vihara Management";
+export const VIHARA_MANAGEMENT_DEPARTMENT = "Vihara Department";
 
 export const COMMON_VISIBLE_DEPARTMENTS = [
   BHIKKU_MANAGEMENT_DEPARTMENT,

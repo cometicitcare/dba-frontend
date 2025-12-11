@@ -51,8 +51,9 @@ export default function TempleAutocompleteAddress({ id, label, placeholder, requ
   }, [input, debounceKey]);
 
   const handleSelect = (opt: TempleOption) => {
-    const display = `${opt.name}${opt.addrs ? ` — ${opt.addrs}` : ""}`;
-    const address = opt.addrs ?? "";
+    const display = `${opt.name}${opt.addrs ? ` – ${opt.addrs}` : ""}`;
+    const trimmedAddress = (opt.addrs ?? "").trim();
+    const address = trimmedAddress || opt.name;
     onPick({ address, display, trn: opt.trn, name: opt.name });
     setInput(display);
     setOpen(false);
