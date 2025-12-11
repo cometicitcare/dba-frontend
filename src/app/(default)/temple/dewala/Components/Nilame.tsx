@@ -22,6 +22,7 @@ import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
 import selectionsData from "@/utils/selectionsData.json";
 import dummyBhikkuData from "./Nilame.json";
+import { NILAME } from "../../constants";
 
 type BhikkuRow = {
   regNo: string;
@@ -680,6 +681,7 @@ const cleaned: BhikkuRow[] = raw.map((row: any) => ({
               onEdit={handleEdit}
               onDelete={handleDelete}
               hidePagination
+              activePage={NILAME}
             />
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm rounded-lg">
