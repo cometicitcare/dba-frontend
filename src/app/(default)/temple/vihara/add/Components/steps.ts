@@ -161,7 +161,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Temple-Owned Land Information",
     fields: [
       // This step will be handled specially with an editable table
-      { name: "temple_lands", label: "Land Information Table", type: "text", rules: { required: false } },
+      { name: "temple_owned_land", label: "Land Information Table", type: "text", rules: { required: false } },
       { name: "land_info_certified", label: "I certify that the above information is true and correct", type: "text", rules: { required: true } },
     ],
   },
