@@ -99,8 +99,8 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
         name: "telephone_number",
         label: "Telephone Number",
         type: "tel",
-        placeholder: "0XX-XXXXXXX",
-        rules: { required: false, pattern: { regex: /^[\d\s\-]+$/, message: "Invalid telephone number" } },
+        placeholder: "07XXXXXXXX",
+        rules: { required: false, pattern: { regex: /^0\d{9}$/, message: "Must be 10 digits (e.g., 07XXXXXXXX)" } },
       },
       {
         name: "whatsapp_number",
