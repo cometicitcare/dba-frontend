@@ -85,6 +85,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<string>("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -262,6 +263,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
         };
         setValues(filledValues);
         console.log("Form values auto-filled:", filledValues);
+
+        setWorkflowStatus(apiData?.ar_workflow_status ?? apiData?.workflow_status ?? "");
 
         // Set certificate metadata
         const certificateNumber = String(apiData?.ar_trn ?? apiData?.ar_id ?? "");
@@ -751,7 +754,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                     <p className="text-slate-300 text-sm">Editing: {aramaId}</p>
                   </div>
                   {
-                    isAdmin && (
+                    isAdmin && workflowStatus !== "COMPLETED" && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleApprove}
