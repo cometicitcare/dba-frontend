@@ -1146,6 +1146,37 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                     );
                                   }
 
+                                  if (id === "br_form_id") {
+                                    return (
+                                      <div key={id}>
+                                        <label
+                                          htmlFor={id}
+                                          className="block text-sm font-medium text-slate-700 mb-2"
+                                        >
+                                          {f.label}
+                                        </label>
+                                        <input
+                                          id={id}
+                                          type="text"
+                                          value={val}
+                                          onChange={(e) =>
+                                            handleInputChange(
+                                              f.name,
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder="Enter the form number"
+                                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                        />
+                                        {err ? (
+                                          <p className="mt-1 text-sm text-red-600">
+                                            {err}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  }
+
                                   if (id === "br_viharadhipathi") {
                                     return (
                                       <div key={id}>
