@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { _manageArama, _uploadScannedDocument } from "@/services/arama";
+import { _manageArama, _markPrintedArama, _uploadScannedDocument } from "@/services/arama";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -82,12 +82,54 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [printingMarking, setPrintingMarking] = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<string>("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+
+  const certificateNumberLabel = certificateMeta.number || "Pending assignment";
+  const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
+  const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
+
+  const handleConfirmPrintCertificate = async () => {
+    try {
+      setPrintingMarking(true);
+      const res = await _markPrintedArama(Number(aramaId));
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to mark as printed. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setPrintDialogOpen(false);
+      setShowUploadModal(true);
+      handlePrintCertificate();
+      setPrintingMarking(false);
+    }
+  };
+
+  const handlePrintCertificate = () => {
+    window.print();
+    setShowUploadModal(true);
+  };
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<AramaForm> => {
@@ -221,6 +263,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
         };
         setValues(filledValues);
         console.log("Form values auto-filled:", filledValues);
+
+        setWorkflowStatus(apiData?.ar_workflow_status ?? apiData?.workflow_status ?? "");
 
         // Set certificate metadata
         const certificateNumber = String(apiData?.ar_trn ?? apiData?.ar_id ?? "");
@@ -582,6 +626,19 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
     );
   }
 
+  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
+
+  const handleCloseApproveDialog = () => {
+    if (approving) return;
+    setApproveDialogOpen(false);
+  };
+  const handleOpenPrintDialog = () => setPrintDialogOpen(true);
+
+  const handleClosePrintDialog = () => {
+    if (printingMarking) return;
+    setPrintDialogOpen(false);
+  };
+
   const handleOpenRejectDialog = () => {
     setRejectionReason("");
     setRejectDialogOpen(true);
@@ -697,7 +754,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                     <p className="text-slate-300 text-sm">Editing: {aramaId}</p>
                   </div>
                   {
-                    isAdmin && (
+                    isAdmin && workflowStatus !== "COMPLETED" && (
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleApprove}
@@ -750,34 +807,82 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
 
                   {/* Certificates Tab */}
                   {isCertificatesTab && (
-                    <div className="space-y-6">
-                      <div className="bg-slate-50 p-6 rounded-lg">
-                        <h3 className="text-lg font-semibold text-slate-800 mb-4">Arama Certificate</h3>
-                        {certificateMeta.number ? (
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-sm text-slate-600 mb-2">Certificate Number: <strong>{certificateMeta.number}</strong></p>
-                              <a
-                                href={certificateMeta.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
-                              >
-                                View Certificate
-                              </a>
-                            </div>
-                            <div className="border-t pt-4">
-                              <p className="text-sm text-slate-600 mb-4">QR Code:</p>
-                              <div className="bg-white p-4 inline-block rounded-lg">
-                                <QRCode value={certificateMeta.url} size={200} />
+                            <div className="space-y-6">
+                              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
+                                <div className="flex flex-col gap-2 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+                                  <div>
+                                    <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
+                                      Certificate number
+                                    </p>
+                                    <p className="text-2xl font-semibold text-slate-900">
+                                      {certificateNumberLabel}
+                                    </p>
+                                    <p className="break-all text-slate-500">
+                                      {certificateUrlLabel}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={handleOpenPrintDialog}
+                                    disabled={printingMarking}
+                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    {printingMarking ? "Please wait..." : "Print QR on Certificate"}
+                                  </button>
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                  Insert the pre-printed legal-size certificate into the printer.
+                                  Only the QR code positioned at the bottom-right corner of the sheet will be printed.
+                                </p>
                               </div>
+
+                              <div className="flex justify-center">
+                                <div
+                                  id="certificate-print-area"
+                                  ref={certificatePaperRef}
+                                  className="relative bg-white"
+                                  style={{ width: "8.5in", height: "14in" }}
+                                >
+                                  <div className="absolute inset-0 pointer-events-none" />
+                                  <div className="absolute bottom-20 right-16">
+                                    <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                      <QRCode
+                                        value={certificateQrValue}
+                                        size={80}
+                                        className="h-20 w-20"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <style>{`
+                                @media print {
+                                  @page {
+                                    margin: 0;
+                                  }
+                                  body {
+                                    margin: 0 !important;
+                                    padding: 0 !important;
+                                  }
+                                  body * {
+                                    visibility: hidden;
+                                    box-shadow: none !important;
+                                  }
+                                  #certificate-print-area,
+                                  #certificate-print-area * {
+                                    visibility: visible;
+                                  }
+                                  #certificate-print-area {
+                                    position: absolute;
+                                    left: 0;
+                                    top: 0;
+                                    right: 0;
+                                    margin: 0 auto;
+                                    box-shadow: none !important;
+                                  }
+                                }
+                              `}</style>
                             </div>
-                          </div>
-                        ) : (
-                          <p className="text-slate-600">Certificate will be available after the arama is registered.</p>
-                        )}
-                      </div>
-                    </div>
                   )}
 
                   {/* Upload Scanned Files Tab */}
@@ -1013,6 +1118,60 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
         </main>
         <FooterBar />
       </div>
+
+       <Dialog
+                    open={approveDialogOpen}
+                    onClose={handleCloseApproveDialog}
+                    aria-labelledby="approve-dialog-title"
+                  >
+                    <DialogTitle id="approve-dialog-title">
+                      Approve registration?
+                    </DialogTitle>
+                    <DialogContent>
+                      <DialogContentText>
+                        Approving will finalize this record. This action may be irreversible.
+                      </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                      <MuiButton onClick={handleCloseApproveDialog} disabled={approving}>
+                        Cancel
+                      </MuiButton>
+                      <MuiButton
+                        onClick={handleApprove}
+                        disabled={approving}
+                        color="primary"
+                        variant="contained"
+                      >
+                        {approving ? "Approving..." : "Approve"}
+                      </MuiButton>
+                    </DialogActions>
+                  </Dialog>
+      
+                  <Dialog
+                    open={printDialogOpen}
+                    onClose={handleClosePrintDialog}
+                    aria-labelledby="print-dialog-title"
+                  >
+                    <DialogTitle id="print-dialog-title">Print QR on Certificate?</DialogTitle>
+                    <DialogContent>
+                      <DialogContentText>
+                        This will mark the certificate as printed and open the print dialog for the QR. Continue?
+                      </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                      <MuiButton onClick={handleClosePrintDialog} disabled={printingMarking}>
+                        Cancel
+                      </MuiButton>
+                      <MuiButton
+                        onClick={handleConfirmPrintCertificate}
+                        disabled={printingMarking}
+                        variant="contained"
+                      >
+                        {printingMarking ? "Marking..." : "Confirm & Print"}
+                      </MuiButton>
+                    </DialogActions>
+                  </Dialog>
+      
 
             <Dialog
               open={rejectDialogOpen}
