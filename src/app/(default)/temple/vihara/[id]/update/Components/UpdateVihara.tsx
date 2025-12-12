@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { _manageVihara, _uploadScannedDocument } from "@/services/vihara";
+import { _manageVihara, _markPrintedVihara, _uploadScannedDocument } from "@/services/vihara";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -98,6 +98,9 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const [rejecting, setRejecting] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [printingMarking, setPrintingMarking] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -630,6 +633,35 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
     setShowUploadModal(true);
   };
 
+  const handleConfirmPrintCertificate = async () => {
+    try {
+      setPrintingMarking(true);
+      const res = await _markPrintedVihara(Number(viharaId));
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to mark as printed. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setPrintDialogOpen(false);
+      setShowUploadModal(true);
+      handlePrintCertificate();
+      setPrintingMarking(false);
+    }
+  };
+
   const handleScanFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -689,6 +721,17 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       </div>
     );
   }
+
+  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
+  const handleCloseApproveDialog = () => {
+    if (approving) return;
+    setApproveDialogOpen(false);
+  };
+  const handleOpenPrintDialog = () => setPrintDialogOpen(true);
+  const handleClosePrintDialog = () => {
+    if (printingMarking) return;
+    setPrintDialogOpen(false);
+  };
 
   const handleOpenRejectDialog = () => {
     setRejectionReason("");
@@ -905,10 +948,11 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                                     </p>
                                   </div>
                                   <button
-                                    onClick={handlePrintCertificate}
-                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400"
+                                    onClick={handleOpenPrintDialog}
+                                    disabled={printingMarking}
+                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
                                   >
-                                    Print QR on Certificate
+                                    {printingMarking ? "Please wait..." : "Print QR on Certificate"}
                                   </button>
                                 </div>
                                 <p className="text-xs text-slate-500">
@@ -1495,6 +1539,59 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
           </div>
         </div>
       ) : null}
+
+            <Dialog
+              open={approveDialogOpen}
+              onClose={handleCloseApproveDialog}
+              aria-labelledby="approve-dialog-title"
+            >
+              <DialogTitle id="approve-dialog-title">
+                Approve registration?
+              </DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  Approving will finalize this record. This action may be irreversible.
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <MuiButton onClick={handleCloseApproveDialog} disabled={approving}>
+                  Cancel
+                </MuiButton>
+                <MuiButton
+                  onClick={handleApprove}
+                  disabled={approving}
+                  color="primary"
+                  variant="contained"
+                >
+                  {approving ? "Approving..." : "Approve"}
+                </MuiButton>
+              </DialogActions>
+            </Dialog>
+
+            <Dialog
+              open={printDialogOpen}
+              onClose={handleClosePrintDialog}
+              aria-labelledby="print-dialog-title"
+            >
+              <DialogTitle id="print-dialog-title">Print QR on Certificate?</DialogTitle>
+              <DialogContent>
+                <DialogContentText>
+                  This will mark the certificate as printed and open the print dialog for the QR. Continue?
+                </DialogContentText>
+              </DialogContent>
+              <DialogActions>
+                <MuiButton onClick={handleClosePrintDialog} disabled={printingMarking}>
+                  Cancel
+                </MuiButton>
+                <MuiButton
+                  onClick={handleConfirmPrintCertificate}
+                  disabled={printingMarking}
+                  variant="contained"
+                >
+                  {printingMarking ? "Marking..." : "Confirm & Print"}
+                </MuiButton>
+              </DialogActions>
+            </Dialog>
 
                   <Dialog
                     open={rejectDialogOpen}
