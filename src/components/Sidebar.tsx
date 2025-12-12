@@ -68,11 +68,12 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Arama",
     path: "/temple/arama",
   },
+  // {
+  //   icon: MonkIcon,
+  //   label: "Ojections",
+  //   path: "/ojections",
+  // },  
   {
-    icon: MonkIcon,
-    label: "Ojections",
-    path: "/ojections",
-  },  {
     icon: MonkIcon,
     label: "Re Print",
     path: "/print-request",

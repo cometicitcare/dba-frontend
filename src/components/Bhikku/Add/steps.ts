@@ -73,6 +73,7 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
         placeholder: "07XXXXXXXX",
         rules: { required: true, custom: (v) => (isPhoneLK(v) ? undefined : "Must be 10 digits (e.g., 07XXXXXXXX)") },
       },
+      { name: "br_form_id", label: "Form Number", type: "text" },
     ],
   },
   {
