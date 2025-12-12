@@ -10,7 +10,7 @@ export const baseURL: string | undefined =
     : process.env.NEXT_PUBLIC_BASE_URL;
 
 // DEPARTMENT
-export const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Management";
+export const BHIKKU_MANAGEMENT_DEPARTMENT = "Bhikku Department";
 export const SILMATHA_MANAGEMENT_DEPARTMENT = "Silmatha Management";
 export const SYSTEM_ADMIN_MANAGEMENT_DEPARTMENT = "System Administration";
 export const DAMMA_SCHOOL_MANAGEMENT_DEPARTMENT = "Damma School";
