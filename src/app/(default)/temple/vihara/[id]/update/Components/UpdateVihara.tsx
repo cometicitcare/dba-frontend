@@ -101,6 +101,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<string>("");
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -243,6 +244,8 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
             setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
           }
         }
+
+        setWorkflowStatus(apiData?.vh_workflow_status ?? apiData?.workflow_status ?? "");
 
         // Set certificate metadata
         const certificateNumber = String(apiData?.vh_trn ?? apiData?.vh_id ?? "");
@@ -872,8 +875,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
                   </div>
-                  {
-                    role === ADMIN_ROLE_LEVEL &&
+                  {role === ADMIN_ROLE_LEVEL && workflowStatus !== "COMPLETED" && (
                   
                   <div className="flex items-center gap-2">
                     <button
@@ -904,7 +906,8 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                     >
                       {rejecting ? "Rejecting…" : "Reject"}
                     </button>
-                  </div>}
+                  </div>
+                  )}
                 </div>
               </div>
 
@@ -1643,4 +1646,3 @@ export default function UpdateVihara({ role }: { role: string | undefined }) {
     </Suspense>
   );
 }
-
