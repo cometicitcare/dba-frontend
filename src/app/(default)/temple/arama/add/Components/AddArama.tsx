@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, Suspense, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageArama } from "@/services/arama";
+import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -340,6 +341,21 @@ function AddAramaPageInner() {
     handleInputChange("resident_silmathas", JSON.stringify(rows));
   };
 
+  const handlePickSilmatha = (picked: { regn?: string; name?: string }) => {
+    const newRow: ResidentSilmathaRow = {
+      id: `silmatha-${Date.now()}`,
+      serialNumber: residentSilmathaRows.length + 1,
+      silmathaName: picked.name ?? picked.regn ?? "",
+      registrationNumber: picked.regn ?? "",
+      occupationEducation: "",
+    };
+    const merged = [...residentSilmathaRows, newRow].map((row, idx) => ({
+      ...row,
+      serialNumber: idx + 1,
+    }));
+    handleResidentSilmathaChange(merged);
+  };
+
   // Helper function to look up location names from codes
   const lookupLocationNames = useCallback((provinceCode?: string, districtCode?: string, divisionCode?: string, gnCode?: string) => {
     const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
@@ -494,7 +510,13 @@ function AddAramaPageInner() {
 
                       {/* Step 6: Resident Sil Mathā Table */}
                       {currentStep === 6 && (
-                        <div className="md:col-span-2">
+                        <div className="md:col-span-2 space-y-4">
+                          <SilmathaAutocomplete
+                            id="silmatha-search"
+                            label="Search and add an existing Silmatha"
+                            placeholder="Type a Silmatha name or registration number"
+                            onPick={(picked) => handlePickSilmatha(picked)}
+                          />
                           <ResidentSilmathaTable value={residentSilmathaRows} onChange={handleResidentSilmathaChange} error={errors.resident_silmathas} />
                           <div className="mt-4">
                             <label className="flex items-center gap-2">
@@ -1059,4 +1081,3 @@ export default function AddArama() {
     </Suspense>
   );
 }
-
