@@ -9,7 +9,7 @@ type SilmathaOption = {
   province?: string;
 };
 
-async function searchSilmatha(q: string, limit = 10): Promise<SilmathaOption[]> {
+export async function fetchSilmathaOptions(q: string, limit = 200): Promise<SilmathaOption[]> {
   const res: any = await _manageSilmatha({
     action: "READ_ALL",
     payload: { limit, search_key: q ?? "" },
@@ -55,7 +55,7 @@ export default function SilmathaAutocomplete({
       const q = input?.trim() ?? "";
       setLoading(true);
       try {
-        const rows = await searchSilmatha(q, 10);
+        const rows = await fetchSilmathaOptions(q);
         if (key === debounceKey) setOptions(rows);
       } finally {
         if (key === debounceKey) setLoading(false);
@@ -67,7 +67,7 @@ export default function SilmathaAutocomplete({
 
   const handleSelect = (opt: SilmathaOption) => {
     const display = `${opt.name} (${opt.regn})`;
-    onPick(storeRegn ? { regn: opt.regn, display } : { name: opt.name, display });
+    onPick({ regn: storeRegn ? opt.regn : undefined, name: opt.name, display });
     setInput(display);
     setOpen(false);
   };
