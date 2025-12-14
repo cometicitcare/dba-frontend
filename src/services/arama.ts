@@ -26,3 +26,11 @@ export const _uploadScannedDocument = async (arId: number, file: File) => {
 };
 
 export const _aramaManage = (body: any) => BackendClient.post(`${baseURL}/silmatha-regist/arama-list`, body);
+export const _markPrintedArama = (ar_id: number) => {
+  return BackendClient.post(`${baseURL}/arama-data/manage`, {
+    action: "MARK_PRINTED",
+    payload: {
+      ar_id,
+    },
+  });
+};

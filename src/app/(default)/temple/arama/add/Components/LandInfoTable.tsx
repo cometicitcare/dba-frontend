@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo, useState, useEffect } from "react";
 import { DataGrid, GridColDef, GridActionsCellItem } from "@mui/x-data-grid";
+import selectionsData from "@/utils/selectionsData.json";
 import type { LandInfoRow } from "./steps";
 
 type Props = {
@@ -15,6 +16,19 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
   useEffect(() => {
     setRows(value || []);
   }, [value]);
+
+  const districtOptions = useMemo(() => {
+    const provinces = (selectionsData as any)?.provinces;
+    if (!Array.isArray(provinces)) return [];
+    const names: string[] = [];
+    provinces.forEach((p: any) => {
+      (p?.districts ?? []).forEach((d: any) => {
+        const name = d?.dd_dname ?? d?.dd_name ?? d?.name;
+        if (name && !names.includes(name)) names.push(name);
+      });
+    });
+    return names.sort((a, b) => a.localeCompare(b));
+  }, []);
 
   const handleAddRow = () => {
     const newRow: LandInfoRow = {
@@ -71,8 +85,10 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
     {
       field: "district",
       headerName: "District",
-      width: 120,
+      width: 140,
       editable: true,
+      type: "singleSelect",
+      valueOptions: districtOptions,
     },
     {
       field: "extent",
@@ -174,5 +190,3 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
     </div>
   );
 }
-
-
