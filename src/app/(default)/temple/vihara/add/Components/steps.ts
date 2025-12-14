@@ -186,7 +186,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     id: 9,
     title: "Ownership and Recommendation",
     fields: [
-      { name: "grama_niladhari_division_ownership", label: "Grama Niladhari Division", type: "text", placeholder: "Enter division name", rules: { required: true } },
+      { name: "grama_niladhari_division_ownership", label: "In the Grama Niladhari Division of .........................", type: "text", placeholder: "Enter division name", rules: { required: true } },
       { name: "sanghika_donation_deed", label: "Ownership has been obtained through a Sanghika (Saṅgha) donation deed", type: "text", rules: { required: false } },
       { name: "government_donation_deed", label: "A donation deed issued by the Government has been obtained", type: "text", rules: { required: false } },
       { name: "government_donation_deed_in_progress", label: "Necessary steps are being taken to prepare the donation deed", type: "text", rules: { required: false } },

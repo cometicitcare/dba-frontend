@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useMemo, useRef, useState, Suspense } from "react";
+import React, { useMemo, useRef, useState, Suspense, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageArama } from "@/services/arama";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
+import selectionsData from "@/utils/selectionsData.json";
 
 import {
   DateField,
@@ -339,6 +340,98 @@ function AddAramaPageInner() {
     handleInputChange("resident_silmathas", JSON.stringify(rows));
   };
 
+  // Helper function to look up location names from codes
+  const lookupLocationNames = useCallback((provinceCode?: string, districtCode?: string, divisionCode?: string, gnCode?: string) => {
+    const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
+    let districtName = "";
+    let divisionName = "";
+    let gnName = "";
+
+    if (districtCode) {
+      for (const province of provinces) {
+        if (province.cp_code === provinceCode) {
+          for (const district of province.districts || []) {
+            if (district.dd_dcode === districtCode) {
+              districtName = district.dd_dname || "";
+              if (divisionCode) {
+                for (const division of district.divisional_secretariats || []) {
+                  if (division.dv_dvcode === divisionCode) {
+                    divisionName = division.dv_dvname || "";
+                    if (gnCode) {
+                      for (const gn of division.gn_divisions || []) {
+                        const code = gn.gn_gnc || gn.gn_code;
+                        if (code === gnCode) {
+                          gnName = gn.gn_gnname || "";
+                          break;
+                        }
+                      }
+                    }
+                    break;
+                  }
+                }
+              }
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    return { districtName, divisionName, gnName };
+  }, []);
+
+  // Auto-populate ownership fields from step 1 and step 2 when navigating to step 8
+  useEffect(() => {
+    if (currentStep === 8) {
+      const updates: Partial<AramaForm> = {};
+      
+      // Populate arama name from step 1 - always sync
+      if (values.arama_name && values.ownership_arama_name !== values.arama_name) {
+        updates.ownership_arama_name = values.arama_name;
+      }
+      
+      // Populate location fields from step 2 - always sync
+      if (values.district || values.divisional_secretariat || values.grama_niladhari_division) {
+        const { districtName, divisionName, gnName } = lookupLocationNames(
+          values.province,
+          values.district,
+          values.divisional_secretariat,
+          values.grama_niladhari_division
+        );
+        
+        if (districtName && values.ownership_district !== districtName) {
+          updates.ownership_district = districtName;
+        }
+        if (divisionName && values.ownership_divisional_secretariat !== divisionName) {
+          updates.ownership_divisional_secretariat = divisionName;
+        }
+        if (gnName && values.ownership_grama_niladhari_division !== gnName) {
+          updates.ownership_grama_niladhari_division = gnName;
+        }
+      }
+      
+      if (Object.keys(updates).length > 0) {
+        handleSetMany(updates);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, values.arama_name, values.district, values.divisional_secretariat, values.grama_niladhari_division, lookupLocationNames]);
+
+  // Auto-populate arama_name to ownership_arama_name when arama_name changes
+  useEffect(() => {
+    if (values.arama_name) {
+      // Always sync ownership_arama_name with arama_name when it changes
+      if (values.ownership_arama_name !== values.arama_name) {
+        handleSetMany({ ownership_arama_name: values.arama_name });
+      }
+    } else if (!values.arama_name && values.ownership_arama_name) {
+      // Clear ownership_arama_name if arama_name is cleared
+      handleSetMany({ ownership_arama_name: "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.arama_name]);
+
   const gridCols = "md:grid-cols-2";
 
   return (
@@ -428,13 +521,52 @@ function AddAramaPageInner() {
                               divisionCode: (values.divisional_secretariat as string) || undefined,
                               gnCode: (values.grama_niladhari_division as string) || undefined,
                             }}
-                            onChange={(sel) => {
-                              handleSetMany({
+                            onChange={(sel, payload) => {
+                              // Get location names from payload, or look them up if not available
+                              let districtName = payload.district?.dd_dname ?? "";
+                              let divisionName = payload.division?.dv_dvname ?? "";
+                              let gnName = payload.gn?.gn_gnname ?? "";
+                              
+                              // Fallback to lookup if payload doesn't have names
+                              if (!districtName || !divisionName || !gnName) {
+                                const lookedUp = lookupLocationNames(
+                                  sel.provinceCode,
+                                  sel.districtCode,
+                                  sel.divisionCode,
+                                  sel.gnCode
+                                );
+                                if (!districtName && lookedUp.districtName) districtName = lookedUp.districtName;
+                                if (!divisionName && lookedUp.divisionName) divisionName = lookedUp.divisionName;
+                                if (!gnName && lookedUp.gnName) gnName = lookedUp.gnName;
+                              }
+                              
+                              const updates: Partial<AramaForm> = {
                                 province: sel.provinceCode ?? "",
                                 district: sel.districtCode ?? "",
                                 divisional_secretariat: sel.divisionCode ?? "",
                                 grama_niladhari_division: sel.gnCode ?? "",
-                              });
+                              };
+                              
+                              // Always update the ownership fields when location is selected/changed
+                              if (sel.districtCode && districtName) {
+                                updates.ownership_district = districtName;
+                              } else if (!sel.districtCode) {
+                                updates.ownership_district = "";
+                              }
+                              
+                              if (sel.divisionCode && divisionName) {
+                                updates.ownership_divisional_secretariat = divisionName;
+                              } else if (!sel.divisionCode) {
+                                updates.ownership_divisional_secretariat = "";
+                              }
+                              
+                              if (sel.gnCode && gnName) {
+                                updates.ownership_grama_niladhari_division = gnName;
+                              } else if (!sel.gnCode) {
+                                updates.ownership_grama_niladhari_division = "";
+                              }
+                              
+                              handleSetMany(updates);
                             }}
                             required
                             labels={{

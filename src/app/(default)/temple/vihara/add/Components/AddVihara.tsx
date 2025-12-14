@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState, useCallback, Suspense } from "react";
+import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageVihara } from "@/services/vihara";
 import { FooterBar } from "@/components/FooterBar";
@@ -384,6 +384,37 @@ function AddViharaPageInner() {
     handleInputChange("resident_bhikkhus", JSON.stringify(rows));
   };
 
+  // Helper function to look up GN name from code
+  const lookupGnName = useCallback((gnCode: string | undefined): string => {
+    if (!gnCode) return "";
+    const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
+    for (const province of provinces) {
+      for (const district of province.districts || []) {
+        for (const division of district.divisional_secretariats || []) {
+          for (const gn of division.gn_divisions || []) {
+            const code = gn.gn_gnc || gn.gn_code;
+            if (code === gnCode) {
+              return gn.gn_gnname || "";
+            }
+          }
+        }
+      }
+    }
+    return "";
+  }, []);
+
+  // Auto-populate grama_niladhari_division_ownership from grama_niladhari_division when navigating to step 9
+  useEffect(() => {
+    if (currentStep === 9 && values.grama_niladhari_division) {
+      const gnName = lookupGnName(values.grama_niladhari_division);
+      // Always sync the ownership field with the selected GN division name when on step 9
+      if (gnName && gnName !== values.grama_niladhari_division_ownership) {
+        handleSetMany({ grama_niladhari_division_ownership: gnName });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, values.grama_niladhari_division, lookupGnName]);
+
   const gridCols = currentStep === 5 ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
@@ -583,13 +614,23 @@ function AddViharaPageInner() {
                             <div key={id} className="md:col-span-2">
                               <LocationPicker
                                 value={selection}
-                                onChange={(sel) => {
-                                  handleSetMany({
+                                onChange={(sel, payload) => {
+                                  // Get GN name from payload, or look it up if not available
+                                  const gnName = payload.gn?.gn_gnname ?? (sel.gnCode ? lookupGnName(sel.gnCode) : "");
+                                  const updates: Partial<ViharaForm> = {
                                     province: sel.provinceCode ?? "",
                                     district: sel.districtCode ?? "",
                                     divisional_secretariat: sel.divisionCode ?? "",
                                     grama_niladhari_division: sel.gnCode ?? "",
-                                  });
+                                  };
+                                  // Always update the ownership field when GN division is selected/changed
+                                  if (sel.gnCode && gnName) {
+                                    updates.grama_niladhari_division_ownership = gnName;
+                                  } else if (!sel.gnCode) {
+                                    // If GN is cleared, clear the ownership field too
+                                    updates.grama_niladhari_division_ownership = "";
+                                  }
+                                  handleSetMany(updates);
                                 }}
                                 required
                                 labels={{
@@ -743,7 +784,7 @@ function AddViharaPageInner() {
                           return (
                             <div key={id} className="md:col-span-2">
                               <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
-                                In the Grama Niladhari Division of .........................
+                                {f.label}
                               </label>
                               <input
                                 id={id}
