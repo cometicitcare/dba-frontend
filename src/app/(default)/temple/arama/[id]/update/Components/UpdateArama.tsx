@@ -86,6 +86,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string>("");
+  const [printingActive, setPrintingActive] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -96,6 +97,108 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const certificateNumberLabel = certificateMeta.number || "Pending assignment";
   const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
   const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
+  const certificateStyles = `
+    .aramaya-certificate {
+      position: relative;
+      width: 8.5in;
+      height: 14in;
+      max-width: calc(100% - 30px);
+      background: #fff;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .aramaya-content {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 20%;
+      bottom: 20%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+    .aramaya-row {
+      display: grid;
+      grid-template-columns: 8% 32% 1fr;
+      align-items: center;
+      column-gap: 10px;
+      row-gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .aramaya-label {
+      font-size: 14px;
+      color: #000;
+    }
+    .aramaya-value {
+      font-size: 17px;
+      color: #000;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .aramaya-multi {
+      display: grid;
+      grid-template-columns: 40px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+    .aramaya-footer {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      bottom: 6%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .aramaya-disclaimer {
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: justify;
+    }
+    .aramaya-signature {
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .aramaya-qr {
+      position: absolute;
+      right: 15%;
+      bottom: 3%;
+      width: 80px;
+    }
+    .aramaya-qr .caption {
+      margin-top: 4px;
+      font-size: 10px;
+      text-align: center;
+      word-break: break-all;
+    }
+    @media print {
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body * {
+        visibility: hidden;
+        box-shadow: none !important;
+      }
+      .aramaya-certificate[data-printing="true"],
+      .aramaya-certificate[data-printing="true"] * {
+        visibility: visible;
+      }
+      .aramaya-certificate[data-printing="true"] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        margin: 0 auto;
+        box-shadow: none !important;
+      }
+    }
+  `;
 
   const handleConfirmPrintCertificate = async () => {
     try {
@@ -127,7 +230,9 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   };
 
   const handlePrintCertificate = () => {
+    setPrintingActive(true);
     window.print();
+    setTimeout(() => setPrintingActive(false), 0);
     setShowUploadModal(true);
   };
 
@@ -610,6 +715,47 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [values.resident_silmathas]);
 
+  const aramaCertificateData = useMemo(() => {
+    const today = new Date();
+    const signatureDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+      today.getDate()
+    ).padStart(2, "0")}`;
+    const residentNames = residentSilmathaRows.map((r) => r.silmathaName || r.registrationNumber || "").filter(Boolean);
+    const padResidents = (index: number) => residentNames[index] || "";
+    return {
+      registration_number: certificateNumberLabel,
+      aramaya_name: values.arama_name || "",
+      aramaya_address: values.arama_address || "",
+      district: values.district || "",
+      divisional_secretariat: values.divisional_secretariat || "",
+      regional_committee: values.provincial_sasanaarakshaka_council || "",
+      establishment_period: values.established_period || "",
+      aramadipati_name: values.chief_nun_name || "",
+      resident_nun_a: padResidents(0),
+      resident_nun_aa: padResidents(1),
+      resident_nun_ae: padResidents(2),
+      resident_nun_aae: padResidents(3),
+      resident_nun_i: padResidents(4),
+      resident_nun_ii: padResidents(5),
+      resident_nun_u: padResidents(6),
+      resident_nun_uu: padResidents(7),
+      land_ownership: values.land_ownership || values.ownership_arama_name || "",
+      signature_date: signatureDate,
+    };
+  }, [
+    certificateNumberLabel,
+    residentSilmathaRows,
+    values.arama_address,
+    values.arama_name,
+    values.chief_nun_name,
+    values.district,
+    values.divisional_secretariat,
+    values.established_period,
+    values.land_ownership,
+    values.ownership_arama_name,
+    values.provincial_sasanaarakshaka_council,
+  ]);
+
   const handleLandInfoChange = (rows: LandInfoRow[]) => {
     handleInputChange("arama_owned_land", JSON.stringify(rows));
   };
@@ -637,6 +783,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const handleClosePrintDialog = () => {
     if (printingMarking) return;
     setPrintDialogOpen(false);
+    setPrintingActive(false);
   };
 
   const handleOpenRejectDialog = () => {
@@ -807,82 +954,128 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
 
                   {/* Certificates Tab */}
                   {isCertificatesTab && (
-                            <div className="space-y-6">
-                              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
-                                <div className="flex flex-col gap-2 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
-                                  <div>
-                                    <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
-                                      Certificate number
-                                    </p>
-                                    <p className="text-2xl font-semibold text-slate-900">
-                                      {certificateNumberLabel}
-                                    </p>
-                                    <p className="break-all text-slate-500">
-                                      {certificateUrlLabel}
-                                    </p>
-                                  </div>
-                                  <button
-                                    onClick={handleOpenPrintDialog}
-                                    disabled={printingMarking}
-                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    {printingMarking ? "Please wait..." : "Print QR on Certificate"}
-                                  </button>
-                                </div>
-                                <p className="text-xs text-slate-500">
-                                  Insert the pre-printed legal-size certificate into the printer.
-                                  Only the QR code positioned at the bottom-right corner of the sheet will be printed.
-                                </p>
-                              </div>
+                    <div className="space-y-8">
+                      <style>{certificateStyles}</style>
+                      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
+                        <div className="flex flex-col gap-2 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-xs uppercase tracking-[0.5em] text-slate-400">Certificate number</p>
+                            <p className="text-2xl font-semibold text-slate-900">{certificateNumberLabel}</p>
+                            <p className="break-all text-slate-500">{certificateUrlLabel}</p>
+                          </div>
+                          <button
+                            onClick={handleOpenPrintDialog}
+                            disabled={printingMarking}
+                            className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {printingMarking ? "Please wait..." : "Print QR on Certificate"}
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                          Insert the pre-printed legal-size certificate into the printer. Only the QR code positioned at the
+                          bottom-right corner of the sheet will be printed.
+                        </p>
+                      </div>
 
-                              <div className="flex justify-center">
-                                <div
-                                  id="certificate-print-area"
-                                  ref={certificatePaperRef}
-                                  className="relative bg-white"
-                                  style={{ width: "8.5in", height: "14in" }}
-                                >
-                                  <div className="absolute inset-0 pointer-events-none" />
-                                  <div className="absolute bottom-20 right-16">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                      <QRCode
-                                        value={certificateQrValue}
-                                        size={80}
-                                        className="h-20 w-20"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <style>{`
-                                @media print {
-                                  @page {
-                                    margin: 0;
-                                  }
-                                  body {
-                                    margin: 0 !important;
-                                    padding: 0 !important;
-                                  }
-                                  body * {
-                                    visibility: hidden;
-                                    box-shadow: none !important;
-                                  }
-                                  #certificate-print-area,
-                                  #certificate-print-area * {
-                                    visibility: visible;
-                                  }
-                                  #certificate-print-area {
-                                    position: absolute;
-                                    left: 0;
-                                    top: 0;
-                                    right: 0;
-                                    margin: 0 auto;
-                                    box-shadow: none !important;
-                                  }
-                                }
-                              `}</style>
+                      <div className="flex justify-center">
+                        <section
+                          id="certificate-print-area"
+                          data-printing={printingActive ? "true" : undefined}
+                          ref={certificatePaperRef}
+                          className="aramaya-certificate"
+                        >
+                          <div className="aramaya-content">
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold"></div>
+                              <div className="aramaya-label">Registration Number :</div>
+                              <div className="aramaya-value">{aramaCertificateData.registration_number}</div>
                             </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">01.</div>
+                              <div className="aramaya-label">Name of Silmatha Aramaya</div>
+                              <div className="aramaya-value">{aramaCertificateData.aramaya_name}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">02.</div>
+                              <div className="aramaya-label">Address of the Aramaya</div>
+                              <div className="aramaya-value">{aramaCertificateData.aramaya_address}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">03.</div>
+                              <div className="aramaya-label">District</div>
+                              <div className="aramaya-value">{aramaCertificateData.district}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">04.</div>
+                              <div className="aramaya-label">Divisional Secretariat</div>
+                              <div className="aramaya-value">{aramaCertificateData.divisional_secretariat}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">05.</div>
+                              <div className="aramaya-label">Regional Sasana Protection Committee</div>
+                              <div className="aramaya-value">{aramaCertificateData.regional_committee}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">06.</div>
+                              <div className="aramaya-label">Period when Aramaya was established</div>
+                              <div className="aramaya-value">{aramaCertificateData.establishment_period}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">07.</div>
+                              <div className="aramaya-label">
+                                Name of Aramadipati (Chief Nun) at the time of registration
+                              </div>
+                              <div className="aramaya-value">{aramaCertificateData.aramadipati_name}</div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">08.</div>
+                              <div className="aramaya-label">
+                                Number and names of other resident nuns at the time of registration
+                              </div>
+                              <div className="space-y-1">
+                                {[["a", "resident_nun_a"], ["b", "resident_nun_aa"], ["c", "resident_nun_ae"], ["d", "resident_nun_aae"], ["e", "resident_nun_i"], ["f", "resident_nun_ii"], ["g", "resident_nun_u"], ["h", "resident_nun_uu"]].map(
+                                  ([code, key]) => (
+                                    <div className="aramaya-multi" key={key}>
+                                      <span className="text-sm">{code}.</span>
+                                      <span className="aramaya-value text-base">
+                                        {(aramaCertificateData as any)[key] || ""}
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                            <div className="aramaya-row">
+                              <div className="aramaya-label font-semibold">10.</div>
+                              <div className="aramaya-label">Ownership of the land where Aramaya is situated</div>
+                              <div className="aramaya-value">{aramaCertificateData.land_ownership}</div>
+                            </div>
+                          </div>
+
+                          <div className="aramaya-footer">
+                            <div className="aramaya-disclaimer">
+                              I hereby certify that the above-mentioned Silmatha Aramaya has been registered in the Department of
+                              Buddhist Affairs as recommended and submitted by the District Silmatha Association and Regional Sasana
+                              Protection Committee.
+                            </div>
+                            <div className="aramaya-signature">
+                              {aramaCertificateData.signature_date}
+                              <br />
+                              At No. 135, Sri Anagarika Dharmapala Mawatha,
+                              <br />
+                              Colombo 07
+                            </div>
+                          </div>
+
+                          <div className="aramaya-qr">
+                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                            </div>
+                            <div className="caption">{certificateUrlLabel}</div>
+                          </div>
+                        </section>
+                      </div>
+                    </div>
                   )}
 
                   {/* Upload Scanned Files Tab */}

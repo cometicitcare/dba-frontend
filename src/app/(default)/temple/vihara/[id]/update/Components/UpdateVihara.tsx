@@ -50,6 +50,25 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/vihara/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const CERTIFICATE_TYPES = [
+  { id: "registration", title: "Certificate of registration of the vihara" },
+  { id: "acceptance", title: "Acceptance of chief incumbent of vihara" },
+] as const;
+type CertificateTypeId = (typeof CERTIFICATE_TYPES)[number]["id"];
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 type CertificateMeta = {
   number: string;
@@ -102,6 +121,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string>("");
+  const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -630,13 +650,233 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
   const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
   const hasCertificateUrl = Boolean(certificateMeta.url);
+  const ensureActivePrintTarget = (): CertificateTypeId => activePrintAreaId || CERTIFICATE_TYPES[0].id;
+  const certificateTemplateStyles = `
+    .certificate-page {
+      position: relative;
+      width: 8.5in;
+      height: 14in;
+      background: #fff;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+      margin: 0 auto;
+      overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .certificate-content {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: 18%;
+      bottom: 18%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+    .certificate-row {
+      display: grid;
+      grid-template-columns: 10% 32% 1fr;
+      align-items: center;
+      column-gap: 10px;
+      row-gap: 4px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .certificate-label {
+      font-size: 14px;
+      color: #000;
+    }
+    .certificate-value {
+      font-size: 17px;
+      color: #000;
+      font-weight: 600;
+      word-break: break-word;
+    }
+    .certificate-footer {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      bottom: 6%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .certificate-date-row {
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .certificate-disclaimer {
+      font-size: 11px;
+      line-height: 1.5;
+      text-align: justify;
+    }
+    .certificate-qr {
+      position: absolute;
+      right: 12%;
+      bottom: 3%;
+      width: 80px;
+      height: 80px;
+    }
+    .certificate-qr .caption {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #000;
+      text-align: center;
+      word-break: break-all;
+    }
+    .letter-page {
+      width: 8.27in;
+      height: 11.69in;
+      padding: 0.75in 1in;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .letter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 14px;
+    }
+    .letter-recipient {
+      line-height: 1.6;
+      font-size: 14px;
+    }
+    .letter-recipient .recipient-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .letter-body {
+      font-size: 14px;
+      line-height: 1.7;
+      text-align: justify;
+      margin-top: 8px;
+      margin-bottom: 12px;
+    }
+    .letter-section {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .letter-copyto {
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .letter-qr {
+      position: absolute;
+      right: 1in;
+      bottom: 0.75in;
+      width: 80px;
+    }
+    .letter-qr .caption {
+      font-size: 10px;
+      margin-top: 4px;
+      text-align: center;
+      word-break: break-all;
+    }
+    @media print {
+      body {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      body * {
+        visibility: hidden;
+        box-shadow: none !important;
+      }
+      .certificate-page[data-printing="true"],
+      .certificate-page[data-printing="true"] * {
+        visibility: visible;
+      }
+      .certificate-page[data-printing="true"] {
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        margin: 0 auto;
+        box-shadow: none !important;
+      }
+    }
+    .simple-certificate {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  `;
+
+  const certificateData = useMemo(() => {
+    const now = new Date();
+    const gYear = now.getFullYear();
+    const gMonthIndex = now.getMonth();
+    const gDay = String(now.getDate()).padStart(2, "0");
+    const monthName = MONTH_NAMES[gMonthIndex] ?? "";
+    const buddhistYear = gYear + 543;
+
+    return {
+      registration_number: certificateNumberLabel,
+      viharasthana_name: values.temple_name ?? "",
+      viharasthana_address: values.temple_address ?? "",
+      regional_committee_divisional_secretariat: values.divisional_secretariat ?? values.pradeshya_sabha ?? "",
+      nikaya: display.nikaya || values.nikaya || "",
+      parshwaya: display.parshawaya || values.parshawaya || "",
+      establishment_period: values.period_established ? toYYYYMMDD(values.period_established) : "",
+      viharadhipathi_name: values.viharadhipathi_name ?? "",
+      buddha_year: String(buddhistYear),
+      buddha_month: monthName,
+      buddha_day: gDay,
+      gregorian_year: String(gYear),
+      gregorian_month: monthName,
+      gregorian_day: gDay,
+    };
+  }, [certificateNumberLabel, display.nikaya, display.parshawaya, values.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
+
+  const acceptanceData = useMemo(() => {
+    const now = new Date();
+    const gYear = now.getFullYear();
+    const gMonthIndex = now.getMonth();
+    const gDay = String(now.getDate()).padStart(2, "0");
+    const gMonth = String(gMonthIndex + 1).padStart(2, "0");
+    const letterDate = `${gYear}.${gMonth}.${gDay}`;
+
+    const addressParts = (values.temple_address || "").split(",");
+
+    return {
+      reference_number: certificateNumberLabel,
+      letter_date: letterDate,
+      mahanayaka_name: values.viharadhipathi_name || "",
+      nikaya_full_name: display.nikaya || values.nikaya || "",
+      temple_name: values.temple_name || "",
+      temple_location_1: addressParts[0]?.trim() || "",
+      temple_location_2: addressParts.slice(1).join(", ").trim(),
+      district: values.district || "",
+      divisional_secretariat: values.divisional_secretariat || "",
+      viharasthana_location: values.grama_niladhari_division || "",
+      viharasthana_area: values.pradeshya_sabha || "",
+      viharasthana_full_name: values.temple_name || "",
+      appointed_monk_title: "Chief Incumbent",
+      appointed_monk_name: values.viharadhipathi_name || "",
+      appointment_letter_date: letterDate,
+      secretary_name: "",
+      phone: "",
+      fax: "",
+      email: "",
+      divisional_secretariat_office: values.divisional_secretariat || "",
+    };
+  }, [certificateNumberLabel, display.nikaya, values.district, values.divisional_secretariat, values.grama_niladhari_division, values.nikaya, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name]);
 
   const handlePrintCertificate = () => {
+    const targetId = ensureActivePrintTarget();
+    setActivePrintAreaId(targetId);
     window.print();
     setShowUploadModal(true);
+    setTimeout(() => setActivePrintAreaId(null), 0);
   };
 
   const handleConfirmPrintCertificate = async () => {
+    if (!activePrintAreaId) {
+      setActivePrintAreaId(CERTIFICATE_TYPES[0].id);
+    }
     try {
       setPrintingMarking(true);
       const res = await _markPrintedVihara(Number(viharaId));
@@ -659,7 +899,6 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       toast.error(errMsg);
     } finally {
       setPrintDialogOpen(false);
-      setShowUploadModal(true);
       handlePrintCertificate();
       setPrintingMarking(false);
     }
@@ -730,10 +969,14 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
     if (approving) return;
     setApproveDialogOpen(false);
   };
-  const handleOpenPrintDialog = () => setPrintDialogOpen(true);
+  const handleOpenPrintDialog = (targetId: CertificateTypeId) => {
+    setActivePrintAreaId(targetId);
+    setPrintDialogOpen(true);
+  };
   const handleClosePrintDialog = () => {
     if (printingMarking) return;
     setPrintDialogOpen(false);
+    setActivePrintAreaId(null);
   };
 
   const handleOpenRejectDialog = () => {
@@ -936,81 +1179,155 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                           </h2>
 
                           {isCertificatesTab ? (
-                            <div className="space-y-6">
-                              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
-                                <div className="flex flex-col gap-2 text-sm text-slate-600 md:flex-row md:items-center md:justify-between">
-                                  <div>
-                                    <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
-                                      Certificate number
-                                    </p>
-                                    <p className="text-2xl font-semibold text-slate-900">
-                                      {certificateNumberLabel}
-                                    </p>
-                                    <p className="break-all text-slate-500">
-                                      {certificateUrlLabel}
-                                    </p>
-                                  </div>
-                                  <button
-                                    onClick={handleOpenPrintDialog}
-                                    disabled={printingMarking}
-                                    className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
-                                  >
-                                    {printingMarking ? "Please wait..." : "Print QR on Certificate"}
-                                  </button>
-                                </div>
-                                <p className="text-xs text-slate-500">
-                                  Insert the pre-printed legal-size certificate into the printer.
-                                  Only the QR code positioned at the bottom-right corner of the sheet will be printed.
-                                </p>
-                              </div>
-
-                              <div className="flex justify-center">
-                                <div
-                                  id="certificate-print-area"
-                                  ref={certificatePaperRef}
-                                  className="relative bg-white"
-                                  style={{ width: "8.5in", height: "14in" }}
-                                >
-                                  <div className="absolute inset-0 pointer-events-none" />
-                                  <div className="absolute bottom-20 right-16">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                      <QRCode
-                                        value={certificateQrValue}
-                                        size={80}
-                                        className="h-20 w-20"
-                                      />
+                            <div className="space-y-8">
+                              <style>{certificateTemplateStyles}</style>
+                              {CERTIFICATE_TYPES.map((cert) => {
+                                const printAreaId = `certificate-print-area-${cert.id}`;
+                                const isActivePrint = activePrintAreaId === cert.id;
+                                const isRegistration = cert.id === "registration";
+                                const certificateRows = [
+                                  { num: "", label: "Registration Number :", field: "registration_number" },
+                                  { num: "01.", label: "Name of Viharasthana", field: "viharasthana_name" },
+                                  { num: "02.", label: "Address of Viharasthana", field: "viharasthana_address" },
+                                  { num: "03.", label: "Regional Sasana Protection Committee / Divisional Secretariat", field: "regional_committee_divisional_secretariat" },
+                                  { num: "04-1.", label: "Nikaya to which Viharasthana belongs", field: "nikaya" },
+                                  { num: "04-2.", label: "Parshwaya (Chapter)", field: "parshwaya" },
+                                  { num: "05.", label: "Period when Viharasthana was established", field: "establishment_period" },
+                                  { num: "06.", label: "Viharadhipathi (Chief Monk) at the time of registration", field: "viharadhipathi_name" },
+                                ] as const;
+                                return (
+                                  <div key={cert.id} className="space-y-4">
+                                    <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
+                                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                          <p className="text-sm font-semibold text-slate-900">{cert.title}</p>
+                                          <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
+                                            Certificate number
+                                          </p>
+                                          <p className="text-2xl font-semibold text-slate-900">
+                                            {certificateNumberLabel}
+                                          </p>
+                                          <p className="break-all text-slate-500">
+                                            {certificateUrlLabel}
+                                          </p>
+                                        </div>
+                                        <button
+                                          onClick={() => handleOpenPrintDialog(cert.id)}
+                                          disabled={printingMarking}
+                                          className="inline-flex items-center justify-center rounded-full bg-slate-800 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-slate-400 disabled:opacity-60 disabled:cursor-not-allowed"
+                                        >
+                                          {printingMarking ? "Please wait..." : "Print QR on Certificate"}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-slate-500">
+                                        Insert the pre-printed legal-size certificate into the printer.
+                                        Only the QR code positioned at the bottom-right corner of the sheet will be printed.
+                                      </p>
                                     </div>
-                                  </div>
-                                </div>
-                              </div>
 
-                              <style>{`
-                                @media print {
-                                  @page {
-                                    margin: 0;
-                                  }
-                                  body {
-                                    margin: 0 !important;
-                                    padding: 0 !important;
-                                  }
-                                  body * {
-                                    visibility: hidden;
-                                    box-shadow: none !important;
-                                  }
-                                  #certificate-print-area,
-                                  #certificate-print-area * {
-                                    visibility: visible;
-                                  }
-                                  #certificate-print-area {
-                                    position: absolute;
-                                    left: 0;
-                                    top: 0;
-                                    right: 0;
-                                    margin: 0 auto;
-                                    box-shadow: none !important;
-                                  }
-                                }
-                              `}</style>
+                                    {isRegistration ? (
+                                      <div className="flex justify-center">
+                                        <section
+                                          id={printAreaId}
+                                          data-printing={isActivePrint ? "true" : undefined}
+                                          ref={certificatePaperRef}
+                                          className="certificate-page"
+                                        >
+                                          <div className="certificate-content">
+                                            {certificateRows.map((row) => (
+                                              <div className="certificate-row" key={row.field}>
+                                                <div className="certificate-label font-semibold">{row.num}</div>
+                                                <div className="certificate-label">{row.label}</div>
+                                                <div className="certificate-value">
+                                                  {(certificateData as any)[row.field] || ""}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+
+                                          <div className="certificate-footer">
+                                            <div className="certificate-disclaimer">
+                                              I hereby certify that the above-mentioned Viharasthana has been registered as a Buddhist Temple in the Department of Buddhist Affairs.
+                                            </div>
+                                            <div className="certificate-date-row">
+                                              Sri Buddha Year: {certificateData.buddha_year}, {certificateData.buddha_month} Month, {certificateData.buddha_day} Day, i.e., Gregorian Year {certificateData.gregorian_year}, {certificateData.gregorian_month} Month, {certificateData.gregorian_day} Day,<br />
+                                              At the Department of Buddhist Affairs, No. 135, Sri Anagarika Dharmapala Mawatha.
+                                            </div>
+                                          </div>
+
+                                          <div className="certificate-qr">
+                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                            </div>
+                                            <div className="caption">{certificateUrlLabel}</div>
+                                          </div>
+                                        </section>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-center">
+                                        <section
+                                          id={printAreaId}
+                                          data-printing={isActivePrint ? "true" : undefined}
+                                          className="certificate-page letter-page relative"
+                                        >
+                                          <div className="letter-header">
+                                            <div className="font-semibold">
+                                              {acceptanceData.reference_number}
+                                            </div>
+                                            <div className="font-semibold">
+                                              Date: {acceptanceData.letter_date}
+                                            </div>
+                                          </div>
+
+                                          <div className="letter-recipient">
+                                            <div className="recipient-title">
+                                              To, Most Venerable {acceptanceData.mahanayaka_name || "—"}
+                                            </div>
+                                            <div>{acceptanceData.nikaya_full_name || "—"}</div>
+                                            <div>{acceptanceData.temple_name || "—"}</div>
+                                            <div>{acceptanceData.temple_location_1 || ""}</div>
+                                            <div>{acceptanceData.temple_location_2 || ""}</div>
+                                          </div>
+
+                                          <div className="letter-section font-semibold">
+                                            Subject: Appointment of Chief Incumbent
+                                          </div>
+
+                                          <div className="letter-body">
+                                            This is to confirm the appointment of <strong>{acceptanceData.appointed_monk_title} {acceptanceData.appointed_monk_name || "—"}</strong> for {acceptanceData.viharasthana_full_name || "the vihara"} located at {acceptanceData.viharasthana_location || "—"}, {acceptanceData.viharasthana_area || acceptanceData.district || ""}. The appointment letter dated {acceptanceData.appointment_letter_date} is hereby acknowledged.
+                                          </div>
+
+                                          <div className="letter-section">
+                                            Divisional Secretariat: {acceptanceData.divisional_secretariat || "—"}
+                                            <br />
+                                            District: {acceptanceData.district || "—"}
+                                          </div>
+
+                                          <div className="letter-section">
+                                            Thank you.
+                                            <br />
+                                            — Department of Buddhist Affairs
+                                          </div>
+
+                                          <div className="letter-copyto">
+                                            <div className="font-semibold mb-2">Copy to:</div>
+                                            <div>1. {acceptanceData.appointed_monk_title} {acceptanceData.appointed_monk_name || "—"}, {acceptanceData.viharasthana_full_name || ""}, {acceptanceData.viharasthana_location || ""}</div>
+                                            <div>2. Divisional Secretariat Office, {acceptanceData.divisional_secretariat_office || acceptanceData.divisional_secretariat || "—"}</div>
+                                          </div>
+
+                                          <div className="letter-qr">
+                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                            </div>
+                                            <div className="caption">{certificateUrlLabel}</div>
+                                          </div>
+                                        </section>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
                             </div>
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
