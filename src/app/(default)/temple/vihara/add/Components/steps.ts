@@ -121,10 +121,10 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     id: 2,
     title: "Administrative Divisions",
     fields: [
-      { name: "district", label: "District", type: "text", rules: { required: true } },
-      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: true } },
+      { name: "district", label: "District", type: "text", rules: { required: false } },
+      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: false } },
       { name: "pradeshya_sabha", label: "Pradeshīya Shāsanarakshaka Bala Mandalaya", type: "text", rules: { required: false } },
-      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: true } },
+      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: false } },
     ],
   },
   {
@@ -252,3 +252,4 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   annex2_approval_construction: false,
   annex2_referral_resubmission: false,
 };
+

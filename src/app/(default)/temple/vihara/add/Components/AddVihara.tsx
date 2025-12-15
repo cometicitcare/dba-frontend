@@ -127,6 +127,14 @@ function AddViharaPageInner() {
       nextErrors[f.name] = msg;
       if (msg) valid = false;
     }
+    if (stepIndex === 2) {
+      if (!values.province) {
+        nextErrors.province = "Required";
+        valid = false;
+      } else {
+        nextErrors.province = "";
+      }
+    }
     setErrors(nextErrors);
     if (!valid) scrollTop();
     return valid;
@@ -145,6 +153,14 @@ function AddViharaPageInner() {
         const msg = validateField(f, stringValue, values, today);
         aggregated[f.name] = msg;
         if (msg) stepValid = false;
+      }
+      if (step.id === 2) {
+        if (!values.province) {
+          aggregated.province = "Required";
+          stepValid = false;
+        } else {
+          aggregated.province = "";
+        }
       }
       if (!stepValid && firstInvalidStep == null) firstInvalidStep = step.id;
     }
@@ -632,7 +648,8 @@ function AddViharaPageInner() {
                                   }
                                   handleSetMany(updates);
                                 }}
-                                required
+                                required={false}
+                                requiredFields={{ province: true, district: false, division: false, gn: false }}
                                 labels={{
                                   province: "Province",
                                   district: "District",
@@ -640,9 +657,9 @@ function AddViharaPageInner() {
                                   gn: "Grama Niladhari Division",
                                 }}
                               />
-                              {(errors.district || errors.divisional_secretariat || errors.grama_niladhari_division) && (
+                              {(errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division) && (
                                 <p className="mt-1 text-sm text-red-600">
-                                  {errors.district || errors.divisional_secretariat || errors.grama_niladhari_division}
+                                  {errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division}
                                 </p>
                               )}
                             </div>

@@ -1546,7 +1546,8 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                                           grama_niladhari_division: sel.gnCode ?? "",
                                         });
                                       }}
-                                      required
+                                      required={false}
+                                      requiredFields={{ province: true, district: false, division: false, gn: false }}
                                       labels={{
                                         province: "Province",
                                         district: "District",
