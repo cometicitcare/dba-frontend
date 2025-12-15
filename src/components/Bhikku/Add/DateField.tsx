@@ -24,7 +24,10 @@ export default function DateField({ id, label, value, onChange, required, placeh
 
   return (
     <div className="grid grid-cols-1">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
       <div className="relative flex">
         <input
           id={id}

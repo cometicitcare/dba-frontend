@@ -111,7 +111,7 @@ const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const API_BASE_URL = "https://api.dbagovlk.com";
 const FALLBACK_PDF_URL =
-  "https://api.dbagovlk.com/storage/bhikku_regist/2025/11/23/BH2025000051/scanned_document_20251123_191251_5aa366eb.pdf";
+  "test.pdf";
 
 
 type PageProps = { params: { id: string } };

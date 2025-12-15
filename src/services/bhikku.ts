@@ -32,4 +32,13 @@ export const _uploadScannedHighDocument = (bhr_regn: any, file: File) => {
 };
 
 
+export const _uploadDirectScannedHighDocument = (bhr_id: any, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return BackendClient.post(
+    `${baseURL}/direct-bhikku-high/${bhr_id}/upload-scanned-document`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+};
 export const _manageDirectHighBhikku = (body: any) => BackendClient.post(`${baseURL}/direct-bhikku-high/manage`, body);

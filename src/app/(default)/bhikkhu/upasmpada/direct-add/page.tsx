@@ -12,7 +12,6 @@ import {
   DateField,
   LocationPicker,
   TempleAutocomplete,
-  TempleAutocompleteAddress,
   Errors,
   StepConfig,
   FieldConfig,
@@ -26,47 +25,31 @@ import { getStoredUserData } from "@/utils/userData";
 import { _manageDirectHighBhikku } from "@/services/bhikku";
 import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
-  candidateRegNo: string;
-  candidateDisplay: string;
   currentStatus: string;
   higherOrdinationPlace: string;
   higherOrdinationDate: string;
   karmacharyaName: string;
   upaddhyayaName: string;
   assumedName: string;
-  higherOrdinationResidenceTrn: string;
-  higherOrdinationResidenceDisplay: string;
-  permanentResidenceTrn: string;
-  permanentResidenceDisplay: string;
-  declarationResidenceAddress: string;
-  tutorsTutorRegNo: string;
-  tutorsTutorDisplay: string;
-  presidingBhikshuRegNo: string;
-  presidingBhikshuDisplay: string;
-  samaneraSerial: string;
+  residenceAtHigherOrdination: string;
+  permanentResidence: string;
+  residenceAtDeclaration: string;
+  bhikshuPresiding: string;
   declarationDate: string;
   remarks: string;
 };
 
 const INITIAL_UPASAMPADA_FORM: UpasampadaForm = {
-  candidateRegNo: "",
-  candidateDisplay: "",
   currentStatus: "",
   higherOrdinationPlace: "",
   higherOrdinationDate: "",
   karmacharyaName: "",
   upaddhyayaName: "",
   assumedName: "",
-  higherOrdinationResidenceTrn: "",
-  higherOrdinationResidenceDisplay: "",
-  permanentResidenceTrn: "",
-  permanentResidenceDisplay: "",
-  declarationResidenceAddress: "",
-  tutorsTutorRegNo: "",
-  tutorsTutorDisplay: "",
-  presidingBhikshuRegNo: "",
-  presidingBhikshuDisplay: "",
-  samaneraSerial: "",
+  residenceAtHigherOrdination: "",
+  permanentResidence: "",
+  residenceAtDeclaration: "",
+  bhikshuPresiding: "",
   declarationDate: "",
   remarks: "",
 };
@@ -89,24 +72,20 @@ type BhikkhuForm = {
   br_division: string;
   br_vilage: string;
   br_gndiv: string;
+  br_form_id: string;
 
-  br_viharadhipathi: string;
   br_nikaya: string;
   br_parshawaya: string;
   br_mahanayaka_name: string;
   br_mahanayaka_address: string;
 
   br_cat: string;
-  br_residence_at_declaration: string;
-  br_declaration_date: string;
-
   br_mahanadate: string;
   br_mahananame: string;
   br_mahanaacharyacd: string;
   br_robing_tutor_residence: string;
 
   br_mahanatemple: string;
-  br_robing_after_residence_temple: string;
 };
 
 type WizardStep = StepConfig<BhikkhuForm> | { title: string; description?: string };
@@ -120,6 +99,7 @@ const BHIKKHU_STEPS: StepConfig<BhikkhuForm>[] = [
       { name: "br_reqstdate", label: "Request Date", type: "date", rules: { required: true, maxDateToday: true } },
       { name: "br_dofb", label: "Date of Birth", type: "date", rules: { required: true, maxDateToday: true } },
       { name: "br_gihiname", label: "Full Name (Gihi Name)", type: "text", rules: { required: true } },
+      { name: "br_form_id", label: "Form number", type: "text", rules: { required: true } },
       { name: "br_fathrname", label: "Father's Name", type: "text", rules: { required: true } },
       // {
       //   name: "br_email",
@@ -156,7 +136,6 @@ const BHIKKHU_STEPS: StepConfig<BhikkhuForm>[] = [
     id: 3,
     title: "Temple Information",
     fields: [
-      { name: "br_viharadhipathi", label: "Name of Viharadhipathi of temple of residence", type: "text", rules: { required: true } },
       { name: "br_nikaya", label: "Name of Nikaya", type: "text", rules: { required: true } },
       { name: "br_parshawaya", label: "Name of Chapter", type: "text", rules: { required: true } },
       { name: "br_mahanayaka_name", label: "Name of Mahanayaka Thera or Nayaka Thero of the Nikaya", type: "text", rules: { required: true } },
@@ -168,19 +147,10 @@ const BHIKKHU_STEPS: StepConfig<BhikkhuForm>[] = [
     title: "Robing Informations",
     fields: [
       { name: "br_mahanadate", label: "Date of robing", type: "date", rules: { required: true, maxDateToday: true } },
-      { name: "br_mahananame", label: "Name assumed at robing", type: "text", rules: { required: true } },
+      { name: "br_mahananame", label: "Samanera Name (optional)", type: "text", rules: { required: false } },
       { name: "br_mahanaacharyacd", label: "Name of robing tutor", type: "text", rules: { required: true } },
       { name: "br_robing_tutor_residence", label: "Name of robing tutor's residence", type: "text", rules: { required: true } },
       { name: "br_mahanatemple", label: "Temple where robing took place", type: "text", rules: { required: true } },
-      { name: "br_robing_after_residence_temple", label: "Temple of residence after robing", type: "text", rules: { required: true } },
-    ],
-  },
-  {
-    id: 5,
-    title: "Additional Details",
-    fields: [
-      { name: "br_residence_at_declaration", label: "Residence at time of declaration", type: "text", rules: { required: false } },
-      { name: "br_declaration_date", label: "Date of making the declaration", type: "date", rules: { required: true, maxDateToday: true } },
     ],
   },
 ];
@@ -203,16 +173,14 @@ const BHIKKHU_INITIAL_VALUES: Partial<BhikkhuForm> = {
   br_division: "",
   br_vilage: "",
   br_gndiv: "",
+  br_form_id: "",
 
-  br_viharadhipathi: "",
   br_nikaya: "",
   br_parshawaya: "",
   br_mahanayaka_name: "",
   br_mahanayaka_address: "",
 
   br_cat: "",
-  br_residence_at_declaration: "",
-  br_declaration_date: "",
 
   br_mahanadate: "",
   br_mahananame: "",
@@ -220,17 +188,12 @@ const BHIKKHU_INITIAL_VALUES: Partial<BhikkhuForm> = {
   br_robing_tutor_residence: "",
 
   br_mahanatemple: "",
-  br_robing_after_residence_temple: "",
 };
 
 const UPASAMPADA_STEPS = [
   {
-    title: "Candidate & Ceremony",
-    description: "Link an existing Bhikkhu and capture the higher ordination specifics.",
-  },
-  {
-    title: "Residences & Clergy",
-    description: "Record residences, tutors, and the presiding Bhikkhu around the ceremony.",
+    title: "Higher Ordination",
+    description: "Capture the ceremony specifics for higher ordination.",
   },
   {
     title: "Declaration & Status",
@@ -245,6 +208,13 @@ const REVIEW_STEP = {
 
 const formatValueOrDash = (value?: string) => (value?.trim() ? value : "—");
 
+const renderLabelWithStar = (label: string, required?: boolean) => (
+  <>
+    {label}
+    {required && <span className="text-red-500 ml-1">*</span>}
+  </>
+);
+
 type UpasReviewFieldConfig = {
   key: keyof UpasampadaForm;
   label: string;
@@ -253,47 +223,39 @@ type UpasReviewFieldConfig = {
 
 const UPAS_REVIEW_FIELDS: Record<number, UpasReviewFieldConfig[]> = {
   1: [
-    { key: "candidateRegNo", label: "Candidate Reg. No." },
-    {
-      key: "candidateDisplay",
-      label: "Linked Bhikkhu",
-      format: (value, form) => {
-        const display = value?.trim();
-        if (display) {
-          return form.candidateRegNo ? `${display} (${form.candidateRegNo})` : display;
-        }
-        return formatValueOrDash(form.candidateRegNo);
-      },
-    },
     { key: "higherOrdinationPlace", label: "Place of Higher Ordination" },
     { key: "higherOrdinationDate", label: "Date of Higher Ordination" },
     { key: "karmacharyaName", label: "Karmacharya" },
     { key: "upaddhyayaName", label: "Upaddhyaya" },
     { key: "assumedName", label: "Name assumed at Higher Ordination" },
+    { key: "residenceAtHigherOrdination", label: "Residence at time of Higher Ordination" },
+    { key: "permanentResidence", label: "Permanent Residence" },
+    {
+      key: "residenceAtDeclaration",
+      label: "Residence at time of declaration, and full Postal Address",
+    },
+    { key: "bhikshuPresiding", label: "Name of Bhikshu presiding at Higher Ordination" },
   ],
   2: [
-    { key: "higherOrdinationResidenceTrn", label: "Res. at Higher Ordination (TRN)" },
-    { key: "higherOrdinationResidenceDisplay", label: "Res. at Higher Ordination (Display)" },
-    { key: "permanentResidenceTrn", label: "Permanent Residence (TRN)" },
-    { key: "permanentResidenceDisplay", label: "Permanent Residence (Display)" },
-    { key: "declarationResidenceAddress", label: "Residence at Declaration" },
-    { key: "tutorsTutorRegNo", label: "Tutor Registration No." },
-    { key: "tutorsTutorDisplay", label: "Tutor Display" },
-    { key: "presidingBhikshuRegNo", label: "Presiding Bhikkhu Reg. No." },
-    { key: "presidingBhikshuDisplay", label: "Presiding Bhikkhu" },
-  ],
-  3: [
     { key: "currentStatus", label: "Current Status" },
-    { key: "samaneraSerial", label: "Samanera Serial No." },
     { key: "declarationDate", label: "Declaration Date" },
     { key: "remarks", label: "Remarks" },
   ],
 };
 
 const REQUIRED_UPAS_STEP_FIELDS: Record<number, Array<keyof UpasampadaForm>> = {
-  1: ["candidateRegNo", "higherOrdinationPlace", "higherOrdinationDate", "karmacharyaName", "upaddhyayaName", "assumedName"],
-  2: ["higherOrdinationResidenceTrn", "permanentResidenceTrn", "declarationResidenceAddress", "tutorsTutorRegNo", "presidingBhikshuRegNo"],
-  3: ["currentStatus", "declarationDate"],
+  1: [
+    "higherOrdinationPlace",
+    "higherOrdinationDate",
+    "karmacharyaName",
+    "upaddhyayaName",
+    "assumedName",
+    "residenceAtHigherOrdination",
+    "permanentResidence",
+    "residenceAtDeclaration",
+    "bhikshuPresiding",
+  ],
+  2: ["currentStatus", "declarationDate"],
 };
 
 const STATIC_NIKAYA_DATA = Array.isArray((selectionsData as any)?.nikayas)
@@ -403,18 +365,24 @@ export default function DirectAddPage() {
     });
   };
 
+  const clearTutorAndResidence = () => {
+    handleInputChange("br_mahanaacharyacd", "");
+    handleInputChange("br_robing_tutor_residence", "");
+    setDisplay((prev) => ({
+      ...prev,
+      br_mahanaacharyacd: "",
+      br_robing_tutor_residence: "",
+    }));
+  };
+
   const formatBhikkhuFieldValue = (name: keyof BhikkhuForm) => {
     const raw = (values[name] as string) ?? "";
     const value = formatValueOrDash(raw);
     switch (name) {
-      case "br_viharadhipathi":
-        return display.br_viharadhipathi ?? value;
       case "br_nikaya":
         return display.br_nikaya ?? value;
       case "br_parshawaya":
         return display.br_parshawaya ?? value;
-      case "br_residence_at_declaration":
-        return display.br_residence_at_declaration ?? value;
       default:
         return value;
     }
@@ -533,6 +501,7 @@ export default function DirectAddPage() {
       dbh_division: values.br_division ?? "",
       dbh_vilage: values.br_vilage ?? "",
       dbh_gndiv: values.br_gndiv ?? "",
+      dbh_form_id: values.br_form_id ?? "",
       dbh_gihiname: values.br_gihiname ?? "",
       dbh_dofb: formatDateField(values.br_dofb),
       dbh_fathrname: values.br_fathrname ?? "",
@@ -542,33 +511,26 @@ export default function DirectAddPage() {
       dbh_mahananame: values.br_mahananame ?? "",
       dbh_mahanadate: formatDateField(values.br_mahanadate),
       dbh_cat: values.br_cat ?? NOVICE_CATEGORY_CODE,
-      dbh_viharadhipathi: values.br_viharadhipathi ?? "",
       dbh_nikaya: values.br_nikaya ?? "",
       dbh_mahanayaka_name: values.br_mahanayaka_name ?? "",
       dbh_mahanayaka_address: values.br_mahanayaka_address ?? "",
-      dbh_residence_at_declaration: values.br_residence_at_declaration ?? "",
-      dbh_declaration_date: formatDateField(upasampadaForm.declarationDate || values.br_declaration_date),
+      dbh_declaration_date: formatDateField(upasampadaForm.declarationDate),
       dbh_robing_tutor_residence: values.br_robing_tutor_residence ?? "",
-      dbh_robing_after_residence_temple: values.br_robing_after_residence_temple ?? "",
       dbh_email: values.br_email ?? "",
       dbh_mobile: values.br_mobile ?? "",
       dbh_fathrsaddrs: values.br_fathrsaddrs ?? "",
       dbh_fathrsmobile: values.br_fathrsmobile ?? "",
       // Upasampada fields
-      dbh_candidate_regn: upasampadaForm.candidateRegNo ?? "",
-      dbh_candidate_display: upasampadaForm.candidateDisplay ?? "",
       dbh_higher_ordination_place: upasampadaForm.higherOrdinationPlace ?? "",
       dbh_higher_ordination_date: formatDateField(upasampadaForm.higherOrdinationDate),
-      dbh_higher_ordination_temple: upasampadaForm.higherOrdinationResidenceTrn ?? "",
-      dbh_livtemple: upasampadaForm.permanentResidenceTrn ?? "",
       dbh_higher_ordination_karmaacharya: upasampadaForm.karmacharyaName ?? "",
       dbh_higher_ordination_upaadhyaaya: upasampadaForm.upaddhyayaName ?? "",
-      dbh_assumed_name: upasampadaForm.assumedName ?? "",
-      dbh_permanent_residence_trn: upasampadaForm.permanentResidenceTrn ?? "",
-      dbh_declaration_residence_address: upasampadaForm.declarationResidenceAddress ?? "",
-      dbh_tutors_tutor_regn: upasampadaForm.tutorsTutorRegNo ?? "",
-      dbh_presiding_bhikshu_regn: upasampadaForm.presidingBhikshuRegNo ?? "",
-      dbh_samanera_serial_no: upasampadaForm.samaneraSerial ?? "",
+      dbh_name_assumed_at_higher_ordination: upasampadaForm.assumedName ?? "",
+      dbh_residence_at_time_of_higher_ordination: upasampadaForm.residenceAtHigherOrdination ?? "",
+      dbh_permanent_residence: upasampadaForm.permanentResidence ?? "",
+      dbh_residence_at_time_of_declaration_and_full_postal_address:
+        upasampadaForm.residenceAtDeclaration ?? "",
+      dbh_name_of_bhikshu_presiding_at_higher_ordination: upasampadaForm.bhikshuPresiding ?? "",
       dbh_u_date_declaration: formatDateField(upasampadaForm.declarationDate),
       dbh_remarks_upasampada: upasampadaForm.remarks ?? "",
       dbh_currstat: upasampadaForm.currentStatus ?? "",
@@ -718,7 +680,9 @@ export default function DirectAddPage() {
           if (name === "br_birthpls") {
             return (
               <div key={name} className={currentTitle === "Birth Location" ? "md:col-span-3" : undefined}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {renderLabelWithStar(field.label, field.rules?.required)}
+                </label>
                 <input
                   id={name}
                   value={value}
@@ -730,30 +694,12 @@ export default function DirectAddPage() {
             );
           }
 
-          if (name === "br_viharadhipathi") {
-            return (
-              <div key={name}>
-                <BhikkhuAutocomplete
-                  id={name}
-                  label={field.label}
-                  required={!!field.rules?.required}
-                  placeholder="Search and pick, auto-fill REGN"
-                  storeRegn
-                  initialDisplay={display[name] ?? ""}
-                  onPick={({ regn, display: disp }) => {
-                    handleInputChange("br_viharadhipathi", regn ?? "");
-                    setDisplay((prev) => ({ ...prev, br_viharadhipathi: disp }));
-                  }}
-                />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-              </div>
-            );
-          }
-
           if (name === "br_nikaya") {
             return (
               <div key={name}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {renderLabelWithStar(field.label, field.rules?.required)}
+                </label>
                 <select
                   id={name}
                   value={values.br_nikaya ?? ""}
@@ -776,7 +722,9 @@ export default function DirectAddPage() {
             const options = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === values.br_nikaya)?.parshawayas ?? [];
             return (
               <div key={name}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {renderLabelWithStar(field.label, field.rules?.required)}
+                </label>
                 <select
                   id={name}
                   value={values.br_parshawaya ?? ""}
@@ -799,7 +747,9 @@ export default function DirectAddPage() {
           if (name === "br_mahanayaka_name") {
             return (
               <div key={name}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {renderLabelWithStar(field.label, field.rules?.required)}
+                </label>
                 <input
                   id={name}
                   value={value}
@@ -822,9 +772,29 @@ export default function DirectAddPage() {
                   placeholder="Search and pick, auto-fill REGN"
                   storeRegn
                   initialDisplay={display[name] ?? ""}
-                  onPick={({ regn, display: disp }) => {
+                  onInputChange={(value) => {
+                    if (!value.trim()) {
+                      clearTutorAndResidence();
+                    }
+                  }}
+                  onPick={({ regn, display: disp, data }) => {
                     handleInputChange("br_mahanaacharyacd", regn ?? "");
                     setDisplay((prev) => ({ ...prev, br_mahanaacharyacd: disp }));
+                    const tutorResidence = data?.br_robing_tutor_residence;
+                    if (tutorResidence?.vh_trn) {
+                      const residencyName = tutorResidence.vh_vname ?? "";
+                      const residenceDisplay = residencyName
+                        ? `${residencyName} ƒ?" ${tutorResidence.vh_trn}`
+                        : tutorResidence.vh_trn;
+                      handleInputChange("br_robing_tutor_residence", tutorResidence.vh_trn);
+                      setDisplay((prev) => ({
+                        ...prev,
+                        br_robing_tutor_residence: residenceDisplay,
+                      }));
+                    } else {
+                      handleInputChange("br_robing_tutor_residence", "");
+                      setDisplay((prev) => ({ ...prev, br_robing_tutor_residence: "" }));
+                    }
                   }}
                 />
                 {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -835,17 +805,16 @@ export default function DirectAddPage() {
           if (name === "br_robing_tutor_residence") {
             return (
               <div key={name}>
-                <TempleAutocomplete
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  {renderLabelWithStar(field.label, field.rules?.required)}
+                </label>
+                <input
                   id={name}
-                  label={field.label}
-                  required={!!field.rules?.required}
-                  placeholder="Search temple, auto-fill TRN"
-                  storeTrn
-                  initialDisplay={display[name] ?? ""}
-                  onPick={({ trn, display: disp }) => {
-                    handleInputChange("br_robing_tutor_residence", trn ?? "");
-                    setDisplay((prev) => ({ ...prev, br_robing_tutor_residence: disp }));
-                  }}
+                  type="text"
+                  value={display[name] ?? (values.br_robing_tutor_residence ?? "")}
+                  placeholder="Auto-populated from tutor selection"
+                  readOnly
+                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600"
                 />
                 {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
               </div>
@@ -872,26 +841,6 @@ export default function DirectAddPage() {
             );
           }
 
-          if (name === "br_robing_after_residence_temple") {
-            return (
-              <div key={name}>
-                <TempleAutocomplete
-                  id={name}
-                  label={field.label}
-                  required={!!field.rules?.required}
-                  placeholder="Search temple, auto-fill TRN"
-                  storeTrn
-                  initialDisplay={display[name] ?? ""}
-                  onPick={({ trn, display: disp }) => {
-                    handleInputChange("br_robing_after_residence_temple", trn ?? "");
-                    setDisplay((prev) => ({ ...prev, br_robing_after_residence_temple: disp }));
-                  }}
-                />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-              </div>
-            );
-          }
-
           if (name === "br_cat") {
             return (
               <div key={name}>
@@ -901,38 +850,25 @@ export default function DirectAddPage() {
             );
           }
 
-          if (name === "br_residence_at_declaration") {
-            return (
-              <div key={name}>
-                <TempleAutocompleteAddress
-                  id={name}
-                  label={field.label}
-                  placeholder="Type or pick a temple address"
-                  initialDisplay={display[name] ?? values.br_residence_at_declaration ?? ""}
-                    onPick={({ address, trn, display: disp }) => {
-                      handleInputChange("br_residence_at_declaration", disp ?? address ?? "");
-                    setDisplay((prev) => ({ ...prev, br_residence_at_declaration: disp }));
-                  }}
-                />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-              </div>
-            );
-          }
-
           if (field.type === "textarea") {
             return (
-              <div key={name} className={name === "br_mahanayaka_address" ? "md:col-span-2" : undefined}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
-                <textarea
-                  id={name}
-                  value={value}
-                  rows={field.rows ?? 4}
-                  placeholder={field.placeholder}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
-                />
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-              </div>
+          <div key={name} className={name === "br_mahanayaka_address" ? "md:col-span-2" : undefined}>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              {renderLabelWithStar(field.label, field.rules?.required)}
+            </label>
+            <textarea
+              id={name}
+              value={value}
+              rows={field.rows ?? 4}
+              placeholder={field.placeholder}
+              readOnly={name === "br_mahanayaka_address"}
+              onChange={name === "br_mahanayaka_address" ? undefined : (e) => handleInputChange(field.name, e.target.value)}
+              className={`w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none ${
+                name === "br_mahanayaka_address" ? "bg-slate-100 text-slate-600" : ""
+              }`}
+            />
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+          </div>
             );
           }
 
@@ -957,7 +893,9 @@ export default function DirectAddPage() {
 
           return (
             <div key={name}>
-              <label className="block text-sm font-medium text-slate-700 mb-2">{field.label}</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                {renderLabelWithStar(field.label, field.rules?.required)}
+              </label>
               <input
                 id={name}
                 type={field.type}
@@ -983,26 +921,57 @@ export default function DirectAddPage() {
       case 1:
         return (
           <>
-            <div className="md:col-span-2">
-              <BhikkhuAutocomplete
-                id="candidate-search"
-                label="Search Bhikkhu"
-                initialDisplay={upasampadaForm.candidateDisplay}
-                onPick={({ regn, display }) => {
-                  updateUpasField("candidateRegNo", regn ?? "");
-                  updateUpasField("candidateDisplay", display ?? "");
-                }}
-                required
-              />
-              {upasampadaForm.candidateRegNo && (
-                <p className="mt-2 text-sm text-slate-500">Linked Bhikkhu: {upasampadaForm.candidateDisplay}</p>
-              )}
-            </div>
+           <TextField
+              id="assumed-name"
+              label="Name assumed at Higher Ordination"
+              value={upasampadaForm.assumedName}
+              onChange={(value) => updateUpasField("assumedName", value)}
+              required
+            />
+            <TempleAutocomplete
+              id="residence-higher-ordination"
+              label="Residence at time of Higher Ordination"
+              required
+              placeholder="Search temple, auto-fill TRN"
+              storeTrn
+              initialDisplay={display.residenceAtHigherOrdination ?? ""}
+              onPick={({ trn, display: disp }) => {
+                updateUpasField("residenceAtHigherOrdination", trn ?? "");
+                setDisplay((prev) => ({ ...prev, residenceAtHigherOrdination: disp ?? "" }));
+              }}
+            />
+            <TempleAutocomplete
+              id="permanent-residence"
+              label="Permanent Residence"
+              required
+              placeholder="Search temple, auto-fill TRN"
+              storeTrn
+              initialDisplay={display.permanentResidence ?? ""}
+              onPick={({ trn, display: disp }) => {
+                updateUpasField("permanentResidence", trn ?? "");
+                setDisplay((prev) => ({ ...prev, permanentResidence: disp ?? "" }));
+              }}
+            />
             <TextField
+              id="declaration-residence"
+              label="Residence at time of declaration, and full Postal Address"
+              value={upasampadaForm.residenceAtDeclaration}
+              onChange={(value) => updateUpasField("residenceAtDeclaration", value)}
+              required
+              rows={3}
+            />
+            <BhikkhuAutocomplete
+              id="bhikshu-presiding-name"
+              label="Name of Bhikshu presiding at Higher Ordination"
+              initialDisplay={upasampadaForm.bhikshuPresiding}
+              onPick={({ display }) => updateUpasField("bhikshuPresiding", display ?? "")}
+              required
+            />
+            <BhikkhuAutocomplete
               id="place-higher-ordination"
               label="Place of Higher Ordination"
-              value={upasampadaForm.higherOrdinationPlace}
-              onChange={(value) => updateUpasField("higherOrdinationPlace", value)}
+              initialDisplay={upasampadaForm.higherOrdinationPlace}
+              onPick={({ display }) => updateUpasField("higherOrdinationPlace", display ?? "")}
               required
             />
             <DateField
@@ -1012,83 +981,24 @@ export default function DirectAddPage() {
               onChange={(value) => updateUpasField("higherOrdinationDate", value)}
               required
             />
-            <TextField
+            <BhikkhuAutocomplete
               id="karmacharya-name"
               label="Name of Karmacharya"
-              value={upasampadaForm.karmacharyaName}
-              onChange={(value) => updateUpasField("karmacharyaName", value)}
+              initialDisplay={upasampadaForm.karmacharyaName}
+              onPick={({ display }) => updateUpasField("karmacharyaName", display ?? "")}
               required
             />
-            <TextField
+            <BhikkhuAutocomplete
               id="upaddhyaya-name"
               label="Name of Upaddhyaya at Higher Ordination"
-              value={upasampadaForm.upaddhyayaName}
-              onChange={(value) => updateUpasField("upaddhyayaName", value)}
+              initialDisplay={upasampadaForm.upaddhyayaName}
+              onPick={({ display }) => updateUpasField("upaddhyayaName", display ?? "")}
               required
             />
-            <TextField
-              id="assumed-name"
-              label="Name assumed at Higher Ordination"
-              value={upasampadaForm.assumedName}
-              onChange={(value) => updateUpasField("assumedName", value)}
-              required
-            />
+           
           </>
         );
       case 2:
-        return (
-          <>
-            <TempleAutocomplete
-              id="residence-ho"
-              label="Residence at time of Higher Ordination"
-              initialDisplay={upasampadaForm.higherOrdinationResidenceDisplay}
-              onPick={({ trn, display }) => {
-                updateUpasField("higherOrdinationResidenceTrn", trn ?? "");
-                updateUpasField("higherOrdinationResidenceDisplay", display ?? "");
-              }}
-              required
-            />
-            <TempleAutocomplete
-              id="residence-permanent"
-              label="Permanent Residence"
-              initialDisplay={upasampadaForm.permanentResidenceDisplay}
-              onPick={({ trn, display }) => {
-                updateUpasField("permanentResidenceTrn", trn ?? "");
-                updateUpasField("permanentResidenceDisplay", display ?? "");
-              }}
-              required
-            />
-            <TextField
-              id="declaration-residence"
-              label="Residence at declaration"
-              value={upasampadaForm.declarationResidenceAddress}
-              onChange={(value) => updateUpasField("declarationResidenceAddress", value)}
-              required
-              rows={4}
-            />
-            <BhikkhuAutocomplete
-              id="tutors-tutor"
-              label="Tutor presenting for Higher Ordination"
-              initialDisplay={upasampadaForm.tutorsTutorDisplay}
-              onPick={({ regn, display }) => {
-                updateUpasField("tutorsTutorRegNo", regn ?? "");
-                updateUpasField("tutorsTutorDisplay", display ?? "");
-              }}
-              required
-            />
-            <BhikkhuAutocomplete
-              id="presiding-bhikshu"
-              label="Bhikkhu presiding the ceremony"
-              initialDisplay={upasampadaForm.presidingBhikshuDisplay}
-              onPick={({ regn, display }) => {
-                updateUpasField("presidingBhikshuRegNo", regn ?? "");
-                updateUpasField("presidingBhikshuDisplay", display ?? "");
-              }}
-              required
-            />
-          </>
-        );
-      case 3:
       default:
         return (
           <>
@@ -1098,12 +1008,6 @@ export default function DirectAddPage() {
               value={upasampadaForm.currentStatus}
               onPick={({ code }) => updateUpasField("currentStatus", code)}
               required
-            />
-            <TextField
-              id="samanera-serial"
-              label="Serial number in Samanera register (if any)"
-              value={upasampadaForm.samaneraSerial}
-              onChange={(value) => updateUpasField("samaneraSerial", value)}
             />
             <DateField
               id="declaration-date"
@@ -1159,8 +1063,7 @@ export default function DirectAddPage() {
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">Combined Bhikkhu + Upasampada Form</h1>
-                    <p className="text-slate-300 text-sm">Gather all Bhikkhu and Upasampada details in one flow.</p>
+                    <h1 className="text-2xl font-bold text-white mb-1">Direct Upasampada Add</h1>
                   </div>
                 </div>
               </div>
@@ -1276,7 +1179,7 @@ function TextField({ id, label, value, onChange, placeholder, required, rows }: 
   return (
     <div className="grid grid-cols-1">
       <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
-        {label}
+        {renderLabelWithStar(label, required)}
       </label>
       {rows && rows > 1 ? (
         <textarea

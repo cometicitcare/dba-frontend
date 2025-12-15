@@ -47,6 +47,7 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
     id: 1,
     title: "Personal Information",
     fields: [
+      { name: "br_form_id", label: "Form number", type: "text", rules: { required: true } },
       { name: "br_cat", label: "Category", type: "text", rules: { required: true } },
       { name: "br_reqstdate", label: "Request Date", type: "date", rules: { required: true, maxDateToday: true } },
       { name: "br_dofb", label: "Date of Birth", type: "date", rules: { required: true, maxDateToday: true } },
@@ -73,7 +74,6 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
         placeholder: "07XXXXXXXX",
         rules: { required: true, custom: (v) => (isPhoneLK(v) ? undefined : "Must be 10 digits (e.g., 07XXXXXXXX)") },
       },
-      { name: "br_form_id", label: "Form Number", type: "text" },
     ],
   },
   {

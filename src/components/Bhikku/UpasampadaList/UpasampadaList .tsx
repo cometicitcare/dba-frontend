@@ -30,6 +30,9 @@ type UpasampadaRow = {
   status?: string;
   workflowStatus?: string;
   workflowStatusCode?: string;
+  formType?: string;
+  bhrId: number | null;
+  bhrRegn: string;
 };
 
 type UpasampadaListProps = {
@@ -46,6 +49,29 @@ function pickRows<T>(res: unknown): T[] {
   if (Array.isArray(r?.data)) return (r.data as unknown as T[]);
   if (Array.isArray(res)) return res as T[];
   return [];
+}
+
+function extractTotalRecords(res: unknown): number | undefined {
+  const response = res as ApiResponse<unknown>;
+  const mainData = response?.data as Record<string, unknown> | undefined;
+  const candidateSources = [
+    mainData?.totalRecords,
+    (res as Record<string, unknown>)?.totalRecords,
+    mainData?.data && (mainData.data as Record<string, unknown>)?.totalRecords,
+    mainData?.rows && (mainData.rows as Record<string, unknown>)?.totalRecords,
+  ];
+
+  for (const candidate of candidateSources) {
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
+    }
+    if (typeof candidate === "string") {
+      const parsed = Number(candidate);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+
+  return undefined;
 }
 
 // tiny inline spinner (why: avoid adding dependency)
@@ -147,6 +173,16 @@ const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
     )
   : {};
 
+const FORM_TYPE_META: Record<string, WorkflowStatusMeta> = {
+  DIRECT: { label: "Direct", textColor: "#025f37", bgColor: "#d1f0dc" },
+  NOTDIRECT: { label: "Not Direct", textColor: "#044a8c", bgColor: "#d7e9ff" },
+};
+
+function normalizeFormTypeKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
 function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
   const code = normalizeWorkflowKey(statusCode);
   const meta =
@@ -160,6 +196,22 @@ function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) 
     <span
       className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
       style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function renderFormTypeBadge(formType?: string) {
+  const key = normalizeFormTypeKey(formType);
+  const meta = FORM_TYPE_META[key];
+  const label = meta?.label ?? formType ?? "-";
+  const pillMeta = meta ?? { textColor: "#1f2937", bgColor: "#e5e7eb", label };
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: pillMeta.textColor, backgroundColor: pillMeta.bgColor }}
     >
       {label}
     </span>
@@ -235,6 +287,8 @@ export default function UpasampadaList({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<UpasampadaRow[]>([]);
+  console.log("recordsrecordsrecordsrecords",records)
+  const [totalRecords, setTotalRecords] = useState<number | undefined>();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -289,7 +343,13 @@ export default function UpasampadaList({
     () => [
       { key: "regNo", label: "REG.NO", sortable: true },
       { key: "highBhikkhuName", label: "UPASAMPADA NAME", sortable: true },
-      { key: "livtemple", label: "LIVING TEMPALE" },
+      { key: "livtemple", label: "LIVING TEMPLE" },
+      {
+        key: "formType",
+        label: "Form Type",
+        sortable: true,
+        render: (row) => renderFormTypeBadge(row.formType),
+      },
       {
         key: "workflowStatus",
         label: "Workflow Status",
@@ -352,14 +412,25 @@ export default function UpasampadaList({
             status: row?.bhr_currstat?.st_descr || row?.bhr_currstat || "",
             workflowStatus,
             workflowStatusCode,
+            formType: String(row?.form_type ?? ""),
+            bhrId:row?.bhr_id,
+            bhrRegn: String(row?.bhr_regn ?? ""),
           };
         });
         setRecords(cleaned);
-        setHasMoreResults(cleaned.length === f.limit);
+        const total = extractTotalRecords(res);
+        setTotalRecords(total);
+        const nextHasMoreResults =
+          typeof total === "number"
+            ? f.page * f.limit < total
+            : cleaned.length === f.limit;
+        setHasMoreResults(nextHasMoreResults);
       } catch (e: any) {
         if (e?.name !== "AbortError") {
           console.error("Fetch Error:", e);
           setRecords([]);
+          setTotalRecords(undefined);
+          setHasMoreResults(false);
         }
       } finally {
         setLoading(false);
@@ -385,7 +456,25 @@ export default function UpasampadaList({
 
   const handleEdit = useCallback(
     (item: UpasampadaRow) => {
-      router.push(`/bhikkhu/upasmpada/manage/${encodeURIComponent(item.id)}`);
+      const normalizedForm = (item.formType ?? "").trim().toLowerCase();
+      if (normalizedForm === "direct") {
+        const targetId = item.bhrId;
+        router.push(
+          `/bhikkhu/upasmpada/direct-manage/${encodeURIComponent(
+            String(targetId ?? "")
+          )}`
+        );
+        return;
+      }
+
+      if (normalizedForm === "not_direct") {
+        router.push(
+          `/bhikkhu/upasmpada/manage/${encodeURIComponent(item.bhrRegn)}`
+        );
+        return;
+      }
+
+      
     },
     [router]
   );
@@ -474,6 +563,14 @@ export default function UpasampadaList({
       document.removeEventListener("keydown", handleKey);
     };
   }, [filterPanelOpen]);
+
+  const startIndex = (filters.page - 1) * filters.limit + 1;
+  const endIndex = startIndex + records.length - 1;
+  const summaryText = records.length
+    ? `Showing ${startIndex} to ${endIndex}${
+        typeof totalRecords === "number" ? ` of ${totalRecords}` : ""
+      }`
+    : "No records to display";
 
   return (
     <div >
@@ -786,15 +883,7 @@ export default function UpasampadaList({
           </div>
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-slate-600">
-              {records.length
-                ? `Showing ${
-                    (filters.page - 1) * filters.limit + 1
-                  } to ${
-                    (filters.page - 1) * filters.limit + records.length
-                  }`
-                : "No records to display"}
-            </div>
+            <div className="text-sm text-slate-600">{summaryText}</div>
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 Rows per page

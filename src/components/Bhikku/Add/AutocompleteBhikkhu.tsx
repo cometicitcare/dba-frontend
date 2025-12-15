@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { _manageBhikku } from "@/services/bhikku";
 
-type BhikkhuOption = { regn: string; name: string };
+type BhikkhuOption = { regn: string; name: string; data: any };
 
 async function searchBhikkhus(q: string, page = 1, limit = 10): Promise<BhikkhuOption[]> {
   const res = await _manageBhikku({
@@ -13,6 +13,7 @@ async function searchBhikkhus(q: string, page = 1, limit = 10): Promise<BhikkhuO
   return rows.map((r) => ({
     regn: r.br_regn,
     name: r.br_mahananame || r.br_gihiname || r.br_regn,
+    data: r,
   }));
 }
 
@@ -22,11 +23,12 @@ type Props = {
   placeholder?: string;
   required?: boolean;
   initialDisplay?: string;
-  onPick: (picked: { regn?: string; name?: string; display: string }) => void;
+  onPick: (picked: { regn?: string; name?: string; display: string; data?: any }) => void;
   storeRegn?: boolean;
+  onInputChange?: (value: string) => void;
 };
 
-export default function BhikkhuAutocomplete({ id, label, placeholder, required, initialDisplay = "", onPick, storeRegn = true }: Props) {
+export default function BhikkhuAutocomplete({ id, label, placeholder, required, initialDisplay = "", onPick, storeRegn = true, onInputChange }: Props) {
   const [input, setInput] = useState<string>(initialDisplay);
   const [options, setOptions] = useState<BhikkhuOption[]>([]);
   const [open, setOpen] = useState(false);
@@ -52,19 +54,32 @@ export default function BhikkhuAutocomplete({ id, label, placeholder, required, 
 
   const handleSelect = (opt: BhikkhuOption) => {
     const display = `${opt.name} — ${opt.regn}`;
-    onPick(storeRegn ? { regn: opt.regn, display } : { name: opt.name, display });
+    onPick(
+      storeRegn
+        ? { regn: opt.regn, display, data: opt.data }
+        : { name: opt.name, display, data: opt.data }
+    );
     setInput(display);
     setOpen(false);
   };
 
   return (
     <div className="relative">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
       <input
         id={id}
         type="text"
         value={input}
-        onChange={(e) => { setInput(e.target.value); setDebounceKey((k) => k + 1); setOpen(true); }}
+        onChange={(e) => {
+          const value = e.target.value;
+          setInput(value);
+          setDebounceKey((k) => k + 1);
+          setOpen(true);
+          onInputChange?.(value);
+        }}
         onFocus={() => { setFocused(true); setOpen(true); }}
         onBlur={() => { setFocused(false); setOpen(false); }}
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
