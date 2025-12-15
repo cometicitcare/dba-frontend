@@ -12,6 +12,7 @@ import QRCode from "react-qr-code";
 import {
   DateField,
   LocationPicker,
+  BhikkhuAutocomplete,
   viharaSteps,
   viharaInitialValues,
   toYYYYMMDD,
@@ -177,6 +178,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       
       // Step D: Leadership
       viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
+      viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
       period_established: apiData.vh_period_established ?? "",
       
       // Step E: Assets & Activities
@@ -425,6 +427,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
         nikaya: "vh_nikaya",
         parshawaya: "vh_parshawa",
         viharadhipathi_name: "vh_viharadhipathi_name",
+        viharadhipathi_regn: "vh_viharadhipathi_regn",
         period_established: "vh_period_established",
         buildings_description: "vh_buildings_description",
         dayaka_families_count: "vh_dayaka_families_count",
@@ -530,6 +533,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name,
+      vh_viharadhipathi_regn: formData.viharadhipathi_regn,
       vh_period_established: formData.period_established,
       
       // Step E: Assets & Activities
@@ -1642,16 +1646,24 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
 
                               // Step D: Viharadhipathi
                               if (id === "viharadhipathi_name") {
+                                const displayValue =
+                                  values.viharadhipathi_name && values.viharadhipathi_regn
+                                    ? `${values.viharadhipathi_name} - ${values.viharadhipathi_regn}`
+                                    : (values.viharadhipathi_name as string) || "";
                                 return (
-                                  <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
-                                    <input
+                                  <div key={id} className="md:col-span-2">
+                                    <BhikkhuAutocomplete
                                       id={id}
-                                      type="text"
-                                      value={val}
-                                      onChange={(e) => handleInputChange(f.name, e.target.value)}
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                                      placeholder="Enter name"
+                                      label={f.label}
+                                      required={!!f.rules?.required}
+                                      initialDisplay={displayValue}
+                                      placeholder="Type a Bhikkhu name or registration number"
+                                      onPick={(picked) => {
+                                        handleSetMany({
+                                          viharadhipathi_name: picked.name ?? "",
+                                          viharadhipathi_regn: picked.regn ?? "",
+                                        });
+                                      }}
                                     />
                                     {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                                   </div>
