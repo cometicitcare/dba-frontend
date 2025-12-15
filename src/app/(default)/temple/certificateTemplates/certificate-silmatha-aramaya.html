@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Silmatha Aramaya Certificate (Legal Size)</title>
+    <style>
+        /* Basic styles for layout and print */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .controls {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+        }
+        /* Centering and layout tweaks */
+        .print-area {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .two-column {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .right-panel {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        /* Page setup for Legal size (8.5" x 14") */
+        .page {
+            page-break-after: always;
+            margin: 0 auto 20px;
+            width: 8.5in;
+            height: 14in;
+            max-width: calc(100% - 30px);
+            position: relative;
+            background-repeat: no-repeat;
+            background-position: center top;
+            background-size: contain;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        /* Make the preview look clean on-screen */
+        @media screen {
+            .page {
+                box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+                background-size: 100% 100%;
+            }
+        }
+
+        /* Background images controlled by JavaScript */
+        .page.no-background {
+            border: 1px solid #ddd;
+        }
+
+        /* Overlay fields placed above the background artwork */
+        .field {
+            position: absolute;
+            color: #000;
+            font-size: 13px;
+            background: rgba(255,255,255,0.0);
+            padding: 2px 4px;
+            white-space: pre-wrap;
+        }
+
+        /* Content area layout */
+        .page .content {
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            top: 20%;
+            bottom: 20%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            align-items: flex-start;
+            pointer-events: none;
+            padding: 0.5rem 0;
+            gap: 0.4rem;
+        }
+
+        /* Row-based layout with 3 columns */
+        .page .row {
+            display: grid;
+            grid-template-columns: 6% 34% 1fr;
+            align-items: center;
+            column-gap: 8px;
+            row-gap: 4px;
+            margin: 4px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .page .row .num-col { 
+            box-sizing: border-box;
+            font-weight: 500;
+        }
+        .page .row .label { 
+            box-sizing: border-box;
+        }
+        .page .row .value { 
+            box-sizing: border-box;
+        }
+        .page .label { 
+            font-size: 14px; 
+            color: #000;
+        }
+        .page .value { 
+            font-size: 17px; 
+            color: #000; 
+            font-weight: 500;
+        }
+
+        /* Multi-language support */
+        .sinhala { display: inline; }
+        .tamil { display: none; }
+        .eng { display: none; }
+
+        /* Language toggle classes */
+        body.show-tamil .sinhala { display: none; }
+        body.show-tamil .tamil { display: inline; }
+        body.show-tamil .eng { display: none; }
+        
+        body.show-english .sinhala { display: none; }
+        body.show-english .tamil { display: none; }
+        body.show-english .eng { display: inline; }
+
+        /* Special row for multi-item list (item 09) */
+        .multi-item-row {
+            display: grid;
+            grid-template-columns: 6% 34% 1fr;
+            align-items: start;
+            column-gap: 8px;
+            margin: 4px 0;
+            width: 100%;
+        }
+        
+        .multi-item-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .multi-item {
+            display: grid;
+            grid-template-columns: 40px 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* QR container positioned at bottom right */
+        .page .qr-container {
+            position: absolute;
+            right: 15%;
+            bottom: 3%;
+            width: 75px;
+            height: 75px;
+            box-sizing: border-box;
+            z-index: 10;
+            text-align: center;
+            pointer-events: auto;
+        }
+        .page .qr-container img { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+        }
+        .page .qr-container .caption {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #000;
+            white-space: nowrap;
+            margin-top: 4px;
+        }
+
+        /* Footer section for signatures and stamps */
+        .footer-section {
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            bottom: 5%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .disclaimer-text {
+            font-size: 11px;
+            line-height: 1.5;
+            text-align: justify;
+            margin-bottom: 20px;
+        }
+
+        .signature-area {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-top: 20px;
+        }
+
+        .signature-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .signature-label {
+            font-size: 11px;
+            text-align: center;
+        }
+
+        @media print {
+            .controls {
+                display: none;
+            }
+            .print-area {
+                padding: 0;
+            }
+            .page {
+                page-break-after: always;
+                margin: 0;
+                background-color: white;
+                width: 8.5in;
+                max-width: 100%;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="populateWithSample()">Load sample data</button>
+        <button onclick="window.print()">Print / Save as PDF</button>
+        <label style="margin-left: 20px;">
+            <input type="checkbox" id="showBackgroundToggle" checked onchange="toggleBackground()"> 
+            Show Background Images
+        </label>
+    </div>
+
+    <div class="print-area">
+        <div class="two-column">
+            <main class="right-panel">
+                <!-- Single Page Certificate -->
+                <section class="page page-1" id="page-1" role="document" aria-label="Silmatha Aramaya Certificate">
+                    <div class="content">
+                        <div class="row">
+                            <div class="num-col"></div>
+                            <div class="label">
+                                <span class="sinhala">ලියාපදිංචි අංකය :</span>
+                                <span class="tamil">பதிவு எண் :</span>
+                                <span class="eng">Registration Number :</span>
+                            </div>
+                            <div class="value"><span data-field="registration_number"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">01.</div>
+                            <div class="label">
+                                <span class="sinhala">සිල්මතා ආරාමයේ නම</span>
+                                <span class="tamil">சீல மாதா ஆரமாயாவின் பெயர்</span>
+                                <span class="eng">Name of Silmatha Aramaya</span>
+                            </div>
+                            <div class="value"><span data-field="aramaya_name"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">02.</div>
+                            <div class="label">
+                                <span class="sinhala">ආරාමයේ ලිපිනය</span>
+                                <span class="tamil">ஆரமாயாவின் முகவரி</span>
+                                <span class="eng">Address of the Aramaya</span>
+                            </div>
+                            <div class="value"><span data-field="aramaya_address"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">03.</div>
+                            <div class="label">
+                                <span class="sinhala">දිස්ත්‍රික්කය</span>
+                                <span class="tamil">மாவட்டம்</span>
+                                <span class="eng">District</span>
+                            </div>
+                            <div class="value"><span data-field="district"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">04.</div>
+                            <div class="label">
+                                <span class="sinhala">ප්‍රාදේශීය ලේකම් කොට්ඨාශය</span>
+                                <span class="tamil">பிரதேச செயலாளர் பிரிவு</span>
+                                <span class="eng">Divisional Secretariat</span>
+                            </div>
+                            <div class="value"><span data-field="divisional_secretariat"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">05.</div>
+                            <div class="label">
+                                <span class="sinhala">ප්‍රාදේශීය ශාසනාරක්ෂක මණ්ඩලය</span>
+                                <span class="tamil">பிரதேச சாசன காப்பு மன்றம்</span>
+                                <span class="eng">Regional Sasana Protection Committee</span>
+                            </div>
+                            <div class="value"><span data-field="regional_committee"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">06.</div>
+                            <div class="label">
+                                <span class="sinhala">ආරාමය ආරම්භ කල කාල වකවානුව</span>
+                                <span class="tamil">ஆரமாயா தொடங்கிய காலம்</span>
+                                <span class="eng">Period when Aramaya was established</span>
+                            </div>
+                            <div class="value"><span data-field="establishment_period"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">07.</div>
+                            <div class="label">
+                                <span class="sinhala">ලියාපදිංචි කරන අවස්ථාවේ වැඩ සිටින ආරාමාධිපති මෑණියන්වහන්සේගේ නම</span>
+                                <span class="tamil">பதிவு செய்யும் நேரத்தில் தங்கியிருக்கும் ஆரமாதிபதி மேனியன් வஹன்சேவின் பெயர்</span>
+                                <span class="eng">Name of Aramadipati (Chief Nun) at the time of registration</span>
+                            </div>
+                            <div class="value"><span data-field="aramadipati_name"></span></div>
+                        </div>
+
+                        <div class="multi-item-row">
+                            <div class="num-col">08.</div>
+                            <div class="label">
+                                <span class="sinhala">ලියාපදිංචි කරන අවස්ථාවේ වැඩ වසන අනෙකුත් මෑණියන්වහන්සේලා සංඛ්‍යාව සහ ඔවුන්ගේ නම්</span>
+                                <span class="tamil">பதிவு செய்யும் நேரத்தில் தங்கியிருக்கும் மற்ற மேனியன் வஹன்சேலாவின் எண்ணிக்கை மற்றும் பெயர்கள்</span>
+                                <span class="eng">Number and names of other resident nuns at the time of registration</span>
+                            </div>
+                            <div class="value">
+                                <div class="multi-item-list">
+                                    <div class="multi-item">
+                                        <span>අ.</span>
+                                        <span data-field="resident_nun_a"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ආ.</span>
+                                        <span data-field="resident_nun_aa"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ඇ.</span>
+                                        <span data-field="resident_nun_ae"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ඈ.</span>
+                                        <span data-field="resident_nun_aae"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ඉ.</span>
+                                        <span data-field="resident_nun_i"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ඊ.</span>
+                                        <span data-field="resident_nun_ii"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>උ.</span>
+                                        <span data-field="resident_nun_u"></span>
+                                    </div>
+                                    <div class="multi-item">
+                                        <span>ඌ.</span>
+                                        <span data-field="resident_nun_uu"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">10.</div>
+                            <div class="label">
+                                <span class="sinhala">ආරාමය පිහිටි ඉඩමේ අයිතිය</span>
+                                <span class="tamil">ஆரமாயா அமைந்துள்ள நிலத்தின் உரிமை</span>
+                                <span class="eng">Ownership of the land where Aramaya is situated</span>
+                            </div>
+                            <div class="value"><span data-field="land_ownership"></span></div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Section -->
+                    <div class="footer-section">
+                        <div class="disclaimer-text">
+                            <span class="sinhala">
+                                දිස්ත්‍රික් සිල්මාතා සංගමයේ හා ප්‍රාදේශීය ශාසනාරක්ෂක මණ්ඩලයේ නිර්දේශ කර ඉදිරිපත් කරන ලද 
+                                ඉහත විස්තර සදහන් සිල්මාතා ආරාමය බෞද්ධ කටයුතු දෙපාර්තුමේන්තුවේ ලියාපදිංචි කර ඇති බව සහතික කරමි
+                            </span>
+                            <span class="tamil">
+                                மாவட்ட சீல மாதா சங்கத்தின் மற்றும் பிரதேச சாசன காப்பு மன்றத்தின் பரிந்துரையின் பேரில் சமர்ப்பிக்கப்பட்ட 
+                                மேலே உள்ள விவரங்கள் குறிப்பிட்ட சீல மாதா ஆரமாயா புத்த விவகார திணைக்களத்தில் பதிவு செய்யப்பட்டுள்ளது என்பதை உறுதிப்படுத்துகிறேன்
+                            </span>
+                            <span class="eng">
+                                I hereby certify that the above-mentioned Silmatha Aramaya has been registered in the Department of Buddhist Affairs 
+                                as recommended and submitted by the District Silmatha Association and Regional Sasana Protection Committee
+                            </span>
+                        </div>
+
+                        <div class="signature-area">
+                            <div class="signature-block">
+                                <div class="signature-label">
+                                    <span class="sinhala">
+                                        <span data-field="signature_date"></span><br/>
+                                        කොළඹ 07, ශ්‍රිමත් අසාතාර්න ධර්මපාල මාවත,<br/>
+                                        අංක 135 යි දී ය.
+                                    </span>
+                                    <span class="tamil">
+                                        <span data-field="signature_date"></span><br/>
+                                        கொழும்பு 07, ஸ்ரீமத் அனகாரிக தர்மபால வீதி,<br/>
+                                        எண் 135 இல்.
+                                    </span>
+                                    <span class="eng">
+                                        <span data-field="signature_date"></span><br/>
+                                        At No. 135, Sri Anagarika Dharmapala Mawatha,<br/>
+                                        Colombo 07
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR code for registration -->
+                    <div class="qr-container" id="qr-container">
+                        <a id="certLink" href="#" target="_blank" aria-label="Registration URL">
+                            <img id="qrCode" src="" alt="QR code" />
+                        </a>
+                        <div class="caption" id="qrLabel" aria-hidden="true"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Toggle background images on/off
+        function toggleBackground() {
+            const checkbox = document.getElementById('showBackgroundToggle');
+            const page1 = document.querySelector('.page.page-1');
+            
+            if (checkbox.checked) {
+                // Enable background - replace with your actual background image path
+                page1.style.backgroundImage = 'url("silmatha-aramaya-certificate-bg.png")';
+                page1.classList.remove('no-background');
+            } else {
+                // Disable background
+                page1.style.backgroundImage = 'none';
+                page1.classList.add('no-background');
+            }
+        }
+        
+        // Initialize backgrounds on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            toggleBackground();
+        });
+
+        // Populate fields from data object
+        function populateFields(data) {
+            document.querySelectorAll('[data-field]').forEach(function(el) {
+                var key = el.getAttribute('data-field');
+                if (data && data[key] !== undefined && data[key] !== null) {
+                    el.textContent = data[key];
+                } else {
+                    el.textContent = '';
+                }
+            });
+
+            // QR code: build URL using the registration number
+            try {
+                var regId = (data && data.registration_number) ? data.registration_number : 'sample-reg';
+                var url = 'https://buddhistaffairs.gov.lk/silmatha-aramaya/' + encodeURIComponent(regId);
+                var qrImg = document.getElementById('qrCode');
+                if (qrImg) {
+                    // Use a public QR generator to create a QR image
+                    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=' + encodeURIComponent(url);
+                }
+                var certLink = document.getElementById('certLink');
+                if (certLink) { 
+                    certLink.href = url; 
+                    certLink.title = url; 
+                }
+                var qrLabel = document.getElementById('qrLabel');
+                if (qrLabel) { 
+                    qrLabel.textContent = url; 
+                }
+            } catch (e) {
+                console.warn('QR generation failed', e);
+            }
+        }
+
+        // Load sample data
+        function populateWithSample() {
+            const sample = {
+                registration_number: "12/18/සිල්මාරාම/115",
+                aramaya_name: "ශ්‍රී සුමිත්‍රා සිල්මාතා ආරාමය",
+                aramaya_address: "කිරිබමුණ, ඉබ්බාගමුව",
+                district: "ඉබ්බාගමුව",
+                divisional_secretariat: "ඉබ්බාගමුව",
+                regional_committee: "ඉබ්බාගමුව 2",
+                establishment_period: "2007 වර්ෂය",
+                aramadipati_name: "ගරු මෝරගහතැන්නේ සුමිත්‍රා සිල්මෑණියන්වහන්සේ",
+                resident_nun_a: "සිල්මෑණි ධම්මානන්දා",
+                resident_nun_aa: "සිල්මෑණි සුමනා",
+                resident_nun_ae: "සිල්මෑණි උපමාලිකා",
+                resident_nun_aae: "සිල්මෑණි සුදර්ශනී",
+                resident_nun_i: "සිල්මෑණි ඤාණරතනා",
+                resident_nun_ii: "සිල්මෑණි සද්ධාරතනා",
+                resident_nun_u: "සිල්මෑණි විමලා",
+                resident_nun_uu: "සිල්මෑණි සුචරිතා",
+                land_ownership: "විකුණුම්කරය 9996",
+                signature_date: "2025 නොවෙම්බර් මස 12 වන දින"
+            };
+
+            populateFields(sample);
+        }
+    </script>
+</body>
+</html>
