@@ -24,6 +24,7 @@ import {
   type LandInfoRow,
   type ResidentSilmathaRow,
 } from "../../../add/Components";
+import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
 
 import { Tabs } from "@/components/ui/Tabs";
 
@@ -231,9 +232,18 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
 
   const handlePrintCertificate = () => {
     setPrintingActive(true);
-    window.print();
-    setTimeout(() => setPrintingActive(false), 0);
-    setShowUploadModal(true);
+    const cleanup = () => {
+      setPrintingActive(false);
+      setShowUploadModal(true);
+      window.onafterprint = null;
+    };
+    window.onafterprint = cleanup;
+    // Defer print so data-printing attr is applied
+    setTimeout(() => {
+      window.print();
+      // Fallback cleanup in case onafterprint doesn't fire
+      setTimeout(cleanup, 300);
+    }, 50);
   };
 
   // Helper function to map API fields to form fields
@@ -443,9 +453,17 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       nextErrors[f.name] = msg;
       if (msg) valid = false;
     }
-    if (tabIndex === 2 && !values.province) {
-      nextErrors.province = "Required";
-      valid = false;
+    if (tabIndex === 2) {
+      if (!values.province) {
+        nextErrors.province = "Required";
+        valid = false;
+      } else {
+        nextErrors.province = undefined;
+      }
+      // Clear optional location field errors
+      nextErrors.district = undefined;
+      nextErrors.divisional_secretariat = undefined;
+      nextErrors.grama_niladhari_division = undefined;
     }
     setErrors(nextErrors);
     if (!valid) scrollTop();
@@ -1208,6 +1226,34 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                         const err = errors[f.name];
 
                         if (id === "arama_owned_land" || id === "resident_silmathas") return null;
+
+                        if (id === "chief_nun_name") {
+                          return (
+                            <div key={id} className="md:col-span-2 space-y-2">
+                              <SilmathaAutocomplete
+                                id="chief-nun-search"
+                                label={f.label}
+                                placeholder="Type a Silmatha name or registration number"
+                                initialDisplay={(values.chief_nun_name as string) ?? ""}
+                                onPick={(picked) => {
+                                  const name = picked.name || picked.display || "";
+                                  const regn = picked.regn || "";
+                                  handleSetMany({
+                                    chief_nun_name: name,
+                                    chief_nun_registration_number:
+                                      regn || (values.chief_nun_registration_number as string) || "",
+                                  });
+                                }}
+                              />
+                              {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                              {values.chief_nun_registration_number ? (
+                                <p className="text-xs text-slate-600">
+                                  Selected Registration: {values.chief_nun_registration_number as string}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        }
 
                         if (f.type === "textarea") {
                           return (

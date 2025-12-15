@@ -130,10 +130,10 @@ export const aramaSteps = (): StepConfig<AramaForm>[] => [
     id: 2,
     title: "Location",
     fields: [
-      { name: "district", label: "District", type: "text", rules: { required: true } },
-      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: true } },
+      { name: "district", label: "District", type: "text", rules: { required: false } },
+      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: false } },
       { name: "provincial_sasanaarakshaka_council", label: "Provincial Sasanaarakshaka Council", type: "text", rules: { required: false } },
-      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: true } },
+      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: false } },
     ],
   },
   {
@@ -278,4 +278,3 @@ export const aramaInitialValues: Partial<AramaForm> = {
   secretary_refer_resubmission: false,
   secretary_resubmission_notes: "",
 };
-

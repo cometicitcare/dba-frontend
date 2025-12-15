@@ -111,6 +111,10 @@ function AddAramaPageInner() {
       nextErrors[f.name] = msg;
       if (msg) valid = false;
     }
+    if (stepIndex === 2 && !values.province) {
+      nextErrors.province = "Required";
+      valid = false;
+    }
     setErrors(nextErrors);
     if (!valid) scrollTop();
     return valid;
@@ -129,6 +133,10 @@ function AddAramaPageInner() {
         const msg = validateField(f, stringValue, values, today);
         aggregated[f.name] = msg;
         if (msg) stepValid = false;
+      }
+      if (step.id === 2 && !values.province) {
+        aggregated.province = "Required";
+        stepValid = false;
       }
       if (!stepValid && firstInvalidStep == null) firstInvalidStep = step.id;
     }
@@ -433,6 +441,35 @@ function AddAramaPageInner() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.arama_name, values.district, values.divisional_secretariat, values.grama_niladhari_division, lookupLocationNames]);
+
+  // Auto-populate Annex II recommend fields from existing location/name data
+  useEffect(() => {
+    if (currentStep === 9) {
+      const { districtName, divisionName, gnName } = lookupLocationNames(
+        values.province,
+        values.district,
+        values.divisional_secretariat,
+        values.grama_niladhari_division
+      );
+      const updates: Partial<AramaForm> = {};
+      if (districtName && values.annex2_recommend_district !== districtName) {
+        updates.annex2_recommend_district = districtName;
+      }
+      if (divisionName && values.annex2_recommend_divisional_secretariat !== divisionName) {
+        updates.annex2_recommend_divisional_secretariat = divisionName;
+      }
+      if (gnName && values.annex2_recommend_grama_niladhari_division !== gnName) {
+        updates.annex2_recommend_grama_niladhari_division = gnName;
+      }
+      if (values.arama_name && values.annex2_recommend_arama_name !== values.arama_name) {
+        updates.annex2_recommend_arama_name = values.arama_name;
+      }
+      if (Object.keys(updates).length > 0) {
+        handleSetMany(updates);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, values.province, values.district, values.divisional_secretariat, values.grama_niladhari_division, values.arama_name, lookupLocationNames]);
 
   // Auto-populate arama_name to ownership_arama_name when arama_name changes
   useEffect(() => {
@@ -956,6 +993,34 @@ function AddAramaPageInner() {
 
                         // Skip table fields in regular rendering
                         if (id === "arama_owned_land" || id === "resident_silmathas") return null;
+
+                        if (currentStep === 3 && id === "chief_nun_name") {
+                          return (
+                            <div key={id} className="md:col-span-2 space-y-2">
+                              <SilmathaAutocomplete
+                                id="chief-nun-search"
+                                label={f.label}
+                                placeholder="Type a Silmatha name or registration number"
+                                initialDisplay={(values.chief_nun_name as string) ?? ""}
+                                onPick={(picked) => {
+                                  const name = picked.name || picked.display || "";
+                                  const regn = picked.regn || "";
+                                  handleSetMany({
+                                    chief_nun_name: name,
+                                    chief_nun_registration_number:
+                                      regn || (values.chief_nun_registration_number as string) || "",
+                                  });
+                                }}
+                              />
+                              {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                              {values.chief_nun_registration_number ? (
+                                <p className="text-xs text-slate-600">
+                                  Selected Registration: {values.chief_nun_registration_number as string}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        }
 
                         // Textarea fields
                         if (f.type === "textarea") {

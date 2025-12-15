@@ -47,6 +47,7 @@ export type ViharaForm = {
 
   // Step D: Leadership Information
   viharadhipathi_name: string; // REGN
+  viharadhipathi_regn: string;
   period_established: string; // Date or period description
 
   // Step E: Temple Assets & Activities
@@ -121,10 +122,10 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     id: 2,
     title: "Administrative Divisions",
     fields: [
-      { name: "district", label: "District", type: "text", rules: { required: true } },
-      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: true } },
+      { name: "district", label: "District", type: "text", rules: { required: false } },
+      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: false } },
       { name: "pradeshya_sabha", label: "Pradeshīya Shāsanarakshaka Bala Mandalaya", type: "text", rules: { required: false } },
-      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: true } },
+      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: false } },
     ],
   },
   {
@@ -140,6 +141,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Leadership Information",
     fields: [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
+      { name: "viharadhipathi_regn", label: "Chief Nun's Registration Number", type: "text", rules: { required: false } },
       // { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text", rules: { required: true } },
       { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
     ],
@@ -224,6 +226,7 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   nikaya: "",
   parshawaya: "",
   viharadhipathi_name: "",
+  viharadhipathi_regn: "",
   period_established: "",
   buildings_description: "",
   dayaka_families_count: "",
