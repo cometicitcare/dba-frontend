@@ -434,6 +434,35 @@ function AddAramaPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.arama_name, values.district, values.divisional_secretariat, values.grama_niladhari_division, lookupLocationNames]);
 
+  // Auto-populate Annex II recommend fields from existing location/name data
+  useEffect(() => {
+    if (currentStep === 9) {
+      const { districtName, divisionName, gnName } = lookupLocationNames(
+        values.province,
+        values.district,
+        values.divisional_secretariat,
+        values.grama_niladhari_division
+      );
+      const updates: Partial<AramaForm> = {};
+      if (districtName && values.annex2_recommend_district !== districtName) {
+        updates.annex2_recommend_district = districtName;
+      }
+      if (divisionName && values.annex2_recommend_divisional_secretariat !== divisionName) {
+        updates.annex2_recommend_divisional_secretariat = divisionName;
+      }
+      if (gnName && values.annex2_recommend_grama_niladhari_division !== gnName) {
+        updates.annex2_recommend_grama_niladhari_division = gnName;
+      }
+      if (values.arama_name && values.annex2_recommend_arama_name !== values.arama_name) {
+        updates.annex2_recommend_arama_name = values.arama_name;
+      }
+      if (Object.keys(updates).length > 0) {
+        handleSetMany(updates);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, values.province, values.district, values.divisional_secretariat, values.grama_niladhari_division, values.arama_name, lookupLocationNames]);
+
   // Auto-populate arama_name to ownership_arama_name when arama_name changes
   useEffect(() => {
     if (values.arama_name) {
