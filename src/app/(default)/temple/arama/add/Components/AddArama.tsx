@@ -111,6 +111,10 @@ function AddAramaPageInner() {
       nextErrors[f.name] = msg;
       if (msg) valid = false;
     }
+    if (stepIndex === 2 && !values.province) {
+      nextErrors.province = "Required";
+      valid = false;
+    }
     setErrors(nextErrors);
     if (!valid) scrollTop();
     return valid;
@@ -129,6 +133,10 @@ function AddAramaPageInner() {
         const msg = validateField(f, stringValue, values, today);
         aggregated[f.name] = msg;
         if (msg) stepValid = false;
+      }
+      if (step.id === 2 && !values.province) {
+        aggregated.province = "Required";
+        stepValid = false;
       }
       if (!stepValid && firstInvalidStep == null) firstInvalidStep = step.id;
     }

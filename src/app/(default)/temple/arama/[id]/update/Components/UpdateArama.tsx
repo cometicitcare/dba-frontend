@@ -452,9 +452,17 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       nextErrors[f.name] = msg;
       if (msg) valid = false;
     }
-    if (tabIndex === 2 && !values.province) {
-      nextErrors.province = "Required";
-      valid = false;
+    if (tabIndex === 2) {
+      if (!values.province) {
+        nextErrors.province = "Required";
+        valid = false;
+      } else {
+        nextErrors.province = undefined;
+      }
+      // Clear optional location field errors
+      nextErrors.district = undefined;
+      nextErrors.divisional_secretariat = undefined;
+      nextErrors.grama_niladhari_division = undefined;
     }
     setErrors(nextErrors);
     if (!valid) scrollTop();
