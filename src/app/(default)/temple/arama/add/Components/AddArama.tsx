@@ -994,6 +994,34 @@ function AddAramaPageInner() {
                         // Skip table fields in regular rendering
                         if (id === "arama_owned_land" || id === "resident_silmathas") return null;
 
+                        if (currentStep === 3 && id === "chief_nun_name") {
+                          return (
+                            <div key={id} className="md:col-span-2 space-y-2">
+                              <SilmathaAutocomplete
+                                id="chief-nun-search"
+                                label={f.label}
+                                placeholder="Type a Silmatha name or registration number"
+                                initialDisplay={(values.chief_nun_name as string) ?? ""}
+                                onPick={(picked) => {
+                                  const name = picked.name || picked.display || "";
+                                  const regn = picked.regn || "";
+                                  handleSetMany({
+                                    chief_nun_name: name,
+                                    chief_nun_registration_number:
+                                      regn || (values.chief_nun_registration_number as string) || "",
+                                  });
+                                }}
+                              />
+                              {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                              {values.chief_nun_registration_number ? (
+                                <p className="text-xs text-slate-600">
+                                  Selected Registration: {values.chief_nun_registration_number as string}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        }
+
                         // Textarea fields
                         if (f.type === "textarea") {
                           return (
