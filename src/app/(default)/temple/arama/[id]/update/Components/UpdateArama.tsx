@@ -231,9 +231,18 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
 
   const handlePrintCertificate = () => {
     setPrintingActive(true);
-    window.print();
-    setTimeout(() => setPrintingActive(false), 0);
-    setShowUploadModal(true);
+    const cleanup = () => {
+      setPrintingActive(false);
+      setShowUploadModal(true);
+      window.onafterprint = null;
+    };
+    window.onafterprint = cleanup;
+    // Defer print so data-printing attr is applied
+    setTimeout(() => {
+      window.print();
+      // Fallback cleanup in case onafterprint doesn't fire
+      setTimeout(cleanup, 300);
+    }, 50);
   };
 
   // Helper function to map API fields to form fields
