@@ -95,6 +95,7 @@ export default function BhikkhuCategorySelect({
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
         {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
       </label>
       <select
         id={id}

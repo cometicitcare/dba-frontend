@@ -563,8 +563,8 @@ function ManageBhikkhuInner({ params }: PageProps) {
 
     const province_code = s(
       api?.br_province?.cp_code ||
-        api?.br_province?.code ||
-        (typeof api?.br_province === "string" ? api?.br_province : "")
+      api?.br_province?.code ||
+      (typeof api?.br_province === "string" ? api?.br_province : "")
     );
     const district_code = s(
       api?.br_district?.dd_dcode ||
@@ -579,9 +579,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
     const gn_code = s(
       api?.br_gndiv?.gn_gnc || api?.br_gndiv?.gn_code || api?.br_gndiv
     );
+    const formIdValue = s(api?.br_form_id ?? api?.dbh_form_id);
 
     const formPatch: Partial<BhikkhuForm> = {
       br_cat: (br_cat_code as any) || NOVICE_CATEGORY_CODE,
+      br_form_id: formIdValue,
       br_reqstdate: toYYYYMMDD(s(api?.br_reqstdate)),
       br_dofb: toYYYYMMDD(s(api?.br_dofb)),
       br_gihiname: s(api?.br_gihiname),
@@ -590,7 +592,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
       br_mobile: s(api?.br_mobile),
       br_fathrsaddrs: s(api?.br_fathrsaddrs),
       br_fathrsmobile: s(api?.br_fathrsmobile),
-      br_form_id: s(api?.br_form_id),
 
       br_birthpls: s(api?.br_birthpls),
       br_province: province_code,
@@ -1135,37 +1136,6 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                               e.target.value
                                             )
                                           }
-                                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                                        />
-                                        {err ? (
-                                          <p className="mt-1 text-sm text-red-600">
-                                            {err}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  }
-
-                                  if (id === "br_form_id") {
-                                    return (
-                                      <div key={id}>
-                                        <label
-                                          htmlFor={id}
-                                          className="block text-sm font-medium text-slate-700 mb-2"
-                                        >
-                                          {f.label}
-                                        </label>
-                                        <input
-                                          id={id}
-                                          type="text"
-                                          value={val}
-                                          onChange={(e) =>
-                                            handleInputChange(
-                                              f.name,
-                                              e.target.value
-                                            )
-                                          }
-                                          placeholder="Enter the form number"
                                           className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                         />
                                         {err ? (

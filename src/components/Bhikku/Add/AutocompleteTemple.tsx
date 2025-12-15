@@ -36,6 +36,10 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
   const [debounceKey, setDebounceKey] = useState(0);
 
   useEffect(() => {
+    setInput(initialDisplay);
+  }, [initialDisplay]);
+
+  useEffect(() => {
     const key = debounceKey;
     const h = setTimeout(async () => {
       const q = input?.trim() ?? "";
@@ -64,7 +68,10 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
       data-filter-keepopen="true"
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+        {label}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </label>
       <input
         id={id}
         type="text"

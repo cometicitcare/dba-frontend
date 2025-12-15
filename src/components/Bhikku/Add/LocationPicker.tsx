@@ -72,6 +72,13 @@ export default function LocationPicker({
 }: Props) {
   const labels = { province: "Province", district: "District", division: "Divisional Secretariat", gn: "GN Division", ...labelsOverride };
 
+  const renderLabel = (text: string) => (
+    <>
+      {text}
+      {required && <span className="text-red-500 ml-1">*</span>}
+    </>
+  );
+
   const provinces = STATIC_PROVINCES;
   const [internal, setInternal] = useState<LocationSelection>({});
   const selection: LocationSelection = value ?? internal;
@@ -106,7 +113,7 @@ export default function LocationPicker({
     <div className={className}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.province}</label>
+          <label className="block mb-1 text-sm font-medium">{renderLabel(labels.province)}</label>
           <select
             className="w-full border rounded-md px-3 py-2"
             value={selection.provinceCode ?? ""}
@@ -124,7 +131,7 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.district}</label>
+          <label className="block mb-1 text-sm font-medium">{renderLabel(labels.district)}</label>
           <select
             className="w-full border rounded-md px-3 py-2"
             value={selection.districtCode ?? ""}
@@ -142,7 +149,7 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.division}</label>
+          <label className="block mb-1 text-sm font-medium">{renderLabel(labels.division)}</label>
           <select
             className="w-full border rounded-md px-3 py-2"
             value={selection.divisionCode ?? ""}
@@ -160,7 +167,7 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.gn}</label>
+          <label className="block mb-1 text-sm font-medium">{renderLabel(labels.gn)}</label>
           <select
             className="w-full border rounded-md px-3 py-2"
             value={selection.gnCode ?? ""}
