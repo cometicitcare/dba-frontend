@@ -967,12 +967,17 @@ export default function DirectAddPage() {
               onPick={({ display }) => updateUpasField("bhikshuPresiding", display ?? "")}
               required
             />
-            <BhikkhuAutocomplete
+            <TempleAutocomplete
               id="place-higher-ordination"
               label="Place of Higher Ordination"
-              initialDisplay={upasampadaForm.higherOrdinationPlace}
-              onPick={({ display }) => updateUpasField("higherOrdinationPlace", display ?? "")}
               required
+              placeholder="Search temple, auto-fill TRN"
+              storeTrn
+              initialDisplay={display.higherOrdinationPlace ?? ""}
+              onPick={({ trn, display: disp }) => {
+                updateUpasField("higherOrdinationPlace", trn ?? "");
+                setDisplay((prev) => ({ ...prev, higherOrdinationPlace: disp ?? "" }));
+              }}
             />
             <DateField
               id="date-higher-ordination"

@@ -203,7 +203,7 @@ const UPAS_REQUIRED_FIELDS: Record<number, Array<keyof UpasampadaForm>> = {
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const API_BASE_URL = "https://api.dbagovlk.com";
 const buildScannedDocumentUrl = (path?: string) => {
-  if (!path) return "";
+  if (!path) return "test.pdf";
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `${API_BASE_URL}${normalized}`;
 };
@@ -241,6 +241,7 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const [scannedDocumentPath, setScannedDocumentPath] = useState<string>("");
   const [serverScannedDocumentPath, setServerScannedDocumentPath] =
     useState<string>("");
+  const [recordReloadTrigger, setRecordReloadTrigger] = useState(0);
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [canAdminActions, setCanAdminActions] = useState(false);
@@ -475,7 +476,7 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     return () => {
       cancelled = true;
     };
-  }, [editId]);
+  }, [editId, recordReloadTrigger]);
 
   const updateField = (field: keyof UpasampadaForm, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -738,17 +739,19 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
       toast.error("Please choose a file to upload.");
       return;
     }
-    try {
-      setUploadingScan(true);
-      await _uploadDirectScannedHighDocument(directId, scannedFile);
-      toast.success("Scanned file uploaded.", { autoClose: 1200 });
-      setScannedFile(null);
-      if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
-      setScanPreviewUrl(null);
-    } catch (error: any) {
-      const message = error?.message ?? "Failed to upload file.";
-      toast.error(message);
-    } finally {
+      try {
+        setUploadingScan(true);
+        await _uploadDirectScannedHighDocument(directId, scannedFile);
+        toast.success("Scanned file uploaded.", { autoClose: 1200 });
+        setScannedFile(null);
+        if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+        setShowUploadModal(false);
+        setRecordReloadTrigger((prev) => prev + 1);
+      } catch (error: any) {
+        const message = error?.message ?? "Failed to upload file.";
+        toast.error(message);
+      } finally {
       setUploadingScan(false);
     }
   };
@@ -1048,11 +1051,14 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
         required
       />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TextField
+        <TempleAutocomplete
           id="place-higher-ordination"
           label="Place of Higher Ordination"
-          value={form.higherOrdinationPlace}
-          onChange={(v) => updateField("higherOrdinationPlace", v)}
+          placeholder="Search temple, auto-fill TRN"
+          initialDisplay={form.higherOrdinationPlace}
+          onPick={({ trn, display }) =>
+            updateField("higherOrdinationPlace", trn ?? display ?? "")
+          }
           required
         />
         <DateField
