@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import ViharaList from './Components/ViharaList'
 import { getStoredUserData, UserData } from '@/utils/userData';
-import { ADMIN_ROLE_LEVEL, VIHARA_MANAGEMENT_DEPARTMENT } from '@/utils/config';
+import { ADMIN_ROLE_LEVEL, DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT, VIHARA_MANAGEMENT_DEPARTMENT } from '@/utils/config';
 import { useRouter } from 'next/navigation'
 
 const Page = () => {
@@ -14,7 +14,8 @@ const Page = () => {
 
   useEffect(() => {
     const stored = getStoredUserData();
-    if (!stored || stored.department !== VIHARA_MANAGEMENT_DEPARTMENT) {
+    const allowedDepartments = [VIHARA_MANAGEMENT_DEPARTMENT, DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT];
+    if (!stored || !allowedDepartments.includes(stored.department || "")) {
       setAccessDenied(true);
       router.replace('/');
       return;
@@ -24,7 +25,7 @@ const Page = () => {
     setAccessChecked(true);
   }, [router]);
 
-  const canDelete = userData?.roleLevel === ADMIN_ROLE_LEVEL;
+  const canDelete = userData?.roleLevel === ADMIN_ROLE_LEVEL && userData.department !== DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
 
   return (
     <ViharaList canDelete={canDelete} />
