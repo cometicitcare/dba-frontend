@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import UpdateVihara from './Components/UpdateVihara'
 import { getStoredUserData, UserData } from '@/utils/userData';
-import { VIHARA_MANAGEMENT_DEPARTMENT } from '@/utils/config';
+import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT, VIHARA_MANAGEMENT_DEPARTMENT } from '@/utils/config';
 import { useRouter } from 'next/navigation'
 
 const Page = () => {
@@ -11,7 +11,8 @@ const Page = () => {
   
     useEffect(() => {
       const stored = getStoredUserData();
-      if (!stored || stored.department !== VIHARA_MANAGEMENT_DEPARTMENT) {
+      const allowedDepartments = [VIHARA_MANAGEMENT_DEPARTMENT, DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT];
+      if (!stored || !allowedDepartments.includes(stored.department || "")) {
         router.replace('/');
         return;
       }
@@ -20,9 +21,10 @@ const Page = () => {
     }, []);
 
     const roleLevel = userData?.roleLevel || '';
+    const department = userData?.department;
 
   return (
-    <div><UpdateVihara role={roleLevel} /></div>
+    <div><UpdateVihara role={roleLevel} department={department} /></div>
   )
 }
 export default Page

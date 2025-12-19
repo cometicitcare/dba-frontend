@@ -7,6 +7,7 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
+import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 
 import {
   DateField,
@@ -48,13 +49,40 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 export const dynamic = "force-dynamic";
 
-function AddViharaPageInner() {
+function AddViharaPageInner({ department }: { department?: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const viharaId = search.get("id") || undefined;
+  const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
 
   const steps = useMemo(() => viharaSteps(), []);
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const reviewEnabled = true;
+  const effectiveSteps: Array<StepConfig<ViharaForm>> = useMemo(() => {
+    if (!reviewEnabled) return steps;
+    return [...steps, { id: steps.length + 1, title: "Review & Confirm", fields: [] }];
+  }, [steps, reviewEnabled]);
+
+  const majorStepGroups = useMemo(
+    () => [
+      { id: 1, steps: effectiveSteps.filter((s) => s.id <= 4) },
+      { id: 2, steps: effectiveSteps.filter((s) => s.id > 4) },
+    ],
+    [effectiveSteps]
+  );
+  const visibleMajorStepGroups = useMemo(
+    () => (isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups),
+    [isDivisionalSec, majorStepGroups]
+  );
+
+  const firstGroupFirstStepIndex = useMemo(() => {
+    const firstStepId = visibleMajorStepGroups[0]?.steps[0]?.id;
+    if (!firstStepId) return 1;
+    const idx = effectiveSteps.findIndex((s) => s.id === firstStepId);
+    return idx >= 0 ? idx + 1 : 1;
+  }, [effectiveSteps, visibleMajorStepGroups]);
+
+  const [activeMajorStep, setActiveMajorStep] = useState<number>(visibleMajorStepGroups[0]?.id ?? 1);
+  const [currentStep, setCurrentStep] = useState<number>(firstGroupFirstStepIndex);
   const [values, setValues] = useState<Partial<ViharaForm>>({
     ...viharaInitialValues,
   });
@@ -63,17 +91,77 @@ function AddViharaPageInner() {
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-
-  const effectiveSteps: Array<StepConfig<ViharaForm>> = useMemo(() => {
-    if (!reviewEnabled) return steps;
-    return [...steps, { id: steps.length + 1, title: "Review & Confirm", fields: [] }];
-  }, [steps, reviewEnabled]);
 
   const isReview = reviewEnabled && currentStep === effectiveSteps.length;
   const current = effectiveSteps[currentStep - 1];
   const stepTitle = current?.title ?? "";
+  const flowOneLastStepIndex = useMemo(() => {
+    const groupOne = majorStepGroups.find((g) => g.id === 1);
+    const lastStepId = groupOne?.steps[groupOne.steps.length - 1]?.id;
+    if (!lastStepId) return null;
+    const idx = effectiveSteps.findIndex((s) => s.id === lastStepId);
+    return idx >= 0 ? idx + 1 : null;
+  }, [effectiveSteps, majorStepGroups]);
+  const isFlowOneExitStep = activeMajorStep === 1 && flowOneLastStepIndex !== null && currentStep === flowOneLastStepIndex;
+  const visibleSteps = useMemo(() => {
+    const group = visibleMajorStepGroups.find((g) => g.id === activeMajorStep);
+    return group?.steps.length ? group.steps : effectiveSteps;
+  }, [activeMajorStep, effectiveSteps, visibleMajorStepGroups]);
+  const currentStepDisplay = useMemo(() => {
+    const currentId = effectiveSteps[currentStep - 1]?.id;
+    const idx = visibleSteps.findIndex((s) => s.id === currentId);
+    return idx >= 0 ? idx + 1 : currentStep;
+  }, [currentStep, effectiveSteps, visibleSteps]);
+
+  const getFirstStepIndexForGroup = useCallback(
+    (groupId: number) => {
+      const group = visibleMajorStepGroups.find((g) => g.id === groupId);
+      const firstStepId = group?.steps[0]?.id;
+      if (!firstStepId) return null;
+      const idx = effectiveSteps.findIndex((s) => s.id === firstStepId);
+      return idx >= 0 ? idx + 1 : null;
+    },
+    [effectiveSteps, visibleMajorStepGroups]
+  );
+
+  useEffect(() => {
+    const stepCfg = effectiveSteps[currentStep - 1];
+    if (!stepCfg) return;
+    const owningGroup = visibleMajorStepGroups.find((g) => g.steps.some((s) => s.id === stepCfg.id));
+    if (owningGroup && owningGroup.id !== activeMajorStep) {
+      setActiveMajorStep(owningGroup.id);
+    }
+  }, [activeMajorStep, currentStep, effectiveSteps, visibleMajorStepGroups]);
+
+  useEffect(() => {
+    const stepCfg = effectiveSteps[currentStep - 1];
+    const activeGroup = visibleMajorStepGroups.find((g) => g.id === activeMajorStep);
+    const stepInGroup = stepCfg && activeGroup?.steps.some((s) => s.id === stepCfg.id);
+    if (!stepInGroup) {
+      const fallbackIdx = getFirstStepIndexForGroup(activeMajorStep);
+      if (fallbackIdx) setCurrentStep(fallbackIdx);
+    }
+  }, [activeMajorStep, currentStep, effectiveSteps, getFirstStepIndexForGroup, visibleMajorStepGroups]);
+
+  useEffect(() => {
+    if (!visibleMajorStepGroups.length) return;
+    const hasActiveGroup = visibleMajorStepGroups.some((g) => g.id === activeMajorStep);
+    const firstGroup = visibleMajorStepGroups[0];
+    const firstIdx = getFirstStepIndexForGroup(firstGroup.id) ?? 1;
+
+    if (!hasActiveGroup) {
+      setActiveMajorStep(firstGroup.id);
+      setCurrentStep(firstIdx);
+      return;
+    }
+
+    const stepCfg = effectiveSteps[currentStep - 1];
+    const stepVisible = stepCfg && visibleMajorStepGroups.some((g) => g.steps.some((s) => s.id === stepCfg.id));
+    if (!stepVisible) {
+      setCurrentStep(firstIdx);
+    }
+  }, [activeMajorStep, currentStep, effectiveSteps, getFirstStepIndexForGroup, visibleMajorStepGroups]);
 
   const fieldLabels: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
@@ -171,6 +259,11 @@ function AddViharaPageInner() {
   const handleNext = () => {
     if (currentStep < effectiveSteps.length && validateStep(currentStep)) {
       setCurrentStep((s) => s + 1);
+    }
+  };
+  const handleSaveFlowOne = () => {
+    if (validateStep(currentStep)) {
+      router.push("/temple/vihara");
     }
   };
   const handlePrevious = () => {
@@ -452,19 +545,52 @@ function AddViharaPageInner() {
               </div>
 
               <div className="px-4 md:px-10 py-6" ref={sectionRef}>
+                {visibleMajorStepGroups.length > 1 && (
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {visibleMajorStepGroups.map((group, idx) => {
+                      const firstStepId = group.steps[0]?.id;
+                      const targetIndex = firstStepId ? effectiveSteps.findIndex((s) => s.id === firstStepId) + 1 : null;
+                      const isActive = group.id === activeMajorStep;
+                      return (
+                        <button
+                          key={group.id}
+                          onClick={() => {
+                            setActiveMajorStep(group.id);
+                            if (targetIndex) {
+                              setCurrentStep(targetIndex);
+                            }
+                            scrollTop();
+                          }}
+                          className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                            isActive
+                              ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                          }`}
+                        >
+                          Vihara flow {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 {/* Stepper */}
                 <div className="flex items-center justify-between mb-6 overflow-x-auto">
-                  {effectiveSteps.map((step, idx) => (
-                    <div key={step.id} className="flex items-center flex-1 min-w-[80px]">
-                      <div className="flex flex-col items-center flex-1">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${currentStep > step.id ? "bg-green-500 text-white" : currentStep === step.id ? "bg-slate-700 text-white ring-4 ring-slate-200" : "bg-slate-200 text-slate-400"}`}>
-                          {currentStep > step.id ? "✓" : step.id}
+                  {visibleSteps.map((step, idx) => {
+                    const stepIndex = effectiveSteps.findIndex((s) => s.id === step.id) + 1;
+                    const isCompleted = currentStep > stepIndex;
+                    const isCurrent = currentStep === stepIndex;
+                    return (
+                      <div key={step.id} className="flex items-center flex-1 min-w-[80px]">
+                        <div className="flex flex-col items-center flex-1">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${isCompleted ? "bg-green-500 text-white" : isCurrent ? "bg-slate-700 text-white ring-4 ring-slate-200" : "bg-slate-200 text-slate-400"}`}>
+                            {isCompleted ? "✓" : idx + 1}
+                          </div>
+                          <span className={`text-[10px] mt-2 font-medium text-center ${isCurrent || isCompleted ? "text-slate-700" : "text-slate-400"}`}>{step.title}</span>
                         </div>
-                        <span className={`text-[10px] mt-2 font-medium text-center ${currentStep >= step.id ? "text-slate-700" : "text-slate-400"}`}>{step.title}</span>
+                        {idx < visibleSteps.length - 1 && <div className={`h-1 flex-1 mx-2 rounded transition-all duration-300 ${isCompleted ? "bg-green-500" : "bg-slate-200"}`} />}
                       </div>
-                      {idx < effectiveSteps.length - 1 && <div className={`h-1 flex-1 mx-2 rounded transition-all duration-300 ${currentStep > step.id ? "bg-green-500" : "bg-slate-200"}`} />}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Form sections */}
@@ -936,12 +1062,21 @@ function AddViharaPageInner() {
                     ‹ Previous
                   </button>
 
-                  <div className="text-sm text-slate-600 font-medium text-center">Step {currentStep} of {effectiveSteps.length}</div>
+                  <div className="text-sm text-slate-600 font-medium text-center">Step {currentStepDisplay} of {visibleSteps.length}</div>
 
                   {currentStep < effectiveSteps.length ? (
-                    <button onClick={handleNext} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all">
-                      Next ›
-                    </button>
+                    isFlowOneExitStep ? (
+                      <button
+                        onClick={handleSaveFlowOne}
+                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all"
+                      >
+                        Save
+                      </button>
+                    ) : (
+                      <button onClick={handleNext} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all">
+                        Next ›
+                      </button>
+                    )
                   ) : (
                     <button
                       onClick={handleSubmit}
@@ -965,10 +1100,10 @@ function AddViharaPageInner() {
   );
 }
 
-export default function AddVihara() {
+export default function AddVihara({ department }: { department?: string }) {
   return (
     <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
-      <AddViharaPageInner />
+      <AddViharaPageInner department={department} />
     </Suspense>
   );
 }

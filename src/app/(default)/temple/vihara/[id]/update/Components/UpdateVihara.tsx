@@ -32,7 +32,7 @@ import { Tabs } from "@/components/ui/Tabs";
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { ADMIN_ROLE_LEVEL } from "@/utils/config";
+import { ADMIN_ROLE_LEVEL, DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Button as MuiButton } from "@mui/material";
 
 // Types local to page
@@ -78,13 +78,14 @@ type CertificateMeta = {
 
 export const dynamic = "force-dynamic";
 
-function UpdateViharaPageInner({ role }: { role: string | undefined }) {
+function UpdateViharaPageInner({ role, department }: { role: string | undefined; department?: string }) {
   const router = useRouter();
   const params = useParams();
   const viharaId = params?.id as string | undefined;
+  const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
 
   const baseSteps = useMemo(() => viharaSteps(), []);
-  const steps = useMemo(() => {
+  const sharedTabs = useMemo(() => {
     const certTab: StepConfig<ViharaForm> = {
       id: baseSteps.length + 1,
       title: "Certificates",
@@ -95,9 +96,53 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       title: "Upload Scanned Files",
       fields: [],
     };
-    return [...baseSteps, certTab, scannedTab];
+    return { certTab, scannedTab };
   }, [baseSteps]);
-  const [activeTab, setActiveTab] = useState<number>(1);
+
+  const majorStepGroups = useMemo(
+    () => [
+      {
+        id: 1,
+        tabs: [...baseSteps.filter((s) => s.id <= 4), sharedTabs.certTab, sharedTabs.scannedTab],
+      },
+      {
+        id: 2,
+        tabs: [...baseSteps.filter((s) => s.id > 4), sharedTabs.certTab, sharedTabs.scannedTab],
+      },
+    ],
+    [baseSteps, sharedTabs]
+  );
+
+  const visibleMajorStepGroups = useMemo(
+    () => (isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups),
+    [isDivisionalSec, majorStepGroups]
+  );
+
+  const [activeMajorStep, setActiveMajorStep] = useState<number>(() => visibleMajorStepGroups[0]?.id ?? 1);
+  const [activeTabId, setActiveTabId] = useState<number>(() => visibleMajorStepGroups[0]?.tabs[0]?.id ?? 1);
+
+  const steps = useMemo(() => {
+    const group = visibleMajorStepGroups.find((g) => g.id === activeMajorStep) ?? visibleMajorStepGroups[0];
+    return group ? group.tabs : [];
+  }, [activeMajorStep, visibleMajorStepGroups]);
+
+  useEffect(() => {
+    if (!visibleMajorStepGroups.length) return;
+    if (!visibleMajorStepGroups.some((g) => g.id === activeMajorStep)) {
+      const firstGroupId = visibleMajorStepGroups[0]?.id;
+      const firstTabId = visibleMajorStepGroups[0]?.tabs[0]?.id;
+      if (firstGroupId) setActiveMajorStep(firstGroupId);
+      if (firstTabId) setActiveTabId(firstTabId);
+    }
+  }, [activeMajorStep, visibleMajorStepGroups]);
+
+  useEffect(() => {
+    const fallbackId = steps[0]?.id;
+    if (!fallbackId) return;
+    if (!steps.some((s) => s.id === activeTabId)) {
+      setActiveTabId(fallbackId);
+    }
+  }, [steps, activeTabId]);
   const [values, setValues] = useState<Partial<ViharaForm>>({
     ...viharaInitialValues,
   });
@@ -125,7 +170,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const current = steps[activeTab - 1];
+  const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
@@ -288,15 +333,15 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
 
   const fieldLabels: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
-    steps.forEach((s) => s.fields.forEach((f) => (map[String(f.name)] = f.label)));
+    baseSteps.forEach((s) => s.fields.forEach((f) => (map[String(f.name)] = f.label)));
     return map;
-  }, [steps]);
+  }, [baseSteps]);
 
   const fieldByName: Map<string, any> = useMemo(() => {
     const m = new Map<string, any>();
-    steps.forEach((s) => s.fields.forEach((f) => m.set(String(f.name), f)));
+    baseSteps.forEach((s) => s.fields.forEach((f) => m.set(String(f.name), f)));
     return m;
-  }, [steps]);
+  }, [baseSteps]);
 
   const scrollTop = () => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
@@ -328,8 +373,8 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
     });
   };
 
-  const validateTab = (tabIndex: number): boolean => {
-    const step = steps[tabIndex - 1];
+  const validateTab = (tabId: number): boolean => {
+    const step = steps.find((s) => s.id === tabId);
     if (!step) return true;
     const nextErrors: Errors<ViharaForm> = { ...errors };
     let valid = true;
@@ -343,7 +388,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       if (msg) valid = false;
     }
     // Special validation for step 2: also validate province
-    if (tabIndex === 2) {
+    if (step.id === 2) {
       if (!values.province) {
         nextErrors.province = "Required";
         valid = false;
@@ -354,14 +399,14 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
     return valid;
   };
 
-  const buildPartialPayloadForTab = (tabIndex: number): Partial<any> => {
-    const s = steps[tabIndex - 1];
+  const buildPartialPayloadForTab = (tabId: number): Partial<any> => {
+    const s = steps.find((step) => step.id === tabId);
     if (!s) return {};
     
     const payload: any = {};
     
     // Handle special cases for table fields
-    if (tabIndex === 6) { // Land Information tab
+    if (tabId === 6) { // Land Information tab
       try {
         const parsedLand = values.temple_owned_land 
           ? (typeof values.temple_owned_land === 'string' ? JSON.parse(values.temple_owned_land) : values.temple_owned_land)
@@ -387,7 +432,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
       return payload;
     }
     
-    if (tabIndex === 7) { // Resident Bhikkhus tab
+    if (tabId === 7) { // Resident Bhikkhus tab
       try {
         const parsedBhikkhus = values.resident_bhikkhus 
           ? (typeof values.resident_bhikkhus === 'string' ? JSON.parse(values.resident_bhikkhus) : values.resident_bhikkhus)
@@ -461,10 +506,10 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   };
 
   const handleSaveTab = async () => {
-    if (!validateTab(activeTab)) return;
+    if (!validateTab(activeTabId)) return;
     try {
       setSaving(true);
-      const partial = buildPartialPayloadForTab(activeTab);
+      const partial = buildPartialPayloadForTab(activeTabId);
       const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
       const vhTrn = viharaId && isNaN(Number(viharaId)) ? viharaId : undefined;
 
@@ -649,12 +694,22 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
     handleInputChange("resident_bhikkhus", JSON.stringify(rows));
   };
 
-  const gridCols = activeTab === 5 ? "md:grid-cols-3" : "md:grid-cols-2";
+  const gridCols = current?.id === 5 ? "md:grid-cols-3" : "md:grid-cols-2";
+  const certificateTypes = useMemo(
+    () => (activeMajorStep === 1 ? CERTIFICATE_TYPES.filter((c) => c.id === "acceptance") : CERTIFICATE_TYPES.filter((c) => c.id === "registration")),
+    [activeMajorStep]
+  );
+  const defaultCertificateId = certificateTypes[0]?.id ?? CERTIFICATE_TYPES[0].id;
   const certificateNumberLabel = certificateMeta.number || "Pending assignment";
   const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
   const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
   const hasCertificateUrl = Boolean(certificateMeta.url);
-  const ensureActivePrintTarget = (): CertificateTypeId => activePrintAreaId || CERTIFICATE_TYPES[0].id;
+  const ensureActivePrintTarget = (): CertificateTypeId => activePrintAreaId || defaultCertificateId;
+  useEffect(() => {
+    if (activePrintAreaId && !certificateTypes.some((c) => c.id === activePrintAreaId)) {
+      setActivePrintAreaId(null);
+    }
+  }, [activePrintAreaId, certificateTypes]);
   const certificateTemplateStyles = `
     .certificate-page {
       position: relative;
@@ -879,7 +934,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
 
   const handleConfirmPrintCertificate = async () => {
     if (!activePrintAreaId) {
-      setActivePrintAreaId(CERTIFICATE_TYPES[0].id);
+      setActivePrintAreaId(defaultCertificateId);
     }
     try {
       setPrintingMarking(true);
@@ -1159,14 +1214,41 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
               </div>
 
               <div className="px-4 md:px-10 py-6" ref={sectionRef}>
+                {visibleMajorStepGroups.length > 1 && (
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {visibleMajorStepGroups.map((group, idx) => {
+                      const isActive = group.id === activeMajorStep;
+                      const firstTabId = group.tabs[0]?.id;
+                      return (
+                        <button
+                          key={group.id}
+                          onClick={() => {
+                            setActiveMajorStep(group.id);
+                            if (firstTabId) {
+                              setActiveTabId(firstTabId);
+                            }
+                            scrollTop();
+                          }}
+                          className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
+                            isActive
+                              ? "bg-slate-800 text-white border-slate-800 shadow-sm"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                          }`}
+                        >
+                          Vihara flow {idx + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 <Tabs
                   tabs={steps.map((s) => ({
                     id: String(s.id),
                     label: s.title,
                   }))}
-                  value={String(activeTab)}
+                  value={String(activeTabId)}
                   onChange={(id) => {
-                    setActiveTab(Number(id));
+                    setActiveTabId(Number(id));
                     scrollTop();
                   }}
                   contentClassName="pt-6"
@@ -1185,7 +1267,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                           {isCertificatesTab ? (
                             <div className="space-y-8">
                               <style>{certificateTemplateStyles}</style>
-                              {CERTIFICATE_TYPES.map((cert) => {
+                              {certificateTypes.map((cert) => {
                                 const printAreaId = `certificate-print-area-${cert.id}`;
                                 const isActivePrint = activePrintAreaId === cert.id;
                                 const isRegistration = cert.id === "registration";
@@ -1385,7 +1467,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                             </div>
                           ) : (
                             <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
-                            {activeTab === 6 && (
+                            {current?.id === 6 && (
                               <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
@@ -1410,7 +1492,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                         </div>
                       )}
 
-                            {activeTab === 7 && (
+                            {current?.id === 7 && (
                               <div className="md:col-span-2">
                           <ResidentBhikkhuTable value={residentBhikkhuRows} onChange={handleResidentBhikkhuChange} error={errors.resident_bhikkhus} />
                           <div className="mt-4">
@@ -1429,7 +1511,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                             )}
 
                             {/* Step J: Annex II - Special rendering with sub-headers */}
-                            {activeTab === 10 && (
+                            {current?.id === 10 && (
                               <div className="md:col-span-2 space-y-6">
                           {/* Permission for Construction and Maintenance of New Religious Centers */}
                           <div className="space-y-3">
@@ -1522,7 +1604,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                               </div>
                             )}
 
-                            {activeTab !== 6 && activeTab !== 7 && activeTab !== 10 && current.fields.map((f) => {
+                            {current?.id !== 6 && current?.id !== 7 && current?.id !== 10 && current?.fields.map((f) => {
                               const id = String(f.name);
                               const val = (values[f.name] as unknown as string) ?? "";
                               const err = errors[f.name];
@@ -1531,7 +1613,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                               if (id === "temple_owned_land" || id === "resident_bhikkhus") return null;
 
                               // Step B: Administrative Divisions - use LocationPicker
-                              if (activeTab === 2 && id === "district") {
+                              if (current?.id === 2 && id === "district") {
                                 return (
                                   <div key={id} className="md:col-span-2">
                                     <LocationPicker
@@ -1732,7 +1814,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                               if (f.type === "textarea") {
                                 const idStr = String(f.name);
                                 // For Step 5, make buildings_description span 3 columns, others span 1
-                                const spanClass = activeTab === 5 
+                                const spanClass = current?.id === 5 
                                   ? (idStr === "buildings_description" ? "md:col-span-3" : "")
                                   : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                                 return (
@@ -1753,7 +1835,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
 
                               // Regular text/email/tel inputs
                               return (
-                                <div key={id} className={activeTab === 5 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
+                                <div key={id} className={current?.id === 5 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
                                   <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
                                   <input
                                     id={id}
@@ -1769,7 +1851,7 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
                             })}
 
                             {/* Step I: Important Notes */}
-                            {activeTab === 9 && (
+                            {current?.id === 9 && (
                               <div className="md:col-span-2">
                                 <ImportantNotes>
                                   <strong>Important:</strong>
@@ -1969,10 +2051,10 @@ function UpdateViharaPageInner({ role }: { role: string | undefined }) {
   );
 }
 
-export default function UpdateVihara({ role }: { role: string | undefined }) {
+export default function UpdateVihara({ role, department }: { role: string | undefined; department?: string }) {
   return (
     <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
-      <UpdateViharaPageInner role={role} />
+      <UpdateViharaPageInner role={role} department={department} />
     </Suspense>
   );
 }
