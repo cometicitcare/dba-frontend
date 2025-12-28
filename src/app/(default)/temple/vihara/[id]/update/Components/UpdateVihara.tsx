@@ -158,7 +158,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     number: "",
     url: "",
   });
-  const [existingScanUrl, setExistingScanUrl] = useState<string | null>(null);
+  const [existingScanUrlStageOne, setExistingScanUrlStageOne] = useState<string | null>(null);
+  const [existingScanUrlStageTwo, setExistingScanUrlStageTwo] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
@@ -333,13 +334,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           : "";
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
 
-        const rawScanPath =
+        // Stage-specific scanned docs (if provided). Default: show final-stage doc only in stage 2 section.
+        const stageOneRaw =
+          apiData?.vh_stage1_scanned_document_path ||
+          apiData?.vh_stage_one_scanned_document_path ||
+          apiData?.stage1_scanned_document_path;
+        const stageTwoRaw =
+          apiData?.vh_stage2_scanned_document_path ||
+          apiData?.vh_stage_two_scanned_document_path ||
+          apiData?.stage2_scanned_document_path ||
           apiData?.vh_scanned_document_path ||
           apiData?.vh_scanned_document ||
           apiData?.scanned_document_path ||
           apiData?.scanned_document;
-        const resolvedScan = resolveScanUrl(rawScanPath);
-        if (resolvedScan) setExistingScanUrl(resolvedScan);
+        const resolvedStageOne = resolveScanUrl(stageOneRaw);
+        const resolvedStageTwo = resolveScanUrl(stageTwoRaw);
+        if (resolvedStageOne) setExistingScanUrlStageOne(resolvedStageOne);
+        if (resolvedStageTwo) setExistingScanUrlStageTwo(resolvedStageTwo);
       } catch (error) {
         console.error("Error loading vihara data:", error);
         toast.error("Failed to load vihara data");
@@ -1035,15 +1046,20 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       
       toast.success(response?.message || "Scanned document uploaded successfully.");
       const pathFromResponse =
+        (response as any)?.data?.vh_stage1_scanned_document_path ||
+        (response as any)?.data?.vh_stage2_scanned_document_path ||
         (response as any)?.data?.vh_scanned_document_path ||
+        (response as any)?.vh_stage1_scanned_document_path ||
+        (response as any)?.vh_stage2_scanned_document_path ||
         (response as any)?.vh_scanned_document_path ||
         (response as any)?.data?.scanned_document_path ||
         (response as any)?.scanned_document_path;
       const resolved = resolveScanUrl(pathFromResponse);
+      const targetSetter = activeMajorStep === 1 ? setExistingScanUrlStageOne : setExistingScanUrlStageTwo;
       if (resolved) {
-        setExistingScanUrl(resolved);
+        targetSetter(resolved);
       } else if (scanPreviewUrl) {
-        setExistingScanUrl(scanPreviewUrl);
+        targetSetter(scanPreviewUrl);
       }
       setShowUploadModal(false);
       setScannedFile(null);
@@ -1068,9 +1084,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
   };
 
-  const renderExistingScan = () => {
-    if (!existingScanUrl) return null;
-    const lower = existingScanUrl.toLowerCase();
+  const renderExistingScan = (url: string | null) => {
+    if (!url) return null;
+    const lower = url.toLowerCase();
     const isImage =
       lower.endsWith(".png") ||
       lower.endsWith(".jpg") ||
@@ -1078,7 +1094,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       lower.endsWith(".gif") ||
       lower.endsWith(".webp");
     const isPdf = lower.includes(".pdf");
-    const fileName = existingScanUrl.split("/").pop() || "scanned-document";
+    const fileName = url.split("/").pop() || "scanned-document";
 
     return (
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm space-y-3">
@@ -1086,7 +1102,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           <div>
             <p className="text-sm font-semibold text-slate-900">Current scanned document</p>
             <a
-              href={existingScanUrl}
+              href={url}
               target="_blank"
               rel="noreferrer"
               className="text-xs text-slate-600 underline break-all"
@@ -1101,14 +1117,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         {isImage ? (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
             <img
-              src={existingScanUrl}
+              src={url}
               alt="Scanned certificate"
               className="w-full max-h-96 object-contain"
             />
           </div>
         ) : isPdf ? (
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <p>PDF file: <a href={existingScanUrl} target="_blank" rel="noreferrer" className="underline">{fileName}</a></p>
+            <p>PDF file: <a href={url} target="_blank" rel="noreferrer" className="underline">{fileName}</a></p>
           </div>
         ) : null}
       </div>
@@ -1527,7 +1543,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 <h3 className="text-lg font-semibold text-slate-800 mb-4">
                                   Upload Scanned Document
                                 </h3>
-                                {renderExistingScan()}
+                                {renderExistingScan(activeMajorStep === 1 ? existingScanUrlStageOne : existingScanUrlStageTwo)}
                                 <p className="text-sm text-slate-600 mb-6">
                                   Upload the scanned certificate or document after printing. Supported formats: PDF, JPEG, PNG (Max 5MB).
                                 </p>
