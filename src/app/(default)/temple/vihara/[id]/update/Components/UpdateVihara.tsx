@@ -51,6 +51,7 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/vihara/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const CERTIFICATE_TYPES = [
   { id: "registration", title: "Certificate of registration of the vihara" },
   { id: "acceptance", title: "Acceptance of chief incumbent of vihara" },
@@ -157,8 +158,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     number: "",
     url: "",
   });
+  const [existingScanUrl, setExistingScanUrl] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -175,6 +178,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+  const resolveScanUrl = (path?: string | null) => {
+    if (!path) return null;
+    const trimmed = String(path).trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${normalizedPath}`;
+  };
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
@@ -321,6 +332,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           ? `${CERTIFICATE_URL_BASE}/${encodeURIComponent(certificateNumber)}`
           : "";
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
+
+        const rawScanPath =
+          apiData?.vh_scanned_document_path ||
+          apiData?.vh_scanned_document ||
+          apiData?.scanned_document_path ||
+          apiData?.scanned_document;
+        const resolvedScan = resolveScanUrl(rawScanPath);
+        if (resolvedScan) setExistingScanUrl(resolvedScan);
       } catch (error) {
         console.error("Error loading vihara data:", error);
         toast.error("Failed to load vihara data");
@@ -979,8 +998,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         return;
       }
       setScannedFile(file);
+      if (file.type?.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        setScanPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } else {
+        if (scanPreviewUrl) {
+          URL.revokeObjectURL(scanPreviewUrl);
+        }
+        setScanPreviewUrl(null);
+      }
     } else {
       setScannedFile(null);
+      if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+      setScanPreviewUrl(null);
     }
   };
 
@@ -1001,8 +1034,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       const response = await _uploadScannedDocument(vhId, scannedFile);
       
       toast.success(response?.message || "Scanned document uploaded successfully.");
+      const pathFromResponse =
+        (response as any)?.data?.vh_scanned_document_path ||
+        (response as any)?.vh_scanned_document_path ||
+        (response as any)?.data?.scanned_document_path ||
+        (response as any)?.scanned_document_path;
+      const resolved = resolveScanUrl(pathFromResponse);
+      if (resolved) {
+        setExistingScanUrl(resolved);
+      } else if (scanPreviewUrl) {
+        setExistingScanUrl(scanPreviewUrl);
+      }
       setShowUploadModal(false);
       setScannedFile(null);
+      if (scanPreviewUrl && resolved) {
+        URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+      }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.message || err?.message || "Failed to upload scanned document.";
       toast.error(errorMsg);
@@ -1014,6 +1062,57 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const handleCloseUploadModal = () => {
     setShowUploadModal(false);
     setScannedFile(null);
+    if (scanPreviewUrl) {
+      URL.revokeObjectURL(scanPreviewUrl);
+      setScanPreviewUrl(null);
+    }
+  };
+
+  const renderExistingScan = () => {
+    if (!existingScanUrl) return null;
+    const lower = existingScanUrl.toLowerCase();
+    const isImage =
+      lower.endsWith(".png") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".gif") ||
+      lower.endsWith(".webp");
+    const isPdf = lower.includes(".pdf");
+    const fileName = existingScanUrl.split("/").pop() || "scanned-document";
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Current scanned document</p>
+            <a
+              href={existingScanUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-600 underline break-all"
+            >
+              {fileName}
+            </a>
+          </div>
+          <div className="text-xs rounded-full bg-green-100 px-3 py-1 text-green-700 self-start sm:self-auto">
+            Latest upload
+          </div>
+        </div>
+        {isImage ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <img
+              src={existingScanUrl}
+              alt="Scanned certificate"
+              className="w-full max-h-96 object-contain"
+            />
+          </div>
+        ) : isPdf ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <p>PDF file: <a href={existingScanUrl} target="_blank" rel="noreferrer" className="underline">{fileName}</a></p>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   if (loading) {
@@ -1428,6 +1527,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 <h3 className="text-lg font-semibold text-slate-800 mb-4">
                                   Upload Scanned Document
                                 </h3>
+                                {renderExistingScan()}
                                 <p className="text-sm text-slate-600 mb-6">
                                   Upload the scanned certificate or document after printing. Supported formats: PDF, JPEG, PNG (Max 5MB).
                                 </p>
@@ -1442,11 +1542,18 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     <p className="mt-4 text-sm text-slate-600">
                                       Selected: <span className="font-medium">{scannedFile.name}</span> ({(scannedFile.size / 1024 / 1024).toFixed(2)} MB)
                                     </p>
+                                  ) : scanPreviewUrl ? (
+                                    <p className="mt-4 text-sm text-slate-600">Preview ready</p>
                                   ) : (
                                     <p className="mt-4 text-sm text-slate-500">
                                       No file selected
                                     </p>
                                   )}
+                                  {scanPreviewUrl ? (
+                                    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                      <img src={scanPreviewUrl} alt="Selected scan preview" className="w-full max-h-96 object-contain" />
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <div className="flex justify-end gap-3 mt-6">
                                   <button
@@ -1454,6 +1561,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
                                     onClick={() => {
                                       setScannedFile(null);
+                                      if (scanPreviewUrl) {
+                                        URL.revokeObjectURL(scanPreviewUrl);
+                                        setScanPreviewUrl(null);
+                                      }
                                       const input = document.querySelector('input[type="file"]') as HTMLInputElement;
                                       if (input) input.value = '';
                                     }}
