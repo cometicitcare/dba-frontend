@@ -54,6 +54,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
   const search = useSearchParams();
   const viharaId = search.get("id") || undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
+  const parseId = useCallback((v?: string | null) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }, []);
+  const [createdViharaId, setCreatedViharaId] = useState<number | null>(() => parseId(viharaId));
 
   const steps = useMemo(() => viharaSteps(), []);
   const reviewEnabled = true;
@@ -261,9 +266,57 @@ function AddViharaPageInner({ department }: { department?: string }) {
       setCurrentStep((s) => s + 1);
     }
   };
-  const handleSaveFlowOne = () => {
-    if (validateStep(currentStep)) {
-      router.push("/temple/vihara");
+  const extractViharaId = (res: any): number | null => {
+    const data = res?.data ?? res;
+    const candidates = [
+      data?.vh_id,
+      data?.id,
+      data?.data?.vh_id,
+      data?.data?.id,
+      data?.payload?.vh_id,
+    ];
+    for (const c of candidates) {
+      const n = Number(c);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+
+  const handleSaveFlowOne = async () => {
+    if (!validateStep(currentStep)) return;
+
+    try {
+      setSubmitting(true);
+      const stageOnePayload = mapFormToStageOneFields(values);
+      const response = await _manageVihara({
+        action: "SAVE_STAGE_ONE",
+        payload: { data: stageOnePayload },
+      } as any);
+
+      const newId = extractViharaId(response);
+      if (newId) {
+        setCreatedViharaId(newId);
+        router.replace(`/temple/vihara/add?id=${encodeURIComponent(String(newId))}`);
+      }
+
+      // Move the user directly to Stage 2 if they have access to both stages
+      if (!isDivisionalSec) {
+        const stageTwoStart = getFirstStepIndexForGroup(2) ?? (flowOneLastStepIndex ? flowOneLastStepIndex + 1 : null);
+        if (stageTwoStart) {
+          setActiveMajorStep(2);
+          setCurrentStep(stageTwoStart);
+          scrollTop();
+        }
+      }
+
+      toast.success("Stage 1 data saved. Continue with Stage 2.", {
+        autoClose: 1200,
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
   const handlePrevious = () => {
@@ -274,6 +327,9 @@ function AddViharaPageInner({ department }: { department?: string }) {
   // Backend expects snake_case field names with vh_ prefix for main fields
   // Array fields use camelCase (serialNumber, bhikkhuName, etc.)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
+    const periodRaw = formData.period_established ?? "";
+    const normalizedPeriodDate = toYYYYMMDD(periodRaw);
+
     // Map temple_owned_land array fields - use camelCase as per API
     const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
       serialNumber: land.serialNumber ?? land.serial_number ?? 0,
@@ -307,11 +363,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
     // Parse period_established (now a date field) to date format for vh_bgndate (YYYY-MM-DD)
     // Since it's a date field, it should already be in YYYY-MM-DD format
     let bgndate: string | null = null;
-    if (formData.period_established) {
-      const periodStr = toYYYYMMDD(formData.period_established);
-      if (periodStr) {
-        bgndate = periodStr;
-      }
+    if (normalizedPeriodDate) {
+      bgndate = normalizedPeriodDate;
     }
 
     // Return payload with backend field names (snake_case with vh_ prefix)
@@ -339,7 +392,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      vh_period_established: formData.period_established ? toYYYYMMDD(formData.period_established) : "",
+      vh_period_established: periodRaw,
       
       // Step E: Assets & Activities
       vh_buildings_description: formData.buildings_description ?? "",
@@ -389,6 +442,31 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return payload;
   };
 
+  const mapFormToStageOneFields = (formData: Partial<ViharaForm>) => {
+    const establishmentDate = toYYYYMMDD(formData.period_established);
+    const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
+
+    return {
+      vh_vname: formData.temple_name ?? "",
+      vh_addrs: formData.temple_address ?? "",
+      vh_mobile: formData.telephone_number ?? "",
+      vh_whtapp: formData.whatsapp_number ?? "",
+      vh_email: formData.email_address ?? "",
+      vh_province: formData.province ?? "",
+      vh_district: formData.district ?? "",
+      vh_divisional_secretariat: formData.divisional_secretariat ?? "",
+      vh_gndiv: formData.grama_niladhari_division ?? "",
+      vh_nikaya: formData.nikaya ?? "",
+      vh_parshawa: formData.parshawaya ?? "",
+      vh_typ: "VIHARA",
+      vh_ownercd: ownerCode,
+      vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
+      vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
+      vh_period_established: formData.period_established ?? "",
+      ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
+    };
+  };
+
   const handleSubmit = async () => {
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
@@ -423,9 +501,20 @@ function AddViharaPageInner({ department }: { department?: string }) {
       
       const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
       console.log("Vihara Form Payload:", apiPayload);
-      await _manageVihara({ action: "CREATE", payload: { data: apiPayload } } as any);
+      const effectiveVhId = createdViharaId ?? parseId(viharaId);
+      const hasVhId = typeof effectiveVhId === "number" && !Number.isNaN(effectiveVhId);
+      const action = hasVhId ? "SAVE_STAGE_TWO" : "CREATE";
+      const payload = hasVhId
+        ? { vh_id: effectiveVhId, data: apiPayload }
+        : { data: apiPayload };
 
-      toast.success(viharaId ? "Vihara updated successfully." : "Vihara created successfully.", {
+      await _manageVihara({ action, payload } as any);
+
+      const successMsg = hasVhId
+        ? "Stage 2 data saved successfully."
+        : "Vihara created successfully.";
+
+      toast.success(successMsg, {
         autoClose: 1200,
         onClose: () => router.push("/temple/vihara"),
       });
@@ -1068,9 +1157,10 @@ function AddViharaPageInner({ department }: { department?: string }) {
                     isFlowOneExitStep ? (
                       <button
                         onClick={handleSaveFlowOne}
+                        disabled={submitting}
                         className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all"
                       >
-                        Save
+                        {submitting ? "Saving..." : "Save"}
                       </button>
                     ) : (
                       <button onClick={handleNext} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all">

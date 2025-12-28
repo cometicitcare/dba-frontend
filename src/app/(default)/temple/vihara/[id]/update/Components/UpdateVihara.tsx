@@ -83,6 +83,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const params = useParams();
   const viharaId = params?.id as string | undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
+  const canModerate = role === ADMIN_ROLE_LEVEL && !isDivisionalSec;
 
   const baseSteps = useMemo(() => viharaSteps(), []);
   const sharedTabs = useMemo(() => {
@@ -1023,7 +1024,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     );
   }
 
-  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
+  const handleOpenApproveDialog = () => {
+    if (!canModerate) return;
+    setApproveDialogOpen(true);
+  };
   const handleCloseApproveDialog = () => {
     if (approving) return;
     setApproveDialogOpen(false);
@@ -1039,6 +1043,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   };
 
   const handleOpenRejectDialog = () => {
+    if (!canModerate) return;
     setRejectionReason("");
     setRejectDialogOpen(true);
   };
@@ -1048,6 +1053,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   };
 
   const handleApprove = async () => {
+    if (!canModerate) return;
     if (
       !window.confirm(
         "Approve this registration? This action may be irreversible."
@@ -1098,6 +1104,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   // };
 
     const handleReject= async () => {
+      if (!canModerate) return;
       try {
         setRejecting(true);
         const reason = rejectionReason.trim();
@@ -1177,7 +1184,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
                   </div>
-                  {role === ADMIN_ROLE_LEVEL && workflowStatus !== "COMPLETED" && (
+                  {canModerate && workflowStatus !== "COMPLETED" && (
                   
                   <div className="flex items-center gap-2">
                     <button
