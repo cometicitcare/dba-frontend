@@ -130,15 +130,17 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     if (isDivisionalSec) {
       return majorStepGroups.filter((g) => g.id === 1);
     }
-    // If Stage 1 pending, lock to Stage 1 only
-    if (workflowStatus === "S1_PENDING") {
-      return majorStepGroups.filter((g) => g.id === 1);
-    }
-    // If Stage 2 pending, allow both flows (unless divisional sec is restricted)
-    if (workflowStatus === "S2_PENDING") {
+    const allowStageTwoStatuses = new Set([
+      "S2_PENDING",
+      "S2_PEND_APPROVAL",
+      "COMPLETED",
+      "REJECTED",
+    ]);
+    // Show Stage 2 only when status allows; otherwise Stage 1 only
+    if (allowStageTwoStatuses.has(String(workflowStatus))) {
       return majorStepGroups;
     }
-    return majorStepGroups;
+    return majorStepGroups.filter((g) => g.id === 1);
   }, [isDivisionalSec, majorStepGroups, workflowStatus]);
 
   const [activeMajorStep, setActiveMajorStep] = useState<number>(() => visibleMajorStepGroups[0]?.id ?? 1);
