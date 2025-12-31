@@ -42,3 +42,5 @@ export const _uploadDirectScannedHighDocument = (bhr_id: any, file: File) => {
   );
 };
 export const _manageDirectHighBhikku = (body: any) => BackendClient.post(`${baseURL}/direct-bhikku-high/manage`, body);
+
+export const _manageTempBhikku = (body: any) => BackendClient.post(`${baseURL}/temporary-bhikku/manage`, body);
