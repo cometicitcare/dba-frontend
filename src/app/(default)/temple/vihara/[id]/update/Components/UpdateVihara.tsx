@@ -121,10 +121,19 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     [baseSteps, sharedTabs]
   );
 
-  const visibleMajorStepGroups = useMemo(
-    () => (isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups),
-    [isDivisionalSec, majorStepGroups]
-  );
+  const [workflowStatus, setWorkflowStatus] = useState<string>("");
+  const visibleMajorStepGroups = useMemo(() => {
+    // If Stage 1 pending, lock to Stage 1 only
+    if (workflowStatus === "S1_PENDING") {
+      return majorStepGroups.filter((g) => g.id === 1);
+    }
+    // If Stage 2 pending, allow both flows (unless divisional sec is restricted)
+    if (workflowStatus === "S2_PENDING") {
+      return isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups;
+    }
+    if (isDivisionalSec) return majorStepGroups.filter((g) => g.id === 2);
+    return majorStepGroups;
+  }, [isDivisionalSec, majorStepGroups, workflowStatus]);
 
   const [activeMajorStep, setActiveMajorStep] = useState<number>(() => visibleMajorStepGroups[0]?.id ?? 1);
   const [activeTabId, setActiveTabId] = useState<number>(() => visibleMajorStepGroups[0]?.tabs[0]?.id ?? 1);
@@ -177,7 +186,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
-  const [workflowStatus, setWorkflowStatus] = useState<string>("");
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -185,6 +193,12 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+  const stageApproved =
+    (activeMajorStep === 1 && workflowStatus === "S1_APPROVED") ||
+    (activeMajorStep === 2 && workflowStatus === "S2_APPROVED");
+  const stagePendingApproval =
+    (activeMajorStep === 1 && workflowStatus === "S1_PEND_APPROVAL") ||
+    (activeMajorStep === 2 && workflowStatus === "S2_PEND_APPROVAL");
   const resolveScanUrl = (path?: string | null) => {
     if (!path) return null;
     const trimmed = String(path).trim();
@@ -341,18 +355,33 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
 
         // Stage-specific scanned docs (if provided). Default: show final-stage doc only in stage 2 section.
-        const stageOneRaw =
-          apiData?.vh_stage1_scanned_document_path ||
-          apiData?.vh_stage_one_scanned_document_path ||
-          apiData?.stage1_scanned_document_path;
-        const stageTwoRaw =
-          apiData?.vh_stage2_scanned_document_path ||
-          apiData?.vh_stage_two_scanned_document_path ||
-          apiData?.stage2_scanned_document_path ||
+        const generalScanRaw =
           apiData?.vh_scanned_document_path ||
           apiData?.vh_scanned_document ||
           apiData?.scanned_document_path ||
           apiData?.scanned_document;
+        const stageOneRaw =
+          apiData?.vh_stage1_document_path ||
+          apiData?.vh_stage1_document ||
+          apiData?.vh_stage1_scanned_document_path ||
+          apiData?.vh_stage_one_scanned_document_path ||
+          apiData?.stage1_scanned_document_path ||
+          apiData?.stage1_document_path ||
+          apiData?.stage1_document ||
+          apiData?.stage_one_document_path ||
+          apiData?.stage_one_scanned_document_path ||
+          generalScanRaw;
+        const stageTwoRaw =
+          apiData?.vh_stage2_document_path ||
+          apiData?.vh_stage2_document ||
+          apiData?.vh_stage2_scanned_document_path ||
+          apiData?.vh_stage_two_scanned_document_path ||
+          apiData?.stage2_scanned_document_path ||
+          apiData?.stage2_document_path ||
+          apiData?.stage2_document ||
+          apiData?.stage_two_document_path ||
+          apiData?.stage_two_scanned_document_path ||
+          generalScanRaw;
         const resolvedStageOne = resolveScanUrl(stageOneRaw);
         const resolvedStageTwo = resolveScanUrl(stageTwoRaw);
         if (resolvedStageOne) setExistingScanUrlStageOne(resolvedStageOne);
@@ -1067,14 +1096,36 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       const vhId = Number(viharaId);
       const stage = activeMajorStep === 1 ? 1 : 2;
       const response = await _uploadStageDocument(vhId, scannedFile, stage);
-      
+
       toast.success(response?.message || "Scanned document uploaded successfully.");
+      const payload = (response as any)?.data ?? response;
+      const nextStatus =
+        payload?.workflow_status ||
+        payload?.vh_workflow_status ||
+        (stage === 1 ? "S1_PEND_APPROVAL" : "S2_PEND_APPROVAL");
+      if (nextStatus) setWorkflowStatus(String(nextStatus));
       const pathFromResponse =
+        (response as any)?.data?.vh_stage1_document_path ||
+        (response as any)?.data?.vh_stage2_document_path ||
         (response as any)?.data?.vh_stage1_scanned_document_path ||
         (response as any)?.data?.vh_stage2_scanned_document_path ||
+        (response as any)?.data?.stage_one_document_path ||
+        (response as any)?.data?.stage_two_document_path ||
+        (response as any)?.data?.stage1_document_path ||
+        (response as any)?.data?.stage2_document_path ||
+        (response as any)?.data?.stage1_scanned_document_path ||
+        (response as any)?.data?.stage2_scanned_document_path ||
         (response as any)?.data?.vh_scanned_document_path ||
+        (response as any)?.vh_stage1_document_path ||
+        (response as any)?.vh_stage2_document_path ||
         (response as any)?.vh_stage1_scanned_document_path ||
         (response as any)?.vh_stage2_scanned_document_path ||
+        (response as any)?.stage_one_document_path ||
+        (response as any)?.stage_two_document_path ||
+        (response as any)?.stage1_document_path ||
+        (response as any)?.stage2_document_path ||
+        (response as any)?.stage1_scanned_document_path ||
+        (response as any)?.stage2_scanned_document_path ||
         (response as any)?.vh_scanned_document_path ||
         (response as any)?.data?.scanned_document_path ||
         (response as any)?.scanned_document_path;
@@ -1289,7 +1340,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
                   </div>
-                  {canModerate && workflowStatus !== "COMPLETED" && (
+                  {canModerate && !stageApproved && stagePendingApproval && (
                   
                   <div className="flex items-center gap-2">
                     <button
@@ -1301,10 +1352,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             ? "bg-green-700/60 text-white cursor-not-allowed"
                             : "bg-green-600 text-white hover:bg-green-700"
                         }`}
-                      aria-label="Approve registration"
-                      title="Approve registration"
+                      aria-label={activeMajorStep === 1 ? "Approve Stage 1" : "Approve Stage 2"}
+                      title={activeMajorStep === 1 ? "Approve Stage 1" : "Approve Stage 2"}
                     >
-                      {approving ? "Approving…" : "Approve"}
+                      {approving
+                        ? activeMajorStep === 1
+                          ? "Approving Stage 1…"
+                          : "Approving Stage 2…"
+                        : activeMajorStep === 1
+                        ? "Approve Stage 1"
+                        : "Approve Stage 2"}
                     </button>
                     <button
                       onClick={handleOpenRejectDialog}
@@ -1315,10 +1372,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             ? "bg-red-700/60 text-white cursor-not-allowed"
                             : "bg-red-600 text-white hover:bg-red-700"
                         }`}
-                      aria-label="Reject registration"
-                      title="Reject registration"
+                      aria-label={activeMajorStep === 1 ? "Reject Stage 1" : "Reject Stage 2"}
+                      title={activeMajorStep === 1 ? "Reject Stage 1" : "Reject Stage 2"}
                     >
-                      {rejecting ? "Rejecting…" : "Reject"}
+                      {rejecting
+                        ? activeMajorStep === 1
+                          ? "Rejecting Stage 1…"
+                          : "Rejecting Stage 2…"
+                        : activeMajorStep === 1
+                        ? "Reject Stage 1"
+                        : "Reject Stage 2"}
                     </button>
                   </div>
                   )}

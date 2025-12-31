@@ -319,24 +319,13 @@ function AddViharaPageInner({ department }: { department?: string }) {
       } as any);
 
       const newId = extractViharaId(response);
-      if (newId) {
-        setCreatedViharaId(newId);
-        router.replace(`/temple/vihara/add?id=${encodeURIComponent(String(newId))}`);
-      }
+      if (newId) setCreatedViharaId(newId);
 
-      // Move the user directly to Stage 2 if they have access to both stages
-      if (!isDivisionalSec) {
-        const stageTwoStart = getFirstStepIndexForGroup(2) ?? (flowOneLastStepIndex ? flowOneLastStepIndex + 1 : null);
-        if (stageTwoStart) {
-          setActiveMajorStep(2);
-          setCurrentStep(stageTwoStart);
-          scrollTop();
-        }
-      }
-
-      toast.success("Stage 1 data saved. Continue with Stage 2.", {
+      toast.success("Stage 1 data saved.", {
         autoClose: 1200,
+        onClose: () => router.push("/temple/vihara"),
       });
+      setTimeout(() => router.push("/temple/vihara"), 1400);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.";
       toast.error(msg);
