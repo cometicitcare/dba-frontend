@@ -53,7 +53,13 @@ function AddViharaPageInner({ department }: { department?: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const viharaId = search.get("id") || undefined;
+  const stageQuery = search.get("stage") || undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
+  const parseId = useCallback((v?: string | null) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }, []);
+  const [createdViharaId, setCreatedViharaId] = useState<number | null>(() => parseId(viharaId));
 
   const steps = useMemo(() => viharaSteps(), []);
   const reviewEnabled = true;
@@ -69,10 +75,14 @@ function AddViharaPageInner({ department }: { department?: string }) {
     ],
     [effectiveSteps]
   );
-  const visibleMajorStepGroups = useMemo(
-    () => (isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups),
-    [isDivisionalSec, majorStepGroups]
-  );
+  const visibleMajorStepGroups = useMemo(() => {
+    // Explicit stage=2 request: only show Stage 2 flow
+    if (stageQuery === "2") return majorStepGroups.filter((g) => g.id === 2);
+    const hasId = Boolean(viharaId);
+    if (!hasId) return majorStepGroups.filter((g) => g.id === 1); // fresh create: Stage 1
+    if (isDivisionalSec) return majorStepGroups.filter((g) => g.id === 2);
+    return majorStepGroups; // default: both flows
+  }, [isDivisionalSec, majorStepGroups, stageQuery, viharaId]);
 
   const firstGroupFirstStepIndex = useMemo(() => {
     const firstStepId = visibleMajorStepGroups[0]?.steps[0]?.id;
@@ -81,8 +91,21 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return idx >= 0 ? idx + 1 : 1;
   }, [effectiveSteps, visibleMajorStepGroups]);
 
-  const [activeMajorStep, setActiveMajorStep] = useState<number>(visibleMajorStepGroups[0]?.id ?? 1);
-  const [currentStep, setCurrentStep] = useState<number>(firstGroupFirstStepIndex);
+  const initialMajorStep = useMemo(() => {
+    if (stageQuery === "2" && visibleMajorStepGroups.some((g) => g.id === 2)) return 2;
+    return visibleMajorStepGroups[0]?.id ?? 1;
+  }, [stageQuery, visibleMajorStepGroups]);
+
+  const initialCurrentStep = useMemo(() => {
+    const targetGroup = visibleMajorStepGroups.find((g) => g.id === initialMajorStep);
+    const firstStepId = targetGroup?.steps[0]?.id;
+    if (!firstStepId) return firstGroupFirstStepIndex;
+    const idx = effectiveSteps.findIndex((s) => s.id === firstStepId);
+    return idx >= 0 ? idx + 1 : firstGroupFirstStepIndex;
+  }, [effectiveSteps, firstGroupFirstStepIndex, initialMajorStep, visibleMajorStepGroups]);
+
+  const [activeMajorStep, setActiveMajorStep] = useState<number>(initialMajorStep);
+  const [currentStep, setCurrentStep] = useState<number>(initialCurrentStep);
   const [values, setValues] = useState<Partial<ViharaForm>>({
     ...viharaInitialValues,
   });
@@ -113,6 +136,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
     const idx = visibleSteps.findIndex((s) => s.id === currentId);
     return idx >= 0 ? idx + 1 : currentStep;
   }, [currentStep, effectiveSteps, visibleSteps]);
+
+  const reviewSteps = useMemo(() => {
+    const group = visibleMajorStepGroups.find((g) => g.id === activeMajorStep) ?? visibleMajorStepGroups[0];
+    return group?.steps?.length ? group.steps : steps;
+  }, [activeMajorStep, steps, visibleMajorStepGroups]);
 
   const getFirstStepIndexForGroup = useCallback(
     (groupId: number) => {
@@ -229,9 +257,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
   };
 
   const validateAll = (): { ok: boolean; firstInvalidStep: number | null } => {
+    const visibleStepIds = new Set(visibleMajorStepGroups.flatMap((g) => g.steps.map((s) => s.id)));
     let firstInvalidStep: number | null = null;
     const aggregated: Errors<ViharaForm> = {};
     for (const step of steps) {
+      if (stageQuery === "2" && !visibleStepIds.has(step.id)) continue;
       let stepValid = true;
       for (const f of step.fields) {
         if (f.name === "temple_owned_land" || f.name === "resident_bhikkhus") continue; // Skip table fields
@@ -261,9 +291,46 @@ function AddViharaPageInner({ department }: { department?: string }) {
       setCurrentStep((s) => s + 1);
     }
   };
-  const handleSaveFlowOne = () => {
-    if (validateStep(currentStep)) {
-      router.push("/temple/vihara");
+  const extractViharaId = (res: any): number | null => {
+    const data = res?.data ?? res;
+    const candidates = [
+      data?.vh_id,
+      data?.id,
+      data?.data?.vh_id,
+      data?.data?.id,
+      data?.payload?.vh_id,
+    ];
+    for (const c of candidates) {
+      const n = Number(c);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  };
+
+  const handleSaveFlowOne = async () => {
+    if (!validateStep(currentStep)) return;
+
+    try {
+      setSubmitting(true);
+      const stageOnePayload = mapFormToStageOneFields(values);
+      const response = await _manageVihara({
+        action: "SAVE_STAGE_ONE",
+        payload: { data: stageOnePayload },
+      } as any);
+
+      const newId = extractViharaId(response);
+      if (newId) setCreatedViharaId(newId);
+
+      toast.success("Stage 1 data saved.", {
+        autoClose: 1200,
+        onClose: () => router.push("/temple/vihara"),
+      });
+      setTimeout(() => router.push("/temple/vihara"), 1400);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
   const handlePrevious = () => {
@@ -274,6 +341,9 @@ function AddViharaPageInner({ department }: { department?: string }) {
   // Backend expects snake_case field names with vh_ prefix for main fields
   // Array fields use camelCase (serialNumber, bhikkhuName, etc.)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
+    const periodRaw = formData.period_established ?? "";
+    const normalizedPeriodDate = toYYYYMMDD(periodRaw);
+
     // Map temple_owned_land array fields - use camelCase as per API
     const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
       serialNumber: land.serialNumber ?? land.serial_number ?? 0,
@@ -307,11 +377,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
     // Parse period_established (now a date field) to date format for vh_bgndate (YYYY-MM-DD)
     // Since it's a date field, it should already be in YYYY-MM-DD format
     let bgndate: string | null = null;
-    if (formData.period_established) {
-      const periodStr = toYYYYMMDD(formData.period_established);
-      if (periodStr) {
-        bgndate = periodStr;
-      }
+    if (normalizedPeriodDate) {
+      bgndate = normalizedPeriodDate;
     }
 
     // Return payload with backend field names (snake_case with vh_ prefix)
@@ -339,7 +406,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      vh_period_established: formData.period_established ? toYYYYMMDD(formData.period_established) : "",
+      vh_period_established: periodRaw,
       
       // Step E: Assets & Activities
       vh_buildings_description: formData.buildings_description ?? "",
@@ -389,7 +456,39 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return payload;
   };
 
+  const mapFormToStageOneFields = (formData: Partial<ViharaForm>) => {
+    const establishmentDate = toYYYYMMDD(formData.period_established);
+    const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
+
+    return {
+      vh_vname: formData.temple_name ?? "",
+      vh_addrs: formData.temple_address ?? "",
+      vh_mobile: formData.telephone_number ?? "",
+      vh_whtapp: formData.whatsapp_number ?? "",
+      vh_email: formData.email_address ?? "",
+      vh_province: formData.province ?? "",
+      vh_district: formData.district ?? "",
+      vh_divisional_secretariat: formData.divisional_secretariat ?? "",
+      vh_gndiv: formData.grama_niladhari_division ?? "",
+      vh_nikaya: formData.nikaya ?? "",
+      vh_parshawa: formData.parshawaya ?? "",
+      vh_typ: "VIHARA",
+      vh_ownercd: ownerCode,
+      vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
+      vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
+      vh_period_established: formData.period_established ?? "",
+      ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
+    };
+  };
+
   const handleSubmit = async () => {
+    console.log("Submitting Vihara form", {
+      stageQuery,
+      viharaId,
+      createdViharaId,
+      currentStep,
+      activeMajorStep,
+    });
     const { ok, firstInvalidStep } = validateAll();
     if (!ok && firstInvalidStep) {
       setCurrentStep(firstInvalidStep);
@@ -423,9 +522,29 @@ function AddViharaPageInner({ department }: { department?: string }) {
       
       const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
       console.log("Vihara Form Payload:", apiPayload);
-      await _manageVihara({ action: "CREATE", payload: { data: apiPayload } } as any);
+      const effectiveVhId = createdViharaId ?? parseId(viharaId);
+      const hasVhId = typeof effectiveVhId === "number" && !Number.isNaN(effectiveVhId);
 
-      toast.success(viharaId ? "Vihara updated successfully." : "Vihara created successfully.", {
+      // Force stage-2 save when requested via query
+      if (stageQuery === "2" && !hasVhId) {
+        toast.error("Vihara ID missing for Stage 2. Please start from Stage 1.");
+        return;
+      }
+
+      const action = stageQuery === "2" ? "SAVE_STAGE_TWO" : "CREATE";
+
+      const payload =
+        action === "SAVE_STAGE_TWO"
+          ? { vh_id: effectiveVhId, data: apiPayload }
+          : { data: apiPayload };
+
+      await _manageVihara({ action, payload } as any);
+
+      const successMsg = action === "SAVE_STAGE_TWO"
+        ? "Stage 2 data saved successfully."
+        : "Vihara created successfully.";
+
+      toast.success(successMsg, {
         autoClose: 1200,
         onClose: () => router.push("/temple/vihara"),
       });
@@ -1012,7 +1131,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                   {isReview && (
                     <div className="space-y-6">
                       <p className="text-slate-600">Review your details below. Use <span className="font-medium">Edit</span> to jump to a section.</p>
-                      {steps.map((s) => (
+                      {reviewSteps.map((s) => (
                         <div key={s.id} className="border border-slate-200 rounded-xl p-4 md:p-5">
                           <div className="flex items-center justify-between mb-3">
                             <h3 className="text-lg font-semibold text-slate-800">{s.title}</h3>
@@ -1068,24 +1187,25 @@ function AddViharaPageInner({ department }: { department?: string }) {
                     isFlowOneExitStep ? (
                       <button
                         onClick={handleSaveFlowOne}
+                        disabled={submitting}
                         className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all"
                       >
-                        Save
+                        {submitting ? "Saving..." : "Save"}
                       </button>
                     ) : (
                       <button onClick={handleNext} className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all">
                         Next ›
                       </button>
                     )
-                  ) : (
-                    <button
-                      onClick={handleSubmit}
-                      disabled={submitting}
-                      className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-70"
-                    >
-                      {submitting ? "Submitting..." : viharaId ? "Update" : "Submit"}
-                    </button>
-                  )}
+                    ) : (
+                      <button
+                        onClick={handleSubmit}
+                        disabled={submitting}
+                        className="flex items-center justify-center gap-2 px-6 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all disabled:opacity-70"
+                      >
+                      {submitting ? "Saving..." : "Save"}
+                      </button>
+                    )}
                 </div>
 
               </div>

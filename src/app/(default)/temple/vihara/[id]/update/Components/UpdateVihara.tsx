@@ -2,7 +2,13 @@
 
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { _manageVihara, _markPrintedVihara, _uploadScannedDocument } from "@/services/vihara";
+import {
+  _manageVihara,
+  _markPrintedVihara,
+  _uploadStageDocument,
+  _approveStage,
+  _rejectStage,
+} from "@/services/vihara";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -51,6 +57,7 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/vihara/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const CERTIFICATE_TYPES = [
   { id: "registration", title: "Certificate of registration of the vihara" },
   { id: "acceptance", title: "Acceptance of chief incumbent of vihara" },
@@ -83,6 +90,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const params = useParams();
   const viharaId = params?.id as string | undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
+  const canModerate = role === ADMIN_ROLE_LEVEL && !isDivisionalSec;
 
   const baseSteps = useMemo(() => viharaSteps(), []);
   const sharedTabs = useMemo(() => {
@@ -100,23 +108,40 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [baseSteps]);
 
   const majorStepGroups = useMemo(
-    () => [
-      {
-        id: 1,
-        tabs: [...baseSteps.filter((s) => s.id <= 4), sharedTabs.certTab, sharedTabs.scannedTab],
-      },
-      {
-        id: 2,
-        tabs: [...baseSteps.filter((s) => s.id > 4), sharedTabs.certTab, sharedTabs.scannedTab],
-      },
-    ],
-    [baseSteps, sharedTabs]
+    () => {
+      const shared = isDivisionalSec ? [] : [sharedTabs.certTab, sharedTabs.scannedTab];
+      return [
+        {
+          id: 1,
+          tabs: [...baseSteps.filter((s) => s.id <= 4), ...shared],
+        },
+        {
+          id: 2,
+          tabs: [...baseSteps.filter((s) => s.id > 4), ...shared],
+        },
+      ];
+    },
+    [baseSteps, sharedTabs, isDivisionalSec]
   );
 
-  const visibleMajorStepGroups = useMemo(
-    () => (isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups),
-    [isDivisionalSec, majorStepGroups]
-  );
+  const [workflowStatus, setWorkflowStatus] = useState<string>("");
+  const visibleMajorStepGroups = useMemo(() => {
+    // Divisional Secretary: only Stage 1, no certificates/upload tabs
+    if (isDivisionalSec) {
+      return majorStepGroups.filter((g) => g.id === 1);
+    }
+    const allowStageTwoStatuses = new Set([
+      "S2_PENDING",
+      "S2_PEND_APPROVAL",
+      "COMPLETED",
+      "REJECTED",
+    ]);
+    // Show Stage 2 only when status allows; otherwise Stage 1 only
+    if (allowStageTwoStatuses.has(String(workflowStatus))) {
+      return majorStepGroups;
+    }
+    return majorStepGroups.filter((g) => g.id === 1);
+  }, [isDivisionalSec, majorStepGroups, workflowStatus]);
 
   const [activeMajorStep, setActiveMajorStep] = useState<number>(() => visibleMajorStepGroups[0]?.id ?? 1);
   const [activeTabId, setActiveTabId] = useState<number>(() => visibleMajorStepGroups[0]?.tabs[0]?.id ?? 1);
@@ -143,6 +168,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       setActiveTabId(fallbackId);
     }
   }, [steps, activeTabId]);
+
   const [values, setValues] = useState<Partial<ViharaForm>>({
     ...viharaInitialValues,
   });
@@ -156,8 +182,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     number: "",
     url: "",
   });
+  const [existingScanUrlStageOne, setExistingScanUrlStageOne] = useState<string | null>(null);
+  const [existingScanUrlStageTwo, setExistingScanUrlStageTwo] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -166,14 +195,27 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
-  const [workflowStatus, setWorkflowStatus] = useState<string>("");
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
-
+  
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+  const stageApproved =
+    (activeMajorStep === 1 && workflowStatus === "S1_APPROVED") ||
+    (activeMajorStep === 2 && workflowStatus === "S2_APPROVED");
+  const stagePendingApproval =
+    (activeMajorStep === 1 && workflowStatus === "S1_PEND_APPROVAL") ||
+    (activeMajorStep === 2 && workflowStatus === "S2_PEND_APPROVAL");
+  const resolveScanUrl = (path?: string | null) => {
+    if (!path) return null;
+    const trimmed = String(path).trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${normalizedPath}`;
+  };
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
@@ -320,6 +362,39 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           ? `${CERTIFICATE_URL_BASE}/${encodeURIComponent(certificateNumber)}`
           : "";
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
+
+        // Stage-specific scanned docs (if provided). Default: show final-stage doc only in stage 2 section.
+        const generalScanRaw =
+          apiData?.vh_scanned_document_path ||
+          apiData?.vh_scanned_document ||
+          apiData?.scanned_document_path ||
+          apiData?.scanned_document;
+        const stageOneRaw =
+          apiData?.vh_stage1_document_path ||
+          apiData?.vh_stage1_document ||
+          apiData?.vh_stage1_scanned_document_path ||
+          apiData?.vh_stage_one_scanned_document_path ||
+          apiData?.stage1_scanned_document_path ||
+          apiData?.stage1_document_path ||
+          apiData?.stage1_document ||
+          apiData?.stage_one_document_path ||
+          apiData?.stage_one_scanned_document_path ||
+          generalScanRaw;
+        const stageTwoRaw =
+          apiData?.vh_stage2_document_path ||
+          apiData?.vh_stage2_document ||
+          apiData?.vh_stage2_scanned_document_path ||
+          apiData?.vh_stage_two_scanned_document_path ||
+          apiData?.stage2_scanned_document_path ||
+          apiData?.stage2_document_path ||
+          apiData?.stage2_document ||
+          apiData?.stage_two_document_path ||
+          apiData?.stage_two_scanned_document_path ||
+          generalScanRaw;
+        const resolvedStageOne = resolveScanUrl(stageOneRaw);
+        const resolvedStageTwo = resolveScanUrl(stageTwoRaw);
+        if (resolvedStageOne) setExistingScanUrlStageOne(resolvedStageOne);
+        if (resolvedStageTwo) setExistingScanUrlStageTwo(resolvedStageTwo);
       } catch (error) {
         console.error("Error loading vihara data:", error);
         toast.error("Failed to load vihara data");
@@ -938,13 +1013,30 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
     try {
       setPrintingMarking(true);
-      const res = await _markPrintedVihara(Number(viharaId));
-      const payload = (res as any)?.data ?? res;
-      const success = (payload as any)?.success ?? true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
+      if (activeMajorStep === 1) {
+        const res = await _manageVihara({
+          action: "MARK_S1_PRINTED",
+          payload: { vh_id: Number(viharaId) },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
+      } else {
+        const res = await _manageVihara({
+          action: "MARK_S2_PRINTED",
+          payload: { vh_id: Number(viharaId) },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
       }
     } catch (e: unknown) {
       const data = (e as any)?.response?.data ?? (e as any)?.data;
@@ -978,8 +1070,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         return;
       }
       setScannedFile(file);
+      if (file.type?.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        setScanPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+      } else {
+        if (scanPreviewUrl) {
+          URL.revokeObjectURL(scanPreviewUrl);
+        }
+        setScanPreviewUrl(null);
+      }
     } else {
       setScannedFile(null);
+      if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
+      setScanPreviewUrl(null);
     }
   };
 
@@ -997,11 +1103,54 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     try {
       setUploadingScan(true);
       const vhId = Number(viharaId);
-      const response = await _uploadScannedDocument(vhId, scannedFile);
-      
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      const response = await _uploadStageDocument(vhId, scannedFile, stage);
+
       toast.success(response?.message || "Scanned document uploaded successfully.");
+      const payload = (response as any)?.data ?? response;
+      const nextStatus =
+        payload?.workflow_status ||
+        payload?.vh_workflow_status ||
+        (stage === 1 ? "S1_PEND_APPROVAL" : "S2_PEND_APPROVAL");
+      if (nextStatus) setWorkflowStatus(String(nextStatus));
+      const pathFromResponse =
+        (response as any)?.data?.vh_stage1_document_path ||
+        (response as any)?.data?.vh_stage2_document_path ||
+        (response as any)?.data?.vh_stage1_scanned_document_path ||
+        (response as any)?.data?.vh_stage2_scanned_document_path ||
+        (response as any)?.data?.stage_one_document_path ||
+        (response as any)?.data?.stage_two_document_path ||
+        (response as any)?.data?.stage1_document_path ||
+        (response as any)?.data?.stage2_document_path ||
+        (response as any)?.data?.stage1_scanned_document_path ||
+        (response as any)?.data?.stage2_scanned_document_path ||
+        (response as any)?.data?.vh_scanned_document_path ||
+        (response as any)?.vh_stage1_document_path ||
+        (response as any)?.vh_stage2_document_path ||
+        (response as any)?.vh_stage1_scanned_document_path ||
+        (response as any)?.vh_stage2_scanned_document_path ||
+        (response as any)?.stage_one_document_path ||
+        (response as any)?.stage_two_document_path ||
+        (response as any)?.stage1_document_path ||
+        (response as any)?.stage2_document_path ||
+        (response as any)?.stage1_scanned_document_path ||
+        (response as any)?.stage2_scanned_document_path ||
+        (response as any)?.vh_scanned_document_path ||
+        (response as any)?.data?.scanned_document_path ||
+        (response as any)?.scanned_document_path;
+      const resolved = resolveScanUrl(pathFromResponse);
+      const targetSetter = activeMajorStep === 1 ? setExistingScanUrlStageOne : setExistingScanUrlStageTwo;
+      if (resolved) {
+        targetSetter(resolved);
+      } else if (scanPreviewUrl) {
+        targetSetter(scanPreviewUrl);
+      }
       setShowUploadModal(false);
       setScannedFile(null);
+      if (scanPreviewUrl && resolved) {
+        URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+      }
     } catch (err: any) {
       const errorMsg = err?.response?.data?.message || err?.message || "Failed to upload scanned document.";
       toast.error(errorMsg);
@@ -1013,6 +1162,57 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const handleCloseUploadModal = () => {
     setShowUploadModal(false);
     setScannedFile(null);
+    if (scanPreviewUrl) {
+      URL.revokeObjectURL(scanPreviewUrl);
+      setScanPreviewUrl(null);
+    }
+  };
+
+  const renderExistingScan = (url: string | null) => {
+    if (!url) return null;
+    const lower = url.toLowerCase();
+    const isImage =
+      lower.endsWith(".png") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".gif") ||
+      lower.endsWith(".webp");
+    const isPdf = lower.includes(".pdf");
+    const fileName = url.split("/").pop() || "scanned-document";
+
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Current scanned document</p>
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-600 underline break-all"
+            >
+              {fileName}
+            </a>
+          </div>
+          <div className="text-xs rounded-full bg-green-100 px-3 py-1 text-green-700 self-start sm:self-auto">
+            Latest upload
+          </div>
+        </div>
+        {isImage ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <img
+              src={url}
+              alt="Scanned certificate"
+              className="w-full max-h-96 object-contain"
+            />
+          </div>
+        ) : isPdf ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <p>PDF file: <a href={url} target="_blank" rel="noreferrer" className="underline">{fileName}</a></p>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   if (loading) {
@@ -1023,7 +1223,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     );
   }
 
-  const handleOpenApproveDialog = () => setApproveDialogOpen(true);
+  const handleOpenApproveDialog = () => {
+    if (!canModerate) return;
+    setApproveDialogOpen(true);
+  };
   const handleCloseApproveDialog = () => {
     if (approving) return;
     setApproveDialogOpen(false);
@@ -1039,6 +1242,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   };
 
   const handleOpenRejectDialog = () => {
+    if (!canModerate) return;
     setRejectionReason("");
     setRejectDialogOpen(true);
   };
@@ -1048,92 +1252,52 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   };
 
   const handleApprove = async () => {
+    if (!canModerate) return;
     if (
       !window.confirm(
-        "Approve this registration? This action may be irreversible."
+        activeMajorStep === 1
+          ? "Approve Stage 1? This action may be irreversible."
+          : "Approve Stage 2? This action may be irreversible."
       )
     )
       return;
     try {
       setApproving(true);
-      await _manageVihara({
-        action: "APPROVE",
-        payload: { vh_id: viharaId },
-      } as any);
-      toast.success("Approved successfully.", { autoClose: 1200 });
+      if (!viharaId) throw new Error("Missing vihara id");
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      await _approveStage(Number(viharaId), stage);
+      toast.success(stage === 1 ? "Stage 1 approved." : "Stage 2 approved.", { autoClose: 1200 });
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : "Failed to approve. Please try again.";
+      const msg = extractApiMessage(e, "Failed to approve. Please try again.");
       toast.error(msg);
     } finally {
       setApproving(false);
     }
   };
 
-  // const handleReject= async () => {
-  //   if (
-  //     !window.confirm(
-  //       "Reject this registration? This action may be irreversible."
-  //     )
-  //   )
-  //     return;
-  //   try {
-  //     setRejecting(true);
-  //     await _manageVihara({
-  //       action: "REJECT",
-  //       payload: { vh_id: viharaId },
-  //     } as any);
-  //     toast.success("Rejected successfully.", { autoClose: 1200 });
-  //   } catch (e: unknown) {
-  //     const msg =
-  //       e instanceof Error
-  //         ? e.message
-  //         : "Failed to reject. Please try again.";
-  //     toast.error(msg);
-  //   } finally {
-  //     setRejecting(false);
-  //   }
-  // };
-
-    const handleReject= async () => {
-      try {
-        setRejecting(true);
-        const reason = rejectionReason.trim();
-        if (!reason) {
-          toast.error("Please enter a rejection reason.");
-          setRejecting(false);
-          return;
-        }
-        setRejectDialogOpen(false);
-        const res = await _manageVihara({
-          action: "REJECT",
-          payload: { vh_id: viharaId, rejection_reason: reason },
-        } as any);
-        const payload = (res as any)?.data ?? res;
-        const success = (payload as any)?.success ?? true;
-        if (!success) {
-          const { messages, fallback } = collectApprovalErrors(payload);
-          toast.error(messages.join("\n") || fallback);
-          return;
-        }
-        toast.success("Rejected successfully.", { autoClose: 1200 });
-        setRejectionReason("");
-      } catch (e: unknown) {
-      const data = (e as any)?.response?.data ?? (e as any)?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
-          ? e.message
-          : "Failed to reject. Please try again.");
-      toast.error(errMsg);
-      } finally {
+  const handleReject = async () => {
+    if (!canModerate) return;
+    try {
+      setRejecting(true);
+      const reason = rejectionReason.trim();
+      if (!reason) {
+        toast.error("Please enter a rejection reason.");
         setRejecting(false);
+        return;
       }
-    };
+      setRejectDialogOpen(false);
+      if (!viharaId) throw new Error("Missing vihara id");
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      await _rejectStage(Number(viharaId), stage, reason);
+      toast.success(stage === 1 ? "Stage 1 rejected." : "Stage 2 rejected.", { autoClose: 1200 });
+      setRejectionReason("");
+    } catch (e: unknown) {
+      const errMsg = extractApiMessage(e, "Failed to reject. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const collectApprovalErrors = (source: any) => {
     const container = source?.data ?? source;
@@ -1161,6 +1325,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return { messages, fallback };
   };
 
+  const extractApiMessage = (err: any, fallback: string) => {
+    const data = err?.response?.data ?? err?.data ?? err;
+    const msg = data?.message || data?.error || data?.msg;
+    if (msg) return msg;
+    const { messages, fallback: fb } = collectApprovalErrors(data);
+    return messages.join("\n") || fb || (err instanceof Error ? err.message : fallback);
+  };
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
@@ -1177,7 +1349,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
                   </div>
-                  {role === ADMIN_ROLE_LEVEL && workflowStatus !== "COMPLETED" && (
+                  {canModerate && !stageApproved && stagePendingApproval && (
                   
                   <div className="flex items-center gap-2">
                     <button
@@ -1189,10 +1361,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             ? "bg-green-700/60 text-white cursor-not-allowed"
                             : "bg-green-600 text-white hover:bg-green-700"
                         }`}
-                      aria-label="Approve registration"
-                      title="Approve registration"
+                      aria-label={activeMajorStep === 1 ? "Approve Stage 1" : "Approve Stage 2"}
+                      title={activeMajorStep === 1 ? "Approve Stage 1" : "Approve Stage 2"}
                     >
-                      {approving ? "Approving…" : "Approve"}
+                      {approving
+                        ? activeMajorStep === 1
+                          ? "Approving Stage 1…"
+                          : "Approving Stage 2…"
+                        : activeMajorStep === 1
+                        ? "Approve Stage 1"
+                        : "Approve Stage 2"}
                     </button>
                     <button
                       onClick={handleOpenRejectDialog}
@@ -1203,10 +1381,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             ? "bg-red-700/60 text-white cursor-not-allowed"
                             : "bg-red-600 text-white hover:bg-red-700"
                         }`}
-                      aria-label="Reject registration"
-                      title="Reject registration"
+                      aria-label={activeMajorStep === 1 ? "Reject Stage 1" : "Reject Stage 2"}
+                      title={activeMajorStep === 1 ? "Reject Stage 1" : "Reject Stage 2"}
                     >
-                      {rejecting ? "Rejecting…" : "Reject"}
+                      {rejecting
+                        ? activeMajorStep === 1
+                          ? "Rejecting Stage 1…"
+                          : "Rejecting Stage 2…"
+                        : activeMajorStep === 1
+                        ? "Reject Stage 1"
+                        : "Reject Stage 2"}
                     </button>
                   </div>
                   )}
@@ -1421,6 +1605,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 <h3 className="text-lg font-semibold text-slate-800 mb-4">
                                   Upload Scanned Document
                                 </h3>
+                                {renderExistingScan(activeMajorStep === 1 ? existingScanUrlStageOne : existingScanUrlStageTwo)}
                                 <p className="text-sm text-slate-600 mb-6">
                                   Upload the scanned certificate or document after printing. Supported formats: PDF, JPEG, PNG (Max 5MB).
                                 </p>
@@ -1435,11 +1620,18 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     <p className="mt-4 text-sm text-slate-600">
                                       Selected: <span className="font-medium">{scannedFile.name}</span> ({(scannedFile.size / 1024 / 1024).toFixed(2)} MB)
                                     </p>
+                                  ) : scanPreviewUrl ? (
+                                    <p className="mt-4 text-sm text-slate-600">Preview ready</p>
                                   ) : (
                                     <p className="mt-4 text-sm text-slate-500">
                                       No file selected
                                     </p>
                                   )}
+                                  {scanPreviewUrl ? (
+                                    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                                      <img src={scanPreviewUrl} alt="Selected scan preview" className="w-full max-h-96 object-contain" />
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <div className="flex justify-end gap-3 mt-6">
                                   <button
@@ -1447,6 +1639,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     className="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
                                     onClick={() => {
                                       setScannedFile(null);
+                                      if (scanPreviewUrl) {
+                                        URL.revokeObjectURL(scanPreviewUrl);
+                                        setScanPreviewUrl(null);
+                                      }
                                       const input = document.querySelector('input[type="file"]') as HTMLInputElement;
                                       if (input) input.value = '';
                                     }}

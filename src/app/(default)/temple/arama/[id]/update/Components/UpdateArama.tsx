@@ -35,6 +35,7 @@ import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, T
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/arama/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 type CertificateMeta = {
   number: string;
@@ -78,6 +79,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   });
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [scannedFile, setScannedFile] = useState<File | null>(null);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [existingScanUrl, setExistingScanUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -94,6 +97,14 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+  const resolveScanUrl = (path?: string | null) => {
+    if (!path) return null;
+    const trimmed = String(path).trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${normalizedPath}`;
+  };
 
   const certificateNumberLabel = certificateMeta.number || "Pending assignment";
   const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
@@ -387,6 +398,14 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
           ? `${CERTIFICATE_URL_BASE}/${encodeURIComponent(certificateNumber)}`
           : "";
         setCertificateMeta({ number: certificateNumber, url: certificateUrl });
+
+        const rawScanPath =
+          apiData?.ar_scanned_document_path ||
+          apiData?.ar_scanned_document ||
+          apiData?.scanned_document_path ||
+          apiData?.scanned_document;
+        const resolvedScan = resolveScanUrl(rawScanPath);
+        if (resolvedScan) setExistingScanUrl(resolvedScan);
       } catch (error) {
         console.error("Error loading arama data:", error);
         toast.error("Failed to load arama data");
@@ -700,18 +719,112 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
 
     try {
       setUploadingScan(true);
-      await _uploadScannedDocument(Number(aramaId), scannedFile);
+      const res = await _uploadScannedDocument(Number(aramaId), scannedFile);
       toast.success("Scanned document uploaded successfully");
+      const pathFromResponse =
+        (res as any)?.data?.ar_scanned_document_path ||
+        (res as any)?.ar_scanned_document_path ||
+        (res as any)?.data?.scanned_document_path ||
+        (res as any)?.scanned_document_path;
+      const resolved = resolveScanUrl(pathFromResponse);
+      if (resolved) {
+        setExistingScanUrl(resolved);
+      } else if (scanPreviewUrl) {
+        setExistingScanUrl(scanPreviewUrl);
+      }
       setShowUploadModal(false);
       setScannedFile(null);
-      // Reload data to get updated workflow status
-      window.location.reload();
+      if (scanPreviewUrl && resolved) {
+        URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to upload document";
       toast.error(msg);
     } finally {
       setUploadingScan(false);
     }
+  };
+
+  const handleScanFileChange = (file: File | null) => {
+    if (!file) {
+      setScannedFile(null);
+      if (scanPreviewUrl) {
+        URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+      }
+      return;
+    }
+    const validTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Invalid file type. Please upload PDF, JPEG, or PNG files.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size exceeds 5MB limit.");
+      return;
+    }
+    setScannedFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setScanPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
+    } else {
+      if (scanPreviewUrl) {
+        URL.revokeObjectURL(scanPreviewUrl);
+        setScanPreviewUrl(null);
+      }
+    }
+  };
+
+  const renderExistingScan = () => {
+    if (!existingScanUrl) return null;
+    const lower = existingScanUrl.toLowerCase();
+    const isImage =
+      lower.endsWith(".png") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".gif") ||
+      lower.endsWith(".webp");
+    const isPdf = lower.includes(".pdf");
+    const fileName = existingScanUrl.split("/").pop() || "scanned-document";
+
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Current scanned document</p>
+            <a
+              href={existingScanUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-slate-600 underline break-all"
+            >
+              {fileName}
+            </a>
+          </div>
+          <div className="text-xs rounded-full bg-green-100 px-3 py-1 text-green-700 self-start sm:self-auto">
+            Latest upload
+          </div>
+        </div>
+        {isImage ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <img src={existingScanUrl} alt="Scanned certificate" className="w-full max-h-96 object-contain" />
+          </div>
+        ) : isPdf ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+            <p>
+              PDF file:{" "}
+              <a href={existingScanUrl} target="_blank" rel="noreferrer" className="underline">
+                {fileName}
+              </a>
+            </p>
+          </div>
+        ) : null}
+      </div>
+    );
   };
 
   // Parse JSON arrays for tables
@@ -1104,20 +1217,28 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                         <div className="space-y-4">
                           <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
-                              Select PDF File
+                              Select PDF/JPEG/PNG File
                             </label>
                             <input
                               type="file"
-                              accept=".pdf"
-                              onChange={(e) => setScannedFile(e.target.files?.[0] || null)}
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => handleScanFileChange(e.target.files?.[0] || null)}
                               className="w-full px-4 py-2 border border-slate-300 rounded-lg"
                             />
                           </div>
-                          {scannedFile && (
+                          {renderExistingScan()}
+                          {scannedFile ? (
                             <div className="text-sm text-slate-600">
                               Selected: {scannedFile.name}
                             </div>
+                          ) : (
+                            <div className="text-sm text-slate-500">No file selected</div>
                           )}
+                          {scanPreviewUrl ? (
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                              <img src={scanPreviewUrl} alt="Selected scan preview" className="w-full max-h-96 object-contain" />
+                            </div>
+                          ) : null}
                           <button
                             onClick={handleUploadScannedDocument}
                             disabled={!scannedFile || uploadingScan}
