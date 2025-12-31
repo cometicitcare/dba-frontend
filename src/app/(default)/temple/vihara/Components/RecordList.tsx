@@ -233,17 +233,6 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     }));
   }, []);
 
-  const columns: Column[] = useMemo(
-    () => [
-      { key: "vh_trn", label: "TRN", sortable: true },
-      { key: "name", label: "Name", sortable: true },
-      { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
-      { key: "workflow_status", label: "Status", sortable: true },
-    ],
-    []
-  );
-
  const fetchData = useCallback(
   async (signal?: AbortSignal, f: FilterState = filters) => {
     setLoading(true);
@@ -372,6 +361,49 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       await fetchData(undefined, nextFilters);
     },
     [fetchData, filters]
+  );
+
+  const handleFillStageTwo = useCallback(
+    (item: ViharaRow) => {
+      if (item.workflow_status !== "S1_APPROVED") {
+        toast.error("Stage 1 must be approved before starting Stage 2.");
+        return;
+      }
+      const id = item.vh_id ? String(item.vh_id) : item.vh_trn;
+      router.push(`/temple/vihara/add?id=${encodeURIComponent(id)}&stage=2`);
+    },
+    [router]
+  );
+
+  const columns: Column[] = useMemo(
+    () => [
+      { key: "vh_trn", label: "TRN", sortable: true },
+      { key: "name", label: "Name", sortable: true },
+      { key: "mobile", label: "Mobile" },
+      { key: "email", label: "Email" },
+      { key: "workflow_status", label: "Status", sortable: true },
+      {
+        key: "stage2",
+        label: "Fill Stage 2",
+        render: (item: ViharaRow) => {
+          const canFill = item.workflow_status === "S1_APPROVED";
+          return (
+            <button
+              onClick={() => handleFillStageTwo(item)}
+              disabled={!canFill}
+              className={`text-sm font-semibold rounded-lg px-3 py-1.5 transition-all ${
+                canFill
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
+              }`}
+            >
+              Fill Stage 2
+            </button>
+          );
+        },
+      },
+    ],
+    [handleFillStageTwo]
   );
 
   useEffect(() => {

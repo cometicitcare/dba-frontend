@@ -2,7 +2,13 @@
 
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { _manageVihara, _markPrintedVihara, _uploadScannedDocument } from "@/services/vihara";
+import {
+  _manageVihara,
+  _markPrintedVihara,
+  _uploadStageDocument,
+  _approveStage,
+  _rejectStage,
+} from "@/services/vihara";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -173,7 +179,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [printingMarking, setPrintingMarking] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string>("");
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
-
+  
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
@@ -969,13 +975,30 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
     try {
       setPrintingMarking(true);
-      const res = await _markPrintedVihara(Number(viharaId));
-      const payload = (res as any)?.data ?? res;
-      const success = (payload as any)?.success ?? true;
-      if (!success) {
-        const { messages, fallback } = collectApprovalErrors(payload);
-        toast.error(messages.join("\n") || fallback);
-        return;
+      if (activeMajorStep === 1) {
+        const res = await _manageVihara({
+          action: "MARK_S1_PRINTED",
+          payload: { vh_id: Number(viharaId) },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
+      } else {
+        const res = await _manageVihara({
+          action: "MARK_S2_PRINTED",
+          payload: { vh_id: Number(viharaId) },
+        } as any);
+        const payload = (res as any)?.data ?? res;
+        const success = (payload as any)?.success ?? true;
+        if (!success) {
+          const { messages, fallback } = collectApprovalErrors(payload);
+          toast.error(messages.join("\n") || fallback);
+          return;
+        }
       }
     } catch (e: unknown) {
       const data = (e as any)?.response?.data ?? (e as any)?.data;
@@ -1042,7 +1065,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     try {
       setUploadingScan(true);
       const vhId = Number(viharaId);
-      const response = await _uploadScannedDocument(vhId, scannedFile);
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      const response = await _uploadStageDocument(vhId, scannedFile, stage);
       
       toast.success(response?.message || "Scanned document uploaded successfully.");
       const pathFromResponse =
@@ -1171,91 +1195,49 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     if (!canModerate) return;
     if (
       !window.confirm(
-        "Approve this registration? This action may be irreversible."
+        activeMajorStep === 1
+          ? "Approve Stage 1? This action may be irreversible."
+          : "Approve Stage 2? This action may be irreversible."
       )
     )
       return;
     try {
       setApproving(true);
-      await _manageVihara({
-        action: "APPROVE",
-        payload: { vh_id: viharaId },
-      } as any);
-      toast.success("Approved successfully.", { autoClose: 1200 });
+      if (!viharaId) throw new Error("Missing vihara id");
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      await _approveStage(Number(viharaId), stage);
+      toast.success(stage === 1 ? "Stage 1 approved." : "Stage 2 approved.", { autoClose: 1200 });
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : "Failed to approve. Please try again.";
+      const msg = extractApiMessage(e, "Failed to approve. Please try again.");
       toast.error(msg);
     } finally {
       setApproving(false);
     }
   };
 
-  // const handleReject= async () => {
-  //   if (
-  //     !window.confirm(
-  //       "Reject this registration? This action may be irreversible."
-  //     )
-  //   )
-  //     return;
-  //   try {
-  //     setRejecting(true);
-  //     await _manageVihara({
-  //       action: "REJECT",
-  //       payload: { vh_id: viharaId },
-  //     } as any);
-  //     toast.success("Rejected successfully.", { autoClose: 1200 });
-  //   } catch (e: unknown) {
-  //     const msg =
-  //       e instanceof Error
-  //         ? e.message
-  //         : "Failed to reject. Please try again.";
-  //     toast.error(msg);
-  //   } finally {
-  //     setRejecting(false);
-  //   }
-  // };
-
-    const handleReject= async () => {
-      if (!canModerate) return;
-      try {
-        setRejecting(true);
-        const reason = rejectionReason.trim();
-        if (!reason) {
-          toast.error("Please enter a rejection reason.");
-          setRejecting(false);
-          return;
-        }
-        setRejectDialogOpen(false);
-        const res = await _manageVihara({
-          action: "REJECT",
-          payload: { vh_id: viharaId, rejection_reason: reason },
-        } as any);
-        const payload = (res as any)?.data ?? res;
-        const success = (payload as any)?.success ?? true;
-        if (!success) {
-          const { messages, fallback } = collectApprovalErrors(payload);
-          toast.error(messages.join("\n") || fallback);
-          return;
-        }
-        toast.success("Rejected successfully.", { autoClose: 1200 });
-        setRejectionReason("");
-      } catch (e: unknown) {
-      const data = (e as any)?.response?.data ?? (e as any)?.data;
-      const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
-          ? e.message
-          : "Failed to reject. Please try again.");
-      toast.error(errMsg);
-      } finally {
+  const handleReject = async () => {
+    if (!canModerate) return;
+    try {
+      setRejecting(true);
+      const reason = rejectionReason.trim();
+      if (!reason) {
+        toast.error("Please enter a rejection reason.");
         setRejecting(false);
+        return;
       }
-    };
+      setRejectDialogOpen(false);
+      if (!viharaId) throw new Error("Missing vihara id");
+      const stage = activeMajorStep === 1 ? 1 : 2;
+      await _rejectStage(Number(viharaId), stage, reason);
+      toast.success(stage === 1 ? "Stage 1 rejected." : "Stage 2 rejected.", { autoClose: 1200 });
+      setRejectionReason("");
+    } catch (e: unknown) {
+      const errMsg = extractApiMessage(e, "Failed to reject. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const collectApprovalErrors = (source: any) => {
     const container = source?.data ?? source;
@@ -1281,6 +1263,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       container?.data?.message ??
       "Failed to approve. Please try again.";
     return { messages, fallback };
+  };
+
+  const extractApiMessage = (err: any, fallback: string) => {
+    const data = err?.response?.data ?? err?.data ?? err;
+    const msg = data?.message || data?.error || data?.msg;
+    if (msg) return msg;
+    const { messages, fallback: fb } = collectApprovalErrors(data);
+    return messages.join("\n") || fb || (err instanceof Error ? err.message : fallback);
   };
 
   return (
