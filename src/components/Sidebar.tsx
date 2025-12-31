@@ -68,11 +68,11 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Arama",
     path: "/temple/arama",
   },
-  // {
-  //   icon: MonkIcon,
-  //   label: "Ojections",
-  //   path: "/ojections",
-  // },  
+  {
+    icon: MonkIcon,
+    label: "Objections",
+    path: "/objections",
+  },
   {
     icon: MonkIcon,
     label: "Re Print",
@@ -85,7 +85,7 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   }
 ];
 
-const PUBLIC_ONLY_PATHS = ["/", "/ojections", "/print-request", "/qr-scan"];
+const PUBLIC_ONLY_PATHS = ["/", "/objections", "/print-request", "/qr-scan"];
 
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
