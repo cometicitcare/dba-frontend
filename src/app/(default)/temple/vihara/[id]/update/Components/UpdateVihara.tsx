@@ -108,30 +108,36 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [baseSteps]);
 
   const majorStepGroups = useMemo(
-    () => [
-      {
-        id: 1,
-        tabs: [...baseSteps.filter((s) => s.id <= 4), sharedTabs.certTab, sharedTabs.scannedTab],
-      },
-      {
-        id: 2,
-        tabs: [...baseSteps.filter((s) => s.id > 4), sharedTabs.certTab, sharedTabs.scannedTab],
-      },
-    ],
-    [baseSteps, sharedTabs]
+    () => {
+      const shared = isDivisionalSec ? [] : [sharedTabs.certTab, sharedTabs.scannedTab];
+      return [
+        {
+          id: 1,
+          tabs: [...baseSteps.filter((s) => s.id <= 4), ...shared],
+        },
+        {
+          id: 2,
+          tabs: [...baseSteps.filter((s) => s.id > 4), ...shared],
+        },
+      ];
+    },
+    [baseSteps, sharedTabs, isDivisionalSec]
   );
 
   const [workflowStatus, setWorkflowStatus] = useState<string>("");
   const visibleMajorStepGroups = useMemo(() => {
+    // Divisional Secretary: only Stage 1, no certificates/upload tabs
+    if (isDivisionalSec) {
+      return majorStepGroups.filter((g) => g.id === 1);
+    }
     // If Stage 1 pending, lock to Stage 1 only
     if (workflowStatus === "S1_PENDING") {
       return majorStepGroups.filter((g) => g.id === 1);
     }
     // If Stage 2 pending, allow both flows (unless divisional sec is restricted)
     if (workflowStatus === "S2_PENDING") {
-      return isDivisionalSec ? majorStepGroups.filter((g) => g.id === 2) : majorStepGroups;
+      return majorStepGroups;
     }
-    if (isDivisionalSec) return majorStepGroups.filter((g) => g.id === 2);
     return majorStepGroups;
   }, [isDivisionalSec, majorStepGroups, workflowStatus]);
 
@@ -160,6 +166,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       setActiveTabId(fallbackId);
     }
   }, [steps, activeTabId]);
+
   const [values, setValues] = useState<Partial<ViharaForm>>({
     ...viharaInitialValues,
   });

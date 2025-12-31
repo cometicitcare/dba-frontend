@@ -24,6 +24,8 @@ import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { VIHARA } from "../../constants";
+import { getStoredUserData } from "@/utils/userData";
+import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -179,6 +181,7 @@ function buildFilterPayload(f: FilterState) {
 
 export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const router = useRouter();
+  const [isDivisionalSec, setIsDivisionalSec] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [records, setRecords] = useState<ViharaRow[]>([]);
@@ -375,6 +378,13 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     [router]
   );
 
+  useEffect(() => {
+    const stored = getStoredUserData();
+    setIsDivisionalSec(
+      (stored?.department || "") === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT
+    );
+  }, []);
+
   const columns: Column[] = useMemo(
     () => [
       { key: "vh_trn", label: "TRN", sortable: true },
@@ -382,28 +392,32 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       { key: "mobile", label: "Mobile" },
       { key: "email", label: "Email" },
       { key: "workflow_status", label: "Status", sortable: true },
-      {
-        key: "stage2",
-        label: "Fill Stage 2",
-        render: (item: ViharaRow) => {
-          const canFill = item.workflow_status === "S1_APPROVED";
-          return (
-            <button
-              onClick={() => handleFillStageTwo(item)}
-              disabled={!canFill}
-              className={`text-sm font-semibold rounded-lg px-3 py-1.5 transition-all ${
-                canFill
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-slate-200 text-slate-500 cursor-not-allowed"
-              }`}
-            >
-              Fill Stage 2
-            </button>
-          );
-        },
-      },
+      ...(isDivisionalSec
+        ? []
+        : [
+            {
+              key: "stage2",
+              label: "Fill Stage 2",
+              render: (item: ViharaRow) => {
+                const canFill = item.workflow_status === "S1_APPROVED";
+                return (
+                  <button
+                    onClick={() => handleFillStageTwo(item)}
+                    disabled={!canFill}
+                    className={`text-sm font-semibold rounded-lg px-3 py-1.5 transition-all ${
+                      canFill
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-slate-200 text-slate-500 cursor-not-allowed"
+                    }`}
+                  >
+                    Fill Stage 2
+                  </button>
+                );
+              },
+            },
+          ]),
     ],
-    [handleFillStageTwo]
+    [handleFillStageTwo, isDivisionalSec]
   );
 
   useEffect(() => {
