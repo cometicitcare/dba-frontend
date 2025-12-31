@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -9,11 +9,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
   Paper,
-  Select,
   Table,
   TableBody,
   TableCell,
@@ -23,8 +19,9 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { _getReprintUrl, _searchId } from "@/services/rePrint";
-import { baseURL } from "@/utils/config";
+import { toast } from "react-toastify";
+import { ReprintResponse, _advanceSearch } from "@/services/rePrint";
+import { _ManageObjections } from "@/services/objections";
 
 type Step = "select" | "verify" | "form";
 type Mode = "list" | "create";
@@ -32,6 +29,79 @@ type Mode = "list" | "create";
 type RecordField = {
   titel: string;
   text: string;
+};
+
+type AdvancedSearchRecord = {
+  entity_type?: string;
+  registration_number?: string;
+  form_id?: string | null;
+  ordained_name?: string;
+  birth_name?: string;
+  date_of_birth?: string;
+  birth_place?: string;
+  mobile?: string | null;
+  email?: string | null;
+  temple_name?: string;
+  temple_address?: string;
+  current_status?: string;
+  workflow_status?: string;
+  ordination_date?: string;
+  request_date?: string;
+};
+
+type ObjectionRecord = {
+  obj_id: number;
+  obj_reason?: string | null;
+  obj_requester_name?: string | null;
+  obj_requester_contact?: string | null;
+  obj_requester_id_num?: string | null;
+  obj_status?: string | null;
+  obj_submitted_at?: string | null;
+  obj_created_at?: string | null;
+  obj_cancellation_reason?: string | null;
+  obj_rejection_reason?: string | null;
+  ot_code?: string | null;
+  form_id?: string | null;
+  bh_regn?: string | null;
+  dbh_regn?: string | null;
+  sil_regn?: string | null;
+  ar_trn?: string | null;
+  vh_trn?: string | null;
+  dv_trn?: string | null;
+};
+
+const ENTITY_TYPE_OPTIONS = [
+  { label: "Bhikku", value: "bhikku" },
+  { label: "Silmatha", value: "silmatha" },
+  { label: "High Bhikku", value: "high_bhikku" },
+  { label: "Direct High Bhikku", value: "direct_high_bhikku" },
+  { label: "Vihara", value: "vihara" },
+  { label: "Arama", value: "arama" },
+  { label: "Devala", value: "devala" },
+] as const;
+
+const initialAdvancedSearchInputs = {
+  registration_number: "",
+  name: "",
+  birth_date: "",
+  entity_type: "",
+};
+
+const OBJECTION_TYPE_OPTIONS = [
+  { label: "Residency Restriction", value: "RESIDENCY_RESTRICTION" },
+  { label: "Reprint Restriction", value: "REPRINT_RESTRICTION" },
+] as const;
+
+const initialObjectionFormValues = {
+  id: "",
+  ot_code: "RESIDENCY_RESTRICTION",
+  obj_reason: "",
+  form_id: "",
+  obj_requester_name: "",
+  obj_requester_contact: "",
+  obj_requester_id_num: "",
+  obj_valid_from: "",
+  obj_valid_until: "",
 };
 
 type RequestStatus = "PENDING" | "APPROVED" | "COMPLETED" | "CANCELLED" | "REJECTED";
@@ -53,50 +123,49 @@ type PrintRequest = {
   flowStatus: RequestStatus;
   requestedAt: string;
   subject?: SubjectInfo;
+  raw?: ObjectionRecord;
 };
 
-const INITIAL_REQUESTS: PrintRequest[] = [
-  {
-    id: "REQ-001",
-    regn: "BHK-001",
-    requestType: "BHIKKU",
-    formNo: "F-101",
-    requestReason: "Duplicate certificate",
-    amount: 1200,
-    remarks: "Urgent delivery",
-    flowStatus: "PENDING",
-    requestedAt: new Date().toISOString(),
-    subject: {
-      name: "Ananda Thero",
-      gihi_name: "Venerable Ananda",
-      phone: "077 123 4567",
-    },
-  },
-  {
-    id: "REQ-002",
-    regn: "H-BHK-024",
-    requestType: "HIGH_BHIKKU",
-    formNo: "F-202",
-    requestReason: "Missing pages",
-    amount: 2500,
-    remarks: "Review required",
-    flowStatus: "APPROVED",
-    requestedAt: new Date(Date.now() - 86400000).toISOString(),
-    subject: {
-      name: "Mahananda Thero",
-      gihi_name: "Gihi Mahananda",
-      phone: "077 987 6543",
-    },
-  },
-];
+const REQUEST_STATUS_VALUES: RequestStatus[] = ["PENDING", "APPROVED", "COMPLETED", "CANCELLED", "REJECTED"];
 
-const SEARCH_SCOPE_OPTIONS = [
-  { label: "Vihara", value: "VIHARA" },
-  { label: "Arama", value: "ARAMA" },
-  { label: "Devala", value: "DEVALA" },
-] as const;
+const normalizeRequestStatus = (value: string | null | undefined): RequestStatus => {
+  if (!value) {
+    return "PENDING";
+  }
+  const normalized = value.toUpperCase() as RequestStatus;
+  return REQUEST_STATUS_VALUES.includes(normalized) ? normalized : "PENDING";
+};
 
-type SearchScope = (typeof SEARCH_SCOPE_OPTIONS)[number]["value"];
+const getObjectionRegistrationNumber = (record: ObjectionRecord) => {
+  const candidates = [
+    record.dbh_regn,
+    record.bh_regn,
+    record.sil_regn,
+    record.ar_trn,
+    record.vh_trn,
+    record.dv_trn,
+  ];
+  const found = candidates.find(Boolean);
+  return found ?? `OBJ-${record.obj_id}`;
+};
+
+const mapObjectionRecordToPrintRequest = (record: ObjectionRecord): PrintRequest => ({
+  id: record.obj_id,
+  regn: getObjectionRegistrationNumber(record),
+  requestType: record.ot_code ?? "OBJECTION",
+  formNo: record.form_id ?? "-",
+  requestReason: record.obj_reason ?? "-",
+  amount: 0,
+  remarks: record.obj_cancellation_reason ?? record.obj_rejection_reason ?? "-",
+  flowStatus: normalizeRequestStatus(record.obj_status),
+  requestedAt: record.obj_submitted_at ?? record.obj_created_at ?? new Date().toISOString(),
+  subject: {
+    name: record.obj_requester_name ?? "-",
+    gihi_name: record.obj_requester_id_num ?? undefined,
+    phone: record.obj_requester_contact ?? undefined,
+  },
+  raw: record,
+});
 
 type RecordSummaryCardProps = {
   fields: RecordField[];
@@ -187,6 +256,37 @@ function RecordSummaryCard({ fields, onEdit, onNext }: RecordSummaryCardProps) {
   );
 }
 
+const formatFieldValue = (value?: string | null) => {
+  if (!value) {
+    return "-";
+  }
+  const trimmed = value.trim();
+  return trimmed || "-";
+};
+
+const formatDateInputValue = (value?: string) => {
+  if (!value) {
+    return undefined;
+  }
+  return `${value}T00:00:00`;
+};
+
+const mapAdvancedRecordToFields = (record: AdvancedSearchRecord): RecordField[] => [
+  { titel: "Registration Number", text: formatFieldValue(record.registration_number) },
+  { titel: "Name", text: formatFieldValue(record.ordained_name) },
+  { titel: "Birth Name", text: formatFieldValue(record.birth_name) },
+  { titel: "Current Status", text: formatFieldValue(record.current_status) },
+  { titel: "Workflow Status", text: formatFieldValue(record.workflow_status) },
+  { titel: "Birth Date", text: formatFieldValue(record.date_of_birth) },
+  { titel: "Birth Place", text: formatFieldValue(record.birth_place) },
+  { titel: "Temple", text: formatFieldValue(record.temple_name) },
+  { titel: "Temple Address", text: formatFieldValue(record.temple_address) },
+  { titel: "Ordination Date", text: formatFieldValue(record.ordination_date) },
+  { titel: "Request Date", text: formatFieldValue(record.request_date) },
+  { titel: "Mobile", text: formatFieldValue(record.mobile) },
+  { titel: "Email", text: formatFieldValue(record.email) },
+];
+
 function StatusPill({ status }: { status: RequestStatus }) {
   const styles: Record<RequestStatus, { color: string; bg: string }> = {
     PENDING: { color: "#b45309", bg: "rgba(251, 191, 36, 0.15)" },
@@ -249,37 +349,30 @@ function SubjectInfoCard({ subject }: { subject?: SubjectInfo }) {
 
 export default function Obections() {
   const [mode, setMode] = useState<Mode>("list");
-  const [requests, setRequests] = useState<PrintRequest[]>(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [step, setStep] = useState<Step>("select");
-  const [search, setSearch] = useState("");
-  const [searchScope, setSearchScope] = useState<SearchScope>(SEARCH_SCOPE_OPTIONS[0].value);
   const [recordFields, setRecordFields] = useState<RecordField[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [advSearchInputs, setAdvSearchInputs] = useState(initialAdvancedSearchInputs);
+  const [advancedSearchResults, setAdvancedSearchResults] = useState<AdvancedSearchRecord[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<AdvancedSearchRecord | null>(null);
+  const [advSearchLoading, setAdvSearchLoading] = useState(false);
+  const [advSearchError, setAdvSearchError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState({
-    receiptNo: "",
-    amount: "",
-    remarks: "",
-    requestReason: "",
-  });
+  const [objectionFormValues, setObjectionFormValues] = useState(initialObjectionFormValues);
   const [tableLoading, setTableLoading] = useState(false);
   const [tableError, setTableError] = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-
   const canSubmitForm =
-    Boolean(formValues.receiptNo) &&
-    Boolean(formValues.amount) &&
-    Boolean(formValues.requestReason);
-  const canTriggerSearch = search.trim().length > 0 && !searching;
-  const [flowStatusInput, setFlowStatusInput] = useState("");
-  const [requestTypeInput, setRequestTypeInput] = useState("");
-  const [regnInput, setRegnInput] = useState("");
-  const [filters, setFilters] = useState({ flowStatus: "", requestType: "", regn: "", searchKey: "" });
+    Boolean(objectionFormValues.id.trim()) &&
+    Boolean(objectionFormValues.ot_code) &&
+    Boolean(objectionFormValues.obj_reason.trim());
+  const hasAdvancedSearchInput =
+    advSearchInputs.registration_number.trim().length > 0 ||
+    advSearchInputs.name.trim().length > 0 ||
+    advSearchInputs.birth_date.trim().length > 0 ||
+    advSearchInputs.entity_type.trim().length > 0;
+  const canTriggerAdvancedSearch = hasAdvancedSearchInput && !advSearchLoading;
+  const [filters, setFilters] = useState({ searchKey: "" });
   const [searchKeyInput, setSearchKeyInput] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<PrintRequest | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -287,22 +380,29 @@ export default function Obections() {
   const [rejectingRequestId, setRejectingRequestId] = useState<number | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
-  const [markingPrinted, setMarkingPrinted] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [cancelingRequestId, setCancelingRequestId] = useState<number | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [approvingRequestId, setApprovingRequestId] = useState<number | null>(null);
 
   const resetFlow = () => {
     setStep("select");
     setRecordFields(null);
-    setSearch("");
-    setSearchScope(SEARCH_SCOPE_OPTIONS[0].value);
-    setSearchError(null);
+    setAdvSearchInputs(initialAdvancedSearchInputs);
+    setAdvancedSearchResults([]);
+    setSelectedCandidate(null);
+    setAdvSearchError(null);
     setSubmitError(null);
-    setSearching(false);
+    setAdvSearchLoading(false);
     setSubmitting(false);
-    setFormValues({ receiptNo: "", amount: "", remarks: "", requestReason: "" });
+    setObjectionFormValues(initialObjectionFormValues);
   };
 
   const [currentPage, setCurrentPage] = useState(1);
   const limit = 5;
+  const [totalRecords, setTotalRecords] = useState(0);
   const handleView = (item: PrintRequest) => {
     setSelectedRequest(item);
     setRejectError(null);
@@ -325,9 +425,35 @@ export default function Obections() {
     setRejectDialogOpen(true);
   };
 
-  const handleApproveRequest = (id: number | string) => {
+  const handleApproveRequest = async (id: number | string) => {
     setRejectError(null);
-    updateRequestStatus(id, "APPROVED");
+    const normalizedId = Number(id);
+    if (Number.isNaN(normalizedId) || normalizedId <= 0) {
+      toast.error("Invalid objection ID.");
+      return;
+    }
+    setApprovingRequestId(normalizedId);
+
+    try {
+      const response = await _ManageObjections({
+        action: "APPROVE",
+        payload: {
+          obj_id: normalizedId,
+        },
+      });
+      const payload = response?.data;
+      if (payload?.status !== "success") {
+        throw new Error(payload?.message || "Unable to approve the objection.");
+      }
+      updateRequestStatus(id, "APPROVED");
+      toast.success(payload?.message ?? "Objection approved.");
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error?.message || "Unable to approve the objection.";
+      toast.error(message);
+    } finally {
+      setApprovingRequestId(null);
+    }
   };
 
   const closeRejectDialog = () => {
@@ -337,34 +463,108 @@ export default function Obections() {
     setRejectingRequestId(null);
   };
 
-  const submitRejection = () => {
+  const submitRejection = async () => {
     if (!rejectingRequestId) {
       setRejectError("Missing request ID.");
       return;
     }
-    if (!rejectReason.trim()) {
+    const trimmedReason = rejectReason.trim();
+    if (!trimmedReason) {
       setRejectError("Please provide a rejection reason.");
+      return;
+    }
+    const normalizedId = Number(rejectingRequestId);
+    if (Number.isNaN(normalizedId) || normalizedId <= 0) {
+      setRejectError("Invalid objection ID.");
       return;
     }
     setRejectLoading(true);
     setRejectError(null);
-    updateRequestStatus(rejectingRequestId, "REJECTED");
-    setRejectLoading(false);
-    closeRejectDialog();
+    try {
+      const response = await _ManageObjections({
+        action: "REJECT",
+        payload: {
+          obj_id: normalizedId,
+          rejection_reason: trimmedReason,
+        },
+      });
+      const payload = response?.data;
+      if (payload?.status !== "success") {
+        throw new Error(payload?.message || "Unable to reject the objection.");
+      }
+      updateRequestStatus(normalizedId, "REJECTED");
+      toast.success(payload?.message ?? "Objection rejected.");
+      setRejectLoading(false);
+      closeRejectDialog();
+      return;
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error?.message || "Unable to reject the objection.";
+      setRejectError(message);
+      toast.error(message);
+    } finally {
+      setRejectLoading(false);
+    }
   };
 
-  const handleMarkPrinted = () => {
-    if (!selectedRequest) return;
-    setMarkingPrinted(true);
-    setRejectError(null);
-    updateRequestStatus(selectedRequest.id, "COMPLETED");
-    setMarkingPrinted(false);
+  const openCancelDialog = (id: number | string) => {
+    setCancelingRequestId(Number(id));
+    setCancellationReason("");
+    setCancelError(null);
+    setCancelDialogOpen(true);
+  };
+
+  const closeCancelDialog = () => {
+    if (cancelLoading) return;
+    setCancelDialogOpen(false);
+    setCancelError(null);
+    setCancelingRequestId(null);
+  };
+
+  const submitCancellation = async () => {
+    if (!cancelingRequestId) {
+      setCancelError("Missing request ID.");
+      return;
+    }
+    const normalizedId = Number(cancelingRequestId);
+    if (Number.isNaN(normalizedId) || normalizedId <= 0) {
+      setCancelError("Invalid objection ID.");
+      return;
+    }
+    const payloadBody: Record<string, string | number> = {
+      obj_id: normalizedId,
+    };
+    if (cancellationReason.trim()) {
+      payloadBody.cancellation_reason = cancellationReason.trim();
+    }
+    setCancelLoading(true);
+    setCancelError(null);
+    try {
+      const response = await _ManageObjections({
+        action: "CANCEL",
+        payload: payloadBody,
+      });
+      const payload = response?.data;
+      if (payload?.status !== "success") {
+        throw new Error(payload?.message || "Unable to cancel the objection.");
+      }
+      updateRequestStatus(normalizedId, "CANCELLED");
+      toast.success(payload?.message ?? "Objection cancelled.");
+      closeCancelDialog();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error?.message || "Unable to cancel the objection.";
+      setCancelError(message);
+      toast.error(message);
+    } finally {
+      setCancelLoading(false);
+    }
   };
 
   const getRecordFieldValue = (label: string) =>
     recordFields?.find((field) => field.titel === label)?.text;
 
-  const allowedStatuses: RequestStatus[] = ["PENDING", "APPROVED", "COMPLETED", "CANCELLED", "REJECTED"];
+  const allowedStatuses = REQUEST_STATUS_VALUES;
   const formatAmount = (value?: number | string) =>
     typeof value === "number" ? value.toFixed(2) : value ? value.toString() : "-";
 
@@ -374,116 +574,163 @@ export default function Obections() {
     if (Number.isNaN(date.getTime())) {
       return value;
     }
-    return date.toLocaleString();
+    const pad = (num: number) => String(num).padStart(2, "0");
+    const day = pad(date.getUTCDate());
+    const month = pad(date.getUTCMonth() + 1);
+    const year = date.getUTCFullYear();
+    const hours = pad(date.getUTCHours());
+    const minutes = pad(date.getUTCMinutes());
+    const seconds = pad(date.getUTCSeconds());
+    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} UTC`;
+  };
+
+  const formatDetailLabel = (key: string) =>
+    key
+      .replace(/_/g, " ")
+      .replace(/(^\w|\s\w)/g, (char) => char.toUpperCase())
+      .trim();
+
+  const formatDetailValue = (value: any) => {
+    if (value === null || value === undefined) {
+      return "-";
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return "-";
+      }
+      const dateMatch = trimmed.match(/^\d{4}-\d{2}-\d{2}T.*Z$/);
+      if (dateMatch) {
+        return formatDateTime(trimmed);
+      }
+      return trimmed;
+    }
+    if (typeof value === "number" || typeof value === "boolean") {
+      return value.toString();
+    }
+    return JSON.stringify(value);
+  };
+
+  const getRequestDetails = (request?: PrintRequest | null) => {
+    if (!request?.raw) {
+      return [];
+    }
+    return Object.entries(request.raw)
+      .filter(([, value]) => !(value === null || value === undefined || (typeof value === "string" && value.trim() === "")))
+      .map(([key, value]) => ({
+        label: formatDetailLabel(key),
+        value: formatDetailValue(value),
+      }));
   };
 
   const applyFilters = () => {
     setFilters({
-      flowStatus: flowStatusInput,
-      requestType: requestTypeInput,
-      regn: regnInput,
       searchKey: searchKeyInput,
     });
     setCurrentPage(1);
   };
 
-  const filteredRequests = requests.filter((item) => {
-    const matchesFlow = filters.flowStatus ? item.flowStatus === filters.flowStatus : true;
-    const matchesType = filters.requestType ? item.requestType === filters.requestType : true;
-    const regnFilter = filters.regn?.trim().toLowerCase();
-    const matchesRegn = regnFilter ? item.regn.toLowerCase().includes(regnFilter) : true;
-    const searchKey = filters.searchKey?.trim().toLowerCase();
-    const searchTargets = [
-      item.id?.toString(),
-      item.regn,
-      item.requestReason,
-      item.remarks,
-      item.subject?.name,
-      item.subject?.gihi_name,
-    ]
-      .filter(Boolean)
-      .map((value) => value!.toLowerCase());
-    const matchesSearchKey = !searchKey || searchTargets.some((value) => value.includes(searchKey));
-    return matchesFlow && matchesType && matchesRegn && matchesSearchKey;
-  });
-
-  const totalRecords = filteredRequests.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / limit));
-  const currentPageSafe = Math.min(Math.max(currentPage, 1), totalPages);
-  const paginatedRequests = filteredRequests.slice((currentPageSafe - 1) * limit, currentPageSafe * limit);
-  const startEntry = totalRecords === 0 ? 0 : (currentPageSafe - 1) * limit + 1;
-  const endEntry = Math.min(currentPageSafe * limit, totalRecords);
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalRecords, 0) / limit));
+  const startEntry = totalRecords === 0 ? 0 : (currentPage - 1) * limit + 1;
+  const endEntry = Math.min(currentPage * limit, totalRecords);
 
   const goToPage = (page: number) => {
     const target = Math.min(Math.max(page, 1), totalPages);
     setCurrentPage(target);
   };
 
-  const fetchRequests = async () => {
-    // Placeholder for future fetch logic; kept for parity with the reprint workflow.
-    setTableLoading(false);
+  const fetchRequests = useCallback(async () => {
+    setTableLoading(true);
     setTableError(null);
-  };
-
-  const fetchPdf = async (regn: string) => {
-    setPdfLoading(true);
-    setPdfError(null);
-    setPdfUrl(null);
+    setSelectedRequest(null);
     try {
-      const response = await _getReprintUrl<{ scanned_document_path?: string }>({ regn });
-      const payload = response?.data;
-      const data = payload?.data;
-      if (payload?.status !== "success" || !data?.scanned_document_path) {
-        throw new Error(payload?.message || "PDF not available.");
-      }
-      const absoluteUrl = `${baseURL ?? "https://api.dbagovlk.com"}${data.scanned_document_path}`;
-      setPdfUrl(absoluteUrl);
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-      const blobResponse = await fetch(absoluteUrl, { credentials: "include" });
-      const blob = await blobResponse.blob();
-      setPdfBlobUrl(URL.createObjectURL(blob));
-      console.log("PDF ready", absoluteUrl);
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || "Unable to load PDF.";
-      setPdfError(message);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!search.trim()) {
-      setSearchError("Please enter an ID number.");
-      return;
-    }
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const response = await _searchId<RecordField[]>({
-        action: "READ_ONE",
-        request_id: search.trim(),
-        search_scope: searchScope,
+      const response = await _ManageObjections({
+        action: "READ_ALL",
+        payload: {
+          search: filters.searchKey?.trim() ?? "",
+          page: currentPage,
+          limit,
+        },
       });
       const payload = response?.data;
-      const details = payload?.data;
-      if (payload?.status !== "success" || !Array.isArray(details) || details.length === 0) {
-        throw new Error(payload?.message || "Record not found.");
+      if (payload?.status !== "success") {
+        throw new Error(payload?.message || "Unable to load objections.");
       }
-      setRecordFields(details);
-      setSubmitError(null);
-      setStep("verify");
+      const records = Array.isArray(payload?.data) ? payload.data : [];
+      setRequests(records.map(mapObjectionRecordToPrintRequest));
+      setTotalRecords(payload?.totalRecords ?? records.length);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message || error?.message || "Unable to load objections.";
+      setTableError(message);
+      setRequests([]);
+      setTotalRecords(0);
+    } finally {
+      setTableLoading(false);
+    }
+  }, [filters.searchKey, currentPage, limit]);
+
+  useEffect(() => {
+    void fetchRequests();
+  }, [fetchRequests]);
+
+  const handleAdvancedSearch = async () => {
+    if (!hasAdvancedSearchInput) {
+      setAdvSearchError("Please fill at least one search field.");
+      return;
+    }
+    setAdvSearchLoading(true);
+    setRecordFields(null);
+    setSelectedCandidate(null);
+    setObjectionFormValues((prev) => ({ ...prev, id: "" }));
+    setAdvSearchError(null);
+    setAdvancedSearchResults([]);
+    try {
+      const payloadBody: Record<string, string | number> = {
+        skip: 0,
+        limit: 200,
+      };
+      if (advSearchInputs.registration_number.trim()) {
+        payloadBody.registration_number = advSearchInputs.registration_number.trim();
+      }
+      if (advSearchInputs.name.trim()) {
+        payloadBody.name = advSearchInputs.name.trim();
+      }
+      if (advSearchInputs.birth_date) {
+        payloadBody.birth_date = advSearchInputs.birth_date;
+      }
+      if (advSearchInputs.entity_type) {
+        payloadBody.entity_type = advSearchInputs.entity_type;
+      }
+      const response = await _advanceSearch(payloadBody);
+      const payload = response?.data as ReprintResponse<AdvancedSearchRecord[]>;
+      const results = Array.isArray(payload?.data) ? payload.data : [];
+      if (payload?.status !== "success" || results.length === 0) {
+        throw new Error(payload?.message || "No matching records were found.");
+      }
+      setAdvancedSearchResults(results);
+      setAdvSearchError(null);
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
         error?.message ||
-        "Unable to load record details.";
-      setSearchError(message);
-      setRecordFields(null);
+        "Unable to search for records.";
+      setAdvSearchError(message);
+      setAdvancedSearchResults([]);
     } finally {
-      setSearching(false);
+      setAdvSearchLoading(false);
     }
+  };
+
+  const handleSelectCandidate = (candidate: AdvancedSearchRecord) => {
+    setSelectedCandidate(candidate);
+    setRecordFields(mapAdvancedRecordToFields(candidate));
+    setObjectionFormValues((prev) => ({
+      ...prev,
+      id: candidate.registration_number ?? prev.id,
+    }));
+    setStep("verify");
+    setAdvSearchError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -493,15 +740,17 @@ export default function Obections() {
       return;
     }
 
-    const amountValue = Number(formValues.amount);
-    if (Number.isNaN(amountValue)) {
-      setSubmitError("Amount must be a valid number.");
+    const idValue =
+      objectionFormValues.id.trim() ||
+      selectedCandidate?.registration_number?.trim() ||
+      getRecordFieldValue("Registration Number")?.trim();
+    if (!idValue) {
+      setSubmitError("Registration number is missing.");
       return;
     }
 
-    const regn = getRecordFieldValue("Registration Number")?.trim() || search.trim();
-    if (!regn) {
-      setSubmitError("Registration number is missing.");
+    if (!objectionFormValues.obj_reason.trim()) {
+      setSubmitError("Objection reason is required.");
       return;
     }
 
@@ -509,23 +758,44 @@ export default function Obections() {
     setSubmitError(null);
 
     try {
-      const response = await _searchId<Record<string, unknown>>({
-        action: "CREATE",
-        create_payload: {
-          regn,
-          request_reason: formValues.requestReason,
-          amount: amountValue,
-          form_no: formValues.receiptNo,
-          remarks: formValues.remarks,
-        },
-      });
-
-      const payload = response?.data;
-      const created = payload?.data;
-      if (payload?.status !== "success" || !created) {
-        throw new Error(payload?.message || "Unable to create request.");
+      const payloadData: Record<string, string> = {
+        id: idValue,
+        ot_code: objectionFormValues.ot_code,
+        obj_reason: objectionFormValues.obj_reason.trim(),
+      };
+      if (objectionFormValues.form_id.trim()) {
+        payloadData.form_id = objectionFormValues.form_id.trim();
+      }
+      if (objectionFormValues.obj_requester_name.trim()) {
+        payloadData.obj_requester_name = objectionFormValues.obj_requester_name.trim();
+      }
+      if (objectionFormValues.obj_requester_contact.trim()) {
+        payloadData.obj_requester_contact = objectionFormValues.obj_requester_contact.trim();
+      }
+      if (objectionFormValues.obj_requester_id_num.trim()) {
+        payloadData.obj_requester_id_num = objectionFormValues.obj_requester_id_num.trim();
+      }
+      const validFrom = formatDateInputValue(objectionFormValues.obj_valid_from);
+      if (validFrom) {
+        payloadData.obj_valid_from = validFrom;
+      }
+      const validUntil = formatDateInputValue(objectionFormValues.obj_valid_until);
+      if (validUntil) {
+        payloadData.obj_valid_until = validUntil;
       }
 
+      const response = await _ManageObjections({
+        action: "CREATE",
+        payload: {
+          data: payloadData,
+        },
+      });
+      const payload = response?.data;
+      if (payload?.status !== "success") {
+        throw new Error(payload?.message || "Unable to submit the objection.");
+      }
+
+      toast.success(payload?.message ?? "Objection request submitted.");
       resetFlow();
       setMode("list");
       setCurrentPage(1);
@@ -534,16 +804,27 @@ export default function Obections() {
       const message =
         error?.response?.data?.message || error?.message || "Unable to submit the request.";
       setSubmitError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
   };
 
   const isApprovedRequest = selectedRequest?.flowStatus === "APPROVED";
+  const isApprovingSelectedRequest =
+    selectedRequest != null &&
+    approvingRequestId !== null &&
+    String(selectedRequest.id) === String(approvingRequestId);
   const isFinalizedRequest =
     selectedRequest?.flowStatus === "APPROVED" ||
     selectedRequest?.flowStatus === "REJECTED" ||
-    selectedRequest?.flowStatus === "COMPLETED";
+    selectedRequest?.flowStatus === "COMPLETED" ||
+    selectedRequest?.flowStatus === "CANCELLED";
+  const isCancelingSelectedRequest =
+    selectedRequest != null &&
+    cancelingRequestId !== null &&
+    String(selectedRequest.id) === String(cancelingRequestId);
+  const requestDetails = getRequestDetails(selectedRequest);
 
   return (
     <div
@@ -617,65 +898,31 @@ export default function Obections() {
       {mode === "list" && (
         <div>
           <div style={{ display: selectedRequest ? "none" : undefined }}>
-            <Box mb={2} display="grid" gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))" gap={2}>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Flow Status</InputLabel>
-              <Select value={flowStatusInput} onChange={(e) => setFlowStatusInput(e.target.value)} label="Flow Status">
-                <MenuItem value="">All</MenuItem>
-                {allowedStatuses.map((status) => (
-                  <MenuItem value={status} key={status}>
-                    {status}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <InputLabel>Request Type</InputLabel>
-              <Select
-                value={requestTypeInput}
-                onChange={(e) => setRequestTypeInput(e.target.value)}
-                label="Request Type"
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="BHIKKU">BHIKKU</MenuItem>
-                <MenuItem value="HIGH_BHIKKU">HIGH_BHIKKU</MenuItem>
-              </Select>
-            </FormControl>
-            <TextField
-              size="small"
-              label="register number"
-              placeholder="Search by register number"
-              value={regnInput}
-              onChange={(e) => setRegnInput(e.target.value)}
-              fullWidth
-            />
-            <TextField
-              size="small"
-              label="Global search"
-              placeholder="Global search"
-              value={searchKeyInput}
-              onChange={(e) => setSearchKeyInput(e.target.value)}
-              fullWidth
-            />
-            <Box display="flex" gap={1} alignItems="flex-end">
-              <Button variant="contained" onClick={applyFilters}>
-                Apply filters
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => {
-                  setFlowStatusInput("");
-                  setRequestTypeInput("");
-                  setRegnInput("");
-                  setSearchKeyInput("");
-                  setFilters({ flowStatus: "", requestType: "", regn: "", searchKey: "" });
-                  setCurrentPage(1);
-                }}
-              >
-                Reset
-              </Button>
+            <Box mb={2} display="flex" flexDirection="column" gap={2}>
+              <TextField
+                size="small"
+                label="Global search"
+                placeholder="Global search"
+                value={searchKeyInput}
+                onChange={(e) => setSearchKeyInput(e.target.value)}
+                fullWidth
+              />
+              <Box display="flex" gap={1} justifyContent="flex-end">
+                <Button variant="contained" onClick={applyFilters}>
+                  Apply filters
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setSearchKeyInput("");
+                    setFilters({ searchKey: "" });
+                    setCurrentPage(1);
+                  }}
+                >
+                  Reset
+                </Button>
+              </Box>
             </Box>
-          </Box>
 
           <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
             {tableLoading ? (
@@ -690,26 +937,19 @@ export default function Obections() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>ID</TableCell>
                     <TableCell>Regn</TableCell>
                     <TableCell>Request Type</TableCell>
-                    <TableCell>Form No</TableCell>
                     <TableCell>Request Reason</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell>Remarks</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Requested At</TableCell>
-                    <TableCell>Subject</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {requests.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell sx={{ fontWeight: 700 }}>{item.id}</TableCell>
                       <TableCell>{item.regn}</TableCell>
                       <TableCell>{item.requestType}</TableCell>
-                      <TableCell>{item.formNo || "-"}</TableCell>
                       <TableCell>
                         <Box display="flex" flexDirection="column" gap={0.5}>
                           
@@ -718,22 +958,10 @@ export default function Obections() {
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell align="right">
-                        <Box display="flex" flexDirection="column" alignItems="flex-end" gap={0.5}>
-                         
-                          <Typography fontWeight={600} color="text.primary">
-                            {formatAmount(item.amount)}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell sx={{ maxWidth: 150, wordBreak: "break-word" }}>{item.remarks || "-"}</TableCell>
                       <TableCell>
                         <StatusPill status={item.flowStatus} />
                       </TableCell>
                       <TableCell>{formatDateTime(item.requestedAt)}</TableCell>
-                      <TableCell>
-                        <SubjectInfoCard subject={item.subject} />
-                      </TableCell>
                       <TableCell>
                         <Box display="flex" gap={1}>
                           <Button variant="contained" size="small" onClick={() => handleView(item)}>
@@ -806,104 +1034,130 @@ export default function Obections() {
               <Box display="flex" justifyContent="space-between" alignItems="flex-start" gap={2} flexWrap="wrap">
                 <Box>
                   <Typography variant="h6">Request details</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Regn: {selectedRequest.regn}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Request type: {selectedRequest.requestType}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Reason: {selectedRequest.requestReason || "-"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Amount: {formatAmount(selectedRequest.amount)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" display="flex" alignItems="center" gap={1}>
-                  Status: <StatusPill status={selectedRequest.flowStatus} />
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Remarks: {selectedRequest.remarks || "-"}
-                </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Regn: {selectedRequest.regn}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Request type: {selectedRequest.requestType}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Reason: {selectedRequest.requestReason || "-"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Amount: {formatAmount(selectedRequest.amount)}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    display="flex"
+                    alignItems="center"
+                    gap={1}
+                  >
+                    Status: <StatusPill status={selectedRequest.flowStatus} />
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Remarks: {selectedRequest.remarks || "-"}
+                  </Typography>
                 </Box>
-              <Box display="flex" gap={1}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => {
-                    setSelectedRequest(null);
-                    setPdfUrl(null);
-                    setPdfError(null);
-                  }}
-                  disabled={markingPrinted}
+                <Box display="flex" gap={1}>
+                  <Button variant="outlined" size="small" onClick={() => setSelectedRequest(null)}>
+                    Close viewer
+                  </Button>
+                  {isApprovedRequest && (
+                    <Button
+                      variant="contained"
+                      size="small"
+                      color="warning"
+                      onClick={() => openCancelDialog(selectedRequest.id)}
+                      disabled={cancelLoading || isCancelingSelectedRequest}
+                    >
+                      {isCancelingSelectedRequest ? "Cancelling..." : "Cancel request"}
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+              {requestDetails.length > 0 && (
+                <Box
+                  mt={2}
+                  display="grid"
+                  gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))"
+                  gap={1}
                 >
-                  Close viewer
-                </Button>
-                {isApprovedRequest && (
+                  {requestDetails.map((detail) => (
+                    <div
+                      key={detail.label}
+                      style={{
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "10px",
+                        background: "white",
+                        minHeight: "60px",
+                      }}
+                    >
+                      <div style={{ fontSize: "12px", color: "#475569", fontWeight: 600 }}>
+                        {detail.label}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: "6px",
+                          fontWeight: 600,
+                          color: "#0f172a",
+                          wordBreak: "break-word",
+                          fontSize: "14px",
+                        }}
+                      >
+                        {detail.value}
+                      </div>
+                    </div>
+                  ))}
+                </Box>
+              )}
+              {!isApprovedRequest && (
+                <Box mt={2} display="flex" gap={1} flexWrap="wrap">
                   <Button
                     variant="contained"
                     size="small"
-                    onClick={handleMarkPrinted}
-                    disabled={markingPrinted || !selectedRequest}
+                    color="success"
+                    onClick={() => handleApproveRequest(selectedRequest.id)}
+                    disabled={isFinalizedRequest || isApprovingSelectedRequest}
                   >
-                    {markingPrinted ? "Marking..." : "Print"}
+                    {isApprovingSelectedRequest ? "Approving..." : "Approve request"}
                   </Button>
-                )}
-              </Box>
-            </Box>
-            {!isApprovedRequest && (
-              <Box mt={2} display="flex" gap={1} flexWrap="wrap">
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="success"
-                  onClick={() => handleApproveRequest(selectedRequest.id)}
-                  disabled={isFinalizedRequest}
-                >
-                  Approve request
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  color="error"
-                  onClick={() => openRejectDialog(selectedRequest.id)}
-                  disabled={isFinalizedRequest}
-                >
-                  Reject request
-                </Button>
-              </Box>
-            )}
-              <Box mt={2} id="reprint-pdf-print-area">
-            {pdfLoading ? (
-              <Typography color="text.secondary">Loading PDF…</Typography>
-            ) : pdfError ? (
-              <Typography color="error">{pdfError}</Typography>
-            ) : pdfUrl ? (
-              <Typography color="text.primary">
-                PDF is ready for print. Use the Print button to send only the scanned document to the printer.
-              </Typography>
-            ) : (
-              <Typography color="text.secondary">Select a request to make its scanned document available.</Typography>
-            )}
-          </Box>
-        </Paper>
-      )}
+                  <Button
+                    variant="contained"
+                    size="small"
+                    color="error"
+                    onClick={() => openRejectDialog(selectedRequest.id)}
+                    disabled={isFinalizedRequest}
+                  >
+                    Reject request
+                  </Button>
+                </Box>
+              )}
+            </Paper>
+          )}
         </div>
       )}
 
       {mode === "create" && step === "select" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "flex-end" }}>
-            <div style={{ flex: "1 1 220px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            <div>
               <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-                Enter ID Number
+                Registration Number
               </label>
               <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setSearchError(null);
-                }}
-                placeholder="ID Number"
+                value={advSearchInputs.registration_number}
+                onChange={(e) =>
+                  setAdvSearchInputs((prev) => ({ ...prev, registration_number: e.target.value }))
+                }
+                placeholder="Registration number"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -913,43 +1167,150 @@ export default function Obections() {
                 }}
               />
             </div>
-            <FormControl size="small" style={{ minWidth: "160px" }}>
-              <InputLabel id="objections-search-scope-label">Record type</InputLabel>
-              <Select
-                labelId="objections-search-scope-label"
-                value={searchScope}
-                label="Record type"
-                onChange={(event) => setSearchScope(event.target.value as SearchScope)}
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Name
+              </label>
+              <input
+                value={advSearchInputs.name}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Name"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Birth Date
+              </label>
+              <input
+                type="date"
+                value={advSearchInputs.birth_date}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, birth_date: e.target.value }))}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Record type
+              </label>
+              <select
+                value={advSearchInputs.entity_type}
+                onChange={(e) => setAdvSearchInputs((prev) => ({ ...prev, entity_type: e.target.value }))}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
               >
-                {SEARCH_SCOPE_OPTIONS.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
+                <option value="">All</option>
+                {ENTITY_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
                     {option.label}
-                  </MenuItem>
+                  </option>
                 ))}
-              </Select>
-            </FormControl>
+              </select>
+            </div>
           </div>
-          {searchError && (
-            <p style={{ marginTop: "8px", color: "#b91c1c", fontSize: "13px" }}>{searchError}</p>
+          {advSearchError && (
+            <p style={{ margin: 0, color: "#b91c1c", fontSize: "13px" }}>{advSearchError}</p>
           )}
-
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
-              disabled={!canTriggerSearch}
-              onClick={handleSearch}
+              disabled={!canTriggerAdvancedSearch}
+              onClick={handleAdvancedSearch}
               style={{
                 padding: "10px 16px",
                 borderRadius: "10px",
                 border: "none",
-                background: canTriggerSearch ? "#0ea5e9" : "#cbd5e1",
+                background: canTriggerAdvancedSearch ? "#0ea5e9" : "#cbd5e1",
                 color: "white",
-                cursor: canTriggerSearch ? "pointer" : "not-allowed",
+                cursor: canTriggerAdvancedSearch ? "pointer" : "not-allowed",
                 fontWeight: 600,
               }}
             >
-              {searching ? "Searching..." : "Next"}
+              {advSearchLoading ? "Searching..." : "Search"}
             </button>
           </div>
+          {advancedSearchResults.length > 0 && (
+            <div
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "16px",
+                background: "#f8fafc",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+              }}
+            >
+              <div style={{ fontWeight: 600, color: "#0f172a" }}>
+                Search results ({advancedSearchResults.length})
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {advancedSearchResults.map((record, index) => (
+                  <div
+                    key={`${record.registration_number ?? index}-${index}`}
+                    style={{
+                      border: "1px solid #cbd5e1",
+                      borderRadius: "10px",
+                      padding: "12px",
+                      background: "white",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ minWidth: "200px" }}>
+                      <div style={{ fontWeight: 600, color: "#0f172a" }}>
+                        {record.ordained_name || record.birth_name || "Unknown"}
+                      </div>
+                      <div style={{ color: "#475569", fontSize: "12px" }}>
+                        {record.registration_number ?? "-"} | {record.current_status ?? "-"}
+                      </div>
+                      <div style={{ color: "#475569", fontSize: "12px" }}>
+                        {record.temple_name ?? "-"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <button
+                        onClick={() => handleSelectCandidate(record)}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: "#0ea5e9",
+                          color: "white",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Select
+                      </button>
+                      <div style={{ fontSize: "12px", color: "#475569" }}>
+                        Workflow: {record.workflow_status ?? "-"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -958,6 +1319,9 @@ export default function Obections() {
           fields={recordFields}
           onEdit={() => {
             setRecordFields(null);
+            setSelectedCandidate(null);
+            setAdvancedSearchResults([]);
+            setAdvSearchError(null);
             setStep("select");
           }}
           onNext={() => setStep("form")}
@@ -969,11 +1333,14 @@ export default function Obections() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             <div>
               <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-                Receipt No
+                ID Number
               </label>
               <input
-                value={formValues.receiptNo}
-                onChange={(e) => setFormValues((v) => ({ ...v, receiptNo: e.target.value }))}
+                value={objectionFormValues.id}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, id: e.target.value }))
+                }
+                placeholder="Registration number"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -985,12 +1352,59 @@ export default function Obections() {
             </div>
             <div>
               <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-                Amount
+                Objection type
+              </label>
+              <select
+                value={objectionFormValues.ot_code}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, ot_code: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              >
+                {OBJECTION_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+              Objection reason
+            </label>
+            <textarea
+              value={objectionFormValues.obj_reason}
+              onChange={(e) =>
+                setObjectionFormValues((prev) => ({ ...prev, obj_reason: e.target.value }))
+              }
+              rows={3}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: "10px",
+                border: "1px solid #e2e8f0",
+                background: "#f8fafc",
+              }}
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Related form ID (optional)
               </label>
               <input
-                type="number"
-                value={formValues.amount}
-                onChange={(e) => setFormValues((v) => ({ ...v, amount: e.target.value }))}
+                value={objectionFormValues.form_id}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, form_id: e.target.value }))
+                }
+                placeholder="FORM-2025-001"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -1000,13 +1414,16 @@ export default function Obections() {
                 }}
               />
             </div>
-            <div style={{ gridColumn: "1 / -1" }}>
+            <div>
               <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
-                Request Reason
+                Requester name (optional)
               </label>
               <input
-                value={formValues.requestReason}
-                onChange={(e) => setFormValues((v) => ({ ...v, requestReason: e.target.value }))}
+                value={objectionFormValues.obj_requester_name}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, obj_requester_name: e.target.value }))
+                }
+                placeholder="Temple Admin"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -1017,21 +1434,91 @@ export default function Obections() {
               />
             </div>
           </div>
-
-          <div>
-            <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>Remarks</label>
-            <textarea
-              value={formValues.remarks}
-              onChange={(e) => setFormValues((v) => ({ ...v, remarks: e.target.value }))}
-              rows={3}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-              }}
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Requester contact (optional)
+              </label>
+              <input
+                value={objectionFormValues.obj_requester_contact}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({
+                    ...prev,
+                    obj_requester_contact: e.target.value,
+                  }))
+                }
+                placeholder="0771234567"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Requester ID number (optional)
+              </label>
+              <input
+                value={objectionFormValues.obj_requester_id_num}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({
+                    ...prev,
+                    obj_requester_id_num: e.target.value,
+                  }))
+                }
+                placeholder="NIC/Passport"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Valid from (optional)
+              </label>
+              <input
+                type="date"
+                value={objectionFormValues.obj_valid_from}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, obj_valid_from: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "8px", color: "#475569", fontWeight: 600 }}>
+                Valid until (optional)
+              </label>
+              <input
+                type="date"
+                value={objectionFormValues.obj_valid_until}
+                onChange={(e) =>
+                  setObjectionFormValues((prev) => ({ ...prev, obj_valid_until: e.target.value }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              />
+            </div>
           </div>
           {submitError && (
             <p style={{ margin: 0, color: "#b91c1c", fontSize: "13px" }}>{submitError}</p>
@@ -1108,23 +1595,42 @@ export default function Obections() {
           </Button>
         </DialogActions>
       </Dialog>
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #reprint-pdf-print-area,
-          #reprint-pdf-print-area * {
-            visibility: visible;
-          }
-          #reprint-pdf-print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-          }
-        }
-      `}</style>
+      <Dialog open={cancelDialogOpen} onClose={closeCancelDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Cancel objection</DialogTitle>
+        <DialogContent>
+          <DialogContentText>Optionally explain why the approved objection is being cancelled.</DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Cancellation reason"
+            type="text"
+            fullWidth
+            multiline
+            minRows={3}
+            value={cancellationReason}
+            onChange={(e) => setCancellationReason(e.target.value)}
+            disabled={cancelLoading}
+          />
+          {cancelError && (
+            <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+              {cancelError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeCancelDialog} disabled={cancelLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={submitCancellation}
+            disabled={cancelLoading}
+          >
+            {cancelLoading ? "Cancelling…" : "Cancel objection"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }

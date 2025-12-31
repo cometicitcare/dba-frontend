@@ -123,8 +123,8 @@ const MODULE_CARD_DEFINITIONS: { path: string; label: string; icon: any; color: 
     color: "from-rose-400 to-pink-600",
   },
   {
-    path: "/ojections",
-    label: "Ojections",
+    path: "/objections",
+    label: "Objections",
     icon: EyeIcon,
     color: "from-emerald-400 to-emerald-600",
   },
