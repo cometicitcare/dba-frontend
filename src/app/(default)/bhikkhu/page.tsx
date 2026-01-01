@@ -12,7 +12,7 @@ import { getStoredUserData, type UserData } from '@/utils/userData'
 import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from '@/utils/config'
 
 const tabItems = [
-    { id: 'bhikkhu', label: 'Bhikkhu List' },
+    { id: 'bhikkhu', label: 'Samanera List' },
     { id: 'upasampada', label: 'Upasampada List' },
 
   ];
