@@ -101,6 +101,7 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
             >
               <div className="text-sm font-medium text-slate-800">{o.name}</div>
               <div className="text-xs text-slate-500">{o.trn}</div>
+              {o.addrs && <div className="text-xs text-slate-500">{o.addrs}</div>}
             </button>
           ))}
         </div>

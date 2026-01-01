@@ -168,14 +168,14 @@ export default function BhikkhuAutocomplete({
                 x
               </button>
             </div>
-              <form
+            <form
               onSubmit={async (event: FormEvent<HTMLFormElement>) => {
                 event.preventDefault();
                 const name = newBhikkhuName.trim();
                 if (!name) return;
                 setAddSubmitting(true);
                 try {
-                  const res = await _manageTempBhikku({
+                  await _manageTempBhikku({
                     action: "CREATE",
                     payload: {
                       data: {
@@ -184,20 +184,6 @@ export default function BhikkhuAutocomplete({
                       },
                     },
                   });
-                  const createdBhikkhu = (res as any)?.data?.data;
-                  if (createdBhikkhu) {
-                    const regn = String(createdBhikkhu.tb_id ?? createdBhikkhu.tb_id_number ?? "");
-                    const displayName =
-                      createdBhikkhu.tb_name ??
-                      createdBhikkhu.tb_samanera_name ??
-                      createdBhikkhu.tb_contact_number ??
-                      regn;
-                    handleSelect({
-                      regn,
-                      name: displayName,
-                      data: createdBhikkhu,
-                    });
-                  }
                   toast.success("Temporary bhikkhu created");
                   await onAddBhikkhu?.({
                     name,
