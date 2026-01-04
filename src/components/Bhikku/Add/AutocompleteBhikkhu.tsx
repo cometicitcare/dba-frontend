@@ -2,6 +2,8 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { _manageBhikku, _manageTempBhikku } from "@/services/bhikku";
+import DateField from "@/components/common/DateField";
+import LocationPicPd, { LocationPayload, LocationSelection } from "@/components/common/LocationPicPd";
 
 type BhikkhuOption = { regn: string; name: string; data: any };
 
@@ -53,8 +55,25 @@ export default function BhikkhuAutocomplete({
   const [debounceKey, setDebounceKey] = useState(0);
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [newBhikkhuName, setNewBhikkhuName] = useState("");
-  const [newBhikkhuPhone, setNewBhikkhuPhone] = useState("");
+  const [tbNic, setTbNic] = useState("");
+  const [tbMobile, setTbMobile] = useState("");
+  const [tbAddress, setTbAddress] = useState("");
+  const [tbViharaName, setTbViharaName] = useState("");
+  const [tbOrdainedDate, setTbOrdainedDate] = useState("");
+  const [locationSelection, setLocationSelection] = useState<LocationSelection>({});
+  const [locationPayload, setLocationPayload] = useState<LocationPayload>({});
   const [addSubmitting, setAddSubmitting] = useState(false);
+
+  const resetDialogFields = () => {
+    setNewBhikkhuName("");
+    setTbNic("");
+    setTbMobile("");
+    setTbAddress("");
+    setTbViharaName("");
+    setTbOrdainedDate("");
+    setLocationSelection({});
+    setLocationPayload({});
+  };
 
   useEffect(() => {
     const key = debounceKey;
@@ -121,8 +140,7 @@ export default function BhikkhuAutocomplete({
           <button
             type="button"
             onClick={() => {
-              setNewBhikkhuName("");
-              setNewBhikkhuPhone("");
+              resetDialogFields();
               setAddDialogOpen(true);
             }}
             className="absolute right-1 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm hover:border-slate-400 hover:text-slate-700 transition"
@@ -156,7 +174,7 @@ export default function BhikkhuAutocomplete({
       </div>
       {isAddDialogOpen && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+          <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">New Bhikkhu</h3>
               <button
@@ -179,15 +197,22 @@ export default function BhikkhuAutocomplete({
                     action: "CREATE",
                     payload: {
                       data: {
+                        tb_bname: name,
                         tb_name: name,
-                        tb_contact_number: newBhikkhuPhone.trim(),
+                        tb_nic: tbNic.trim(),
+                        tb_mobile: tbMobile.trim(),
+                        tb_address: tbAddress.trim(),
+                        tb_district: locationPayload.district?.dd_dname ?? "කොළඹ",
+                        tb_province: locationPayload.province?.cp_name,
+                        tb_vihara_name: tbViharaName.trim(),
+                        tb_ordained_date: tbOrdainedDate,
                       },
                     },
                   });
                   toast.success("Temporary bhikkhu created");
                   await onAddBhikkhu?.({
                     name,
-                    phone: newBhikkhuPhone.trim(),
+                    phone: tbMobile.trim(),
                   });
                   setAddDialogOpen(false);
                 } finally {
@@ -196,25 +221,74 @@ export default function BhikkhuAutocomplete({
               }}
               className="space-y-4"
             >
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <label className="block text-sm font-medium text-slate-700">
+                  Name
+                  <input
+                    type="text"
+                    value={newBhikkhuName}
+                    onChange={(e) => setNewBhikkhuName(e.target.value)}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  NIC
+                  <input
+                    type="text"
+                    value={tbNic}
+                    onChange={(e) => setTbNic(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  Mobile
+                  <input
+                    type="tel"
+                    value={tbMobile}
+                    onChange={(e) => setTbMobile(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  Vihara Name
+                  <input
+                    type="text"
+                    value={tbViharaName}
+                    onChange={(e) => setTbViharaName(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  />
+                </label>
+              </div>
               <label className="block text-sm font-medium text-slate-700">
-                Name
-                <input
-                  type="text"
-                  value={newBhikkhuName}
-                  onChange={(e) => setNewBhikkhuName(e.target.value)}
-                  required
+                Address
+                <textarea
+                  value={tbAddress}
+                  onChange={(e) => setTbAddress(e.target.value)}
+                  rows={3}
                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  placeholder="Address"
                 />
               </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Phone
-                <input
-                  type="tel"
-                  value={newBhikkhuPhone}
-                  onChange={(e) => setNewBhikkhuPhone(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
+              <div className="space-y-2">
+                <LocationPicPd
+                  value={locationSelection}
+                  onChange={(selection, payload) => {
+                    setLocationSelection(selection);
+                    setLocationPayload(payload);
+                  }}
+                  required={false}
                 />
-              </label>
+              </div>
+              <div>
+                <DateField
+                  id="tb-ordained-date"
+                  label="Ordained Date"
+                  value={tbOrdainedDate}
+                  onChange={setTbOrdainedDate}
+                  placeholder="2020-01-15"
+                />
+              </div>
               <div className="flex justify-end gap-2">
                 <button
                   type="button"
@@ -238,3 +312,4 @@ export default function BhikkhuAutocomplete({
     </div>
   );
 }
+

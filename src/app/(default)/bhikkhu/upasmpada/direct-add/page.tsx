@@ -367,11 +367,9 @@ export default function DirectAddPage() {
 
   const clearTutorAndResidence = () => {
     handleInputChange("br_mahanaacharyacd", "");
-    handleInputChange("br_robing_tutor_residence", "");
     setDisplay((prev) => ({
       ...prev,
       br_mahanaacharyacd: "",
-      br_robing_tutor_residence: "",
     }));
   };
 
@@ -777,44 +775,29 @@ export default function DirectAddPage() {
                       clearTutorAndResidence();
                     }
                   }}
-                  onPick={({ regn, display: disp, data }) => {
+                  onPick={({ regn, display: disp }) => {
                     handleInputChange("br_mahanaacharyacd", regn ?? "");
                     setDisplay((prev) => ({ ...prev, br_mahanaacharyacd: disp }));
-                    const tutorResidence = data?.br_robing_tutor_residence;
-                    if (tutorResidence?.vh_trn) {
-                      const residencyName = tutorResidence.vh_vname ?? "";
-                      const residenceDisplay = residencyName
-                        ? `${residencyName} ƒ?" ${tutorResidence.vh_trn}`
-                        : tutorResidence.vh_trn;
-                      handleInputChange("br_robing_tutor_residence", tutorResidence.vh_trn);
-                      setDisplay((prev) => ({
-                        ...prev,
-                        br_robing_tutor_residence: residenceDisplay,
-                      }));
-                    } else {
-                      handleInputChange("br_robing_tutor_residence", "");
-                      setDisplay((prev) => ({ ...prev, br_robing_tutor_residence: "" }));
-                    }
                   }}
                 />
                 {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
               </div>
             );
           }
-
           if (name === "br_robing_tutor_residence") {
             return (
               <div key={name}>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {renderLabelWithStar(field.label, field.rules?.required)}
-                </label>
-                <input
+                <TempleAutocomplete
                   id={name}
-                  type="text"
-                  value={display[name] ?? (values.br_robing_tutor_residence ?? "")}
-                  placeholder="Auto-populated from tutor selection"
-                  readOnly
-                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg bg-slate-100 text-slate-600"
+                  label={field.label}
+                  required={!!field.rules?.required}
+                  placeholder="Search temple, auto-fill TRN"
+                  storeTrn
+                  initialDisplay={display[name] ?? ""}
+                  onPick={({ trn, display: disp }) => {
+                    handleInputChange(name, trn ?? "");
+                    setDisplay((prev) => ({ ...prev, [name]: disp ?? "" }));
+                  }}
                 />
                 {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
               </div>
