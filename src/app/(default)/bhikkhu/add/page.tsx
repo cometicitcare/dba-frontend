@@ -268,7 +268,20 @@ function AddBhikkhuPageInner() {
     handleInputChange("br_parshawaya", code);
     const nikaya = findNikayaByCode(values.br_nikaya);
     const p = nikaya?.parshawayas.find((x) => x.code === code);
-    setDisplay((d) => ({ ...d, br_parshawaya: p ? `${p.name} - ${p.code}` : code }));
+    const nayakaName = p?.nayaka?.mahananame ?? "";
+    const nayakaAddress = p?.nayaka?.address ?? "";
+
+    handleSetMany({
+      br_mahanayaka_name: nayakaName,
+      br_mahanayaka_address: nayakaAddress,
+    });
+
+    setDisplay((d) => ({
+      ...d,
+      br_parshawaya: p ? `${p.name} - ${p.code}` : code,
+      br_mahanayaka_name: nayakaName,
+      br_mahanayaka_address: nayakaAddress,
+    }));
   };
 
   const gridCols = stepTitle === "Birth Location" ? "md:grid-cols-3" : "md:grid-cols-2";
