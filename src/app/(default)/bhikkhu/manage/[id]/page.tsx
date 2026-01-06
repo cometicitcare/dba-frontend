@@ -492,6 +492,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
     handleInputChange("br_parshawaya", code);
     const nikaya = findNikayaByCode(values.br_nikaya);
     const p = nikaya?.parshawayas.find((x) => x.code === code);
+    const nayaka = p?.nayaka;
+    handleSetMany({
+      br_mahanayaka_name: nayaka?.mahananame ?? "",
+      br_mahanayaka_address: nayaka?.address ?? "",
+    });
     setDisplay((d) => ({
       ...d,
       br_parshawaya: p ? `${p.name} - ${p.code}` : code,
