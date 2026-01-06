@@ -234,7 +234,6 @@ export default function TempleAutocomplete({
                     display: displayName,
                     data: created,
                   });
-                  setInput(displayName);
                   setAddDialogOpen(false);
                   resetAddForm();
                   setDebounceKey((k) => k + 1);
