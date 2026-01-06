@@ -732,6 +732,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
                       });
                     }}
                     required={!!field.rules?.required}
+                    requiredFields={{ province: true, district: true, division: false, gn: false }}
                   />
                   {anyLocationError ? (
                     <p className="mt-1 text-sm text-red-600">{anyLocationError}</p>

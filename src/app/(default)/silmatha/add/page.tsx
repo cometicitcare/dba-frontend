@@ -447,6 +447,7 @@ function SilmathaAddPageInner() {
                                       });
                                     }}
                                     required={!!field.rules?.required}
+                                    requiredFields={{ province: true, district: true, division: false, gn: false }}
                                   />
                                   {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
                                 </div>

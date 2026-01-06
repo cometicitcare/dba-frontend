@@ -59,6 +59,7 @@ type Props = {
   className?: string;
   disabled?: boolean;
   required?: boolean;
+  requiredFields?: Partial<{ province: boolean; district: boolean; division: boolean; gn: boolean }>;
   labels?: Partial<{ province: string; district: string; division: string; gn: string }>;
 };
 
@@ -68,9 +69,16 @@ export default function LocationPicker({
   className,
   disabled = false,
   required = false,
+  requiredFields,
   labels: labelsOverride,
 }: Props) {
   const labels = { province: "Province", district: "District", division: "Divisional Secretariat", gn: "GN Division", ...labelsOverride };
+  const requiredMap = {
+    province: requiredFields?.province ?? required,
+    district: requiredFields?.district ?? required,
+    division: requiredFields?.division ?? required,
+    gn: requiredFields?.gn ?? required,
+  };
 
   const provinces = STATIC_PROVINCES;
   const [internal, setInternal] = useState<LocationSelection>({});
@@ -112,7 +120,7 @@ export default function LocationPicker({
             value={selection.provinceCode ?? ""}
             onChange={(e) => setSelection({ provinceCode: e.target.value || undefined, districtCode: undefined, divisionCode: undefined, gnCode: undefined })}
             disabled={disabled}
-            required={required}
+            required={requiredMap.province}
           >
             <option value="">Select Province</option>
             {provinces.map((p) => (
@@ -130,7 +138,7 @@ export default function LocationPicker({
             value={selection.districtCode ?? ""}
             onChange={(e) => setSelection({ districtCode: e.target.value || undefined, divisionCode: undefined, gnCode: undefined })}
             disabled={disabled || !currentProvince}
-            required={required}
+            required={requiredMap.district}
           >
             <option value="">Select District</option>
             {districts.map((d) => (
@@ -148,7 +156,7 @@ export default function LocationPicker({
             value={selection.divisionCode ?? ""}
             onChange={(e) => setSelection({ divisionCode: e.target.value || undefined, gnCode: undefined })}
             disabled={disabled || !currentDistrict}
-            required={required}
+            required={requiredMap.division}
           >
             <option value="">Select Divisional Secretariat</option>
             {divisions.map((dv) => (
@@ -166,7 +174,7 @@ export default function LocationPicker({
             value={selection.gnCode ?? ""}
             onChange={(e) => setSelection({ gnCode: e.target.value || undefined })}
             disabled={disabled || !currentDivision || !gnDivisions.length}
-            required={required}
+            required={requiredMap.gn}
           >
             <option value="">Select GN Division</option>
             {gnDivisions.map((g) => {
