@@ -1064,7 +1064,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
                               <div
                                 className={`grid grid-cols-1 ${gridCols} gap-5`}
                               >
-                                {current.fields.map((f) => {
+                                {current?.fields?.map((f) => {
                                   const id = String(f.name);
                                   const val =
                                     (values[f.name] as unknown as string) ?? "";
