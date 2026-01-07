@@ -997,26 +997,26 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                     {printingMarking ? "Please wait..." : "Print QR on Certificate"}
                                   </button>
                                 </div>
-                                <p className="text-xs text-slate-500">
-                                  Insert the pre-printed legal-size certificate into the printer.
-                                  Only the QR code positioned at the bottom-right corner of the sheet will be printed.
-                                </p>
-                              </div>
-
-                                <div className="flex justify-center">
-                                  <div
-                                    id="certificate-print-area"
-                                    ref={certificatePaperRef}
-                                    className="relative bg-white"
-                                    style={{ width: "8.5in", height: "14in" }}
-                                  >
-                                  <div className="absolute inset-0 pointer-events-none" />
-                                  <div className="absolute bottom-20 right-16">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                      <QRCode
-                                        value={certificateQrValue}
-                                        size={80}
-                                        className="h-20 w-20"
+                                  <p className="text-xs text-slate-500">
+                                    Insert the pre-printed legal-size certificate into the printer.
+                                    Only the QR code positioned at the upper-left corner of the sheet will be printed.
+                                  </p>
+                                </div>
+  
+                                  <div className="flex justify-center">
+                                    <div
+                                      id="certificate-print-area"
+                                      ref={certificatePaperRef}
+                                      className="relative bg-white"
+                                      style={{ width: "8.5in", height: "14in" }}
+                                    >
+                                    <div className="absolute inset-0 pointer-events-none" />
+                                    <div className="absolute top-16 left-16">
+                                      <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                        <QRCode
+                                          value={certificateQrValue}
+                                          size={80}
+                                          className="h-20 w-20"
                                       />
                                     </div>
                                   </div>
