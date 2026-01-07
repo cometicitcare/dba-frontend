@@ -444,8 +444,41 @@ export default function ReprintRequest() {
 
   const handleMarkPrinted = async () => {
     if (!selectedRequest) return;
+    if (!pdfBlobUrl) {
+      const message = "PDF is not ready yet. Please wait for the document to finish loading.";
+      setRejectError(message);
+      toast.error(message);
+      return;
+    }
+
     setMarkingPrinted(true);
     setRejectError(null);
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      const message =
+        "Unable to open the print dialog. Please allow popups for this site and try again.";
+      setRejectError(message);
+      toast.error(message);
+      setMarkingPrinted(false);
+      return;
+    }
+
+    printWindow.onload = () => {
+      if (printWindow.closed) return;
+      printWindow.focus();
+      setTimeout(() => {
+        if (printWindow.closed) return;
+        printWindow.print();
+      }, 250);
+    };
+
+    printWindow.onafterprint = () => {
+      if (!printWindow.closed) {
+        printWindow.close();
+      }
+    };
+
     try {
       const response = await _searchId<{ flow_status?: string }>({
         action: "MARK_PRINTED",
@@ -463,15 +496,8 @@ export default function ReprintRequest() {
       }
       toast.success(payload?.message ?? "Reprint request marked as completed.");
       fetchRequests();
-      if (pdfBlobUrl) {
-        const printWindow = window.open(pdfBlobUrl, "_blank");
-        if (printWindow) {
-          printWindow.onload = () => {
-            printWindow.focus();
-            printWindow.print();
-            printWindow.close();
-          };
-        }
+      if (!printWindow.closed) {
+        printWindow.location.href = pdfBlobUrl;
       }
     } catch (error: any) {
       const message =
@@ -481,6 +507,9 @@ export default function ReprintRequest() {
         "Unable to mark the request as printed.";
       setRejectError(message);
       toast.error(message);
+      if (!printWindow.closed) {
+        printWindow.close();
+      }
     } finally {
       setMarkingPrinted(false);
     }
