@@ -190,7 +190,9 @@ function ManageBhikkhuInner({ params }: PageProps) {
   
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const current = steps[activeTab - 1];
+  const getStepById = (tabId: number) =>
+    steps.find((step) => step.id === tabId);
+  const current = getStepById(activeTab);
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isUploadTab = stepTitle === "Upload Scanned Files";
@@ -261,7 +263,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
   }, [router]);
 
   const validateTab = (tabIndex: number): boolean => {
-    const step = steps[tabIndex - 1];
+    const step = getStepById(tabIndex);
     if (!step) return true;
     const nextErrors: Errors<BhikkhuForm> = { ...errors };
     let valid = true;
@@ -279,7 +281,8 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const buildPartialPayloadForTab = (
     tabIndex: number
   ): Partial<BhikkhuForm> => {
-    const s = steps[tabIndex - 1];
+    const s = getStepById(tabIndex);
+    if (!s) return {};
     const payload: Partial<BhikkhuForm> = {};
     s.fields.forEach((f) => {
       const v = values[f.name] as unknown as string | undefined;

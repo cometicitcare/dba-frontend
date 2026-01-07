@@ -2,7 +2,6 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { _listTemple, _manageTempTemple } from "@/services/temple";
-import DateField from "@/components/common/DateField";
 import LocationPicPd, { LocationSelection, Province } from "@/components/common/LocationPicPd";
 import selectionsData from "@/utils/selectionsData.json";
 
@@ -57,11 +56,8 @@ export default function TempleAutocomplete({
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [newBhikkhuName, setNewBhikkhuName] = useState("");
-  const [newBhikkhuNic, setNewBhikkhuNic] = useState("");
-  const [newBhikkhuMobile, setNewBhikkhuMobile] = useState("");
   const [newViharaName, setNewViharaName] = useState("");
   const [newAddress, setNewAddress] = useState("");
-  const [newOrdainedDate, setNewOrdainedDate] = useState("");
   const [locationSelection, setLocationSelection] = useState<LocationSelection>({});
 
   useEffect(() => {
@@ -93,11 +89,8 @@ export default function TempleAutocomplete({
 
   const resetAddForm = () => {
     setNewBhikkhuName("");
-    setNewBhikkhuNic("");
-    setNewBhikkhuMobile("");
     setNewViharaName("");
     setNewAddress("");
-    setNewOrdainedDate("");
     setLocationSelection({});
   };
   const handleLocationChange = (selection: LocationSelection) => {
@@ -182,9 +175,9 @@ export default function TempleAutocomplete({
 
       {isAddDialogOpen && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4">
-        <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-lg">
+        <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900">Temporary Temple</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Create Temporary Temple</h3>
               <button
                 type="button"
                 onClick={() => {
@@ -213,7 +206,6 @@ export default function TempleAutocomplete({
                   const payloadData = {
                     tv_name: newViharaName.trim(),
                     tv_address: newAddress.trim(),
-                    tv_contact_number: newBhikkhuMobile.trim(),
                     tv_district: districtName,
                     tv_province: provinceName,
                     tv_viharadhipathi_name: newBhikkhuName.trim(),
@@ -243,35 +235,13 @@ export default function TempleAutocomplete({
               }}
               className="space-y-4"
             >
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
                   Bhikkhu Name
                   <input
                     type="text"
                     value={newBhikkhuName}
                     onChange={(e) => setNewBhikkhuName(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                  />
-                </label>
-                <label className="block text-sm font-medium text-slate-700">
-                  NIC
-                  <input
-                    type="text"
-                    value={newBhikkhuNic}
-                    onChange={(e) => setNewBhikkhuNic(e.target.value.toUpperCase())}
-                    placeholder="123456789V"
-                    required
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                  />
-                </label>
-                <label className="block text-sm font-medium text-slate-700">
-                  Contact Number
-                  <input
-                    type="tel"
-                    value={newBhikkhuMobile}
-                    onChange={(e) => setNewBhikkhuMobile(e.target.value)}
-                    placeholder="0771234567"
                     required
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   />
@@ -286,15 +256,6 @@ export default function TempleAutocomplete({
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   />
                 </label>
-                <div className="md:col-span-2">
-                  <DateField
-                    id={`${id}-ordained`}
-                    label="Ordained Date"
-                    value={newOrdainedDate}
-                    onChange={setNewOrdainedDate}
-                    required
-                  />
-                </div>
                 <div className="col-span-full">
                   <label className="block text-sm font-medium text-slate-700">
                     Address
