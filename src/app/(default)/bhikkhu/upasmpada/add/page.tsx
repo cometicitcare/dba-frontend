@@ -443,7 +443,7 @@ export default function AddUpasampadaPage() {
 
                   <div className="min-h-[360px]">{renderStep()}</div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-40 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={goBack}

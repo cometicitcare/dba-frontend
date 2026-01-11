@@ -1,7 +1,6 @@
 ﻿"use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Box,
   Button,
@@ -25,8 +24,8 @@ import {
   Typography,
 } from "@mui/material";
 import { ReprintResponse, _advanceSearch, _getReprintUrl, _searchId } from "@/services/rePrint";
-import { baseURL } from "@/utils/config";
 import { toast } from "react-toastify";
+import ShowPrinter from "@/app/(default)/print-request/ShowPrinter";
 
 type Step = "select" | "verify" | "form";
 type Mode = "list" | "create";
@@ -55,6 +54,19 @@ type AdvancedSearchRecord = {
 };
 
 type RequestStatus = "PENDING" | "APPROVED" | "COMPLETED" | "CANCELLED" | "REJECTED";
+
+const ALLOWED_STATUSES: RequestStatus[] = [
+  "PENDING",
+  "APPROVED",
+  "COMPLETED",
+  "CANCELLED",
+  "REJECTED",
+];
+
+const parseFlowStatus = (value?: string): RequestStatus =>
+  value && ALLOWED_STATUSES.includes(value as RequestStatus)
+    ? (value as RequestStatus)
+    : "PENDING";
 
 type SubjectInfo = {
   name?: string;
@@ -249,7 +261,6 @@ function SubjectInfoCard({ subject }: { subject?: SubjectInfo }) {
 }
 
 export default function ReprintRequest() {
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>("list");
   const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [step, setStep] = useState<Step>("select");
@@ -291,18 +302,16 @@ export default function ReprintRequest() {
   const [tableLoading, setTableLoading] = useState(true);
   const [tableError, setTableError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PrintRequest | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const pdfIframeRef = React.useRef<HTMLIFrameElement | null>(null);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingRequestId, setRejectingRequestId] = useState<number | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
-  const [markingPrinted, setMarkingPrinted] = useState(false);
+  const [printerDialogOpen, setPrinterDialogOpen] = useState(false);
 
   const resetFlow = () => {
     setStep("select");
@@ -335,12 +344,8 @@ export default function ReprintRequest() {
 
   const clearViewer = () => {
     setSelectedRequest(null);
-    setPdfUrl(null);
     setPdfError(null);
-    if (pdfBlobUrl) {
-      URL.revokeObjectURL(pdfBlobUrl);
-      setPdfBlobUrl(null);
-    }
+    setPdfBase64(null);
     setApproveError(null);
     setRejectError(null);
   };
@@ -442,85 +447,18 @@ export default function ReprintRequest() {
     }
   };
 
-  const handleMarkPrinted = async () => {
-    if (!selectedRequest) return;
-    if (!pdfBlobUrl) {
+  const handleOpenPrinter = () => {
+    if (!pdfBase64) {
       const message = "PDF is not ready yet. Please wait for the document to finish loading.";
       setRejectError(message);
       toast.error(message);
       return;
     }
-
-    setMarkingPrinted(true);
-    setRejectError(null);
-
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      const message =
-        "Unable to open the print dialog. Please allow popups for this site and try again.";
-      setRejectError(message);
-      toast.error(message);
-      setMarkingPrinted(false);
-      return;
-    }
-
-    printWindow.onload = () => {
-      if (printWindow.closed) return;
-      printWindow.focus();
-      setTimeout(() => {
-        if (printWindow.closed) return;
-        printWindow.print();
-      }, 250);
-    };
-
-    printWindow.onafterprint = () => {
-      if (!printWindow.closed) {
-        printWindow.close();
-      }
-    };
-
-    try {
-      const response = await _searchId<{ flow_status?: string }>({
-        action: "MARK_PRINTED",
-        request_id: selectedRequest.id,
-      });
-      const payload = response?.data;
-      const success = payload?.status === "success" && (payload?.data?.flow_status || payload?.success);
-      if (!success) {
-        const errors = payload?.errors ?? [];
-        const message =
-          errors.find((err: any) => err?.message)?.message ??
-          payload?.message ??
-          "Unable to mark the request as printed.";
-        throw new Error(message);
-      }
-      toast.success(payload?.message ?? "Reprint request marked as completed.");
-      fetchRequests();
-      if (!printWindow.closed) {
-        printWindow.location.href = pdfBlobUrl;
-      }
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.errors?.[0]?.message ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "Unable to mark the request as printed.";
-      setRejectError(message);
-      toast.error(message);
-      if (!printWindow.closed) {
-        printWindow.close();
-      }
-    } finally {
-      setMarkingPrinted(false);
-    }
+    setPrinterDialogOpen(true);
   };
 
   const getRecordFieldValue = (label: string) =>
     recordFields?.find((field) => field.titel === label)?.text;
-
-  const allowedStatuses: RequestStatus[] = ["PENDING", "APPROVED", "COMPLETED", "CANCELLED", "REJECTED"];
-  const parseFlowStatus = (value?: string): RequestStatus =>
-    value && allowedStatuses.includes(value as RequestStatus) ? (value as RequestStatus) : "PENDING";
 
   const formatAmount = (value?: number | string) =>
     typeof value === "number" ? value.toFixed(2) : value ? value.toString() : "-";
@@ -604,23 +542,21 @@ export default function ReprintRequest() {
   const fetchPdf = async (regn: string) => {
     setPdfLoading(true);
     setPdfError(null);
-    setPdfUrl(null);
+    setPdfBase64(null);
     try {
-      const response = await _getReprintUrl<{ scanned_document_path?: string }>({ regn });
+      const response = await _getReprintUrl<{
+        scanned_document_path?: string;
+        base64_data?: string;
+      }>({ regn });
       const payload = response?.data;
       const data = payload?.data;
       if (payload?.status !== "success" || !data?.scanned_document_path) {
         throw new Error(payload?.message || "PDF not available.");
       }
-      const absoluteUrl = `${baseURL ?? "https://api.dbagovlk.com"}${data.scanned_document_path}`;
-      setPdfUrl(absoluteUrl);
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
+      if (!data?.base64_data) {
+        throw new Error("PDF base64 data not available.");
       }
-      const blobResponse = await fetch(absoluteUrl, { credentials: "include" });
-      const blob = await blobResponse.blob();
-      setPdfBlobUrl(URL.createObjectURL(blob));
-      console.log("PDF ready", absoluteUrl);
+      setPdfBase64(data.base64_data);
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || "Unable to load PDF.";
       setPdfError(message);
@@ -818,7 +754,7 @@ export default function ReprintRequest() {
               <InputLabel>Flow Status</InputLabel>
               <Select value={flowStatusInput} onChange={(e) => setFlowStatusInput(e.target.value)} label="Flow Status">
                 <MenuItem value="">All</MenuItem>
-                {allowedStatuses.map((status) => (
+                {ALLOWED_STATUSES.map((status) => (
                   <MenuItem value={status} key={status}>
                     {status}
                   </MenuItem>
@@ -1026,7 +962,6 @@ export default function ReprintRequest() {
                   variant="outlined"
                   size="small"
                   onClick={clearViewer}
-                  disabled={markingPrinted}
                 >
                   Close viewer
                 </Button>
@@ -1034,10 +969,10 @@ export default function ReprintRequest() {
                   <Button
                     variant="contained"
                     size="small"
-                    onClick={handleMarkPrinted}
-                    disabled={markingPrinted || !selectedRequest}
+                    onClick={handleOpenPrinter}
+                    disabled={!selectedRequest}
                   >
-                    {markingPrinted ? "Marking..." : "Print"}
+                    Print
                   </Button>
                 )}
               </Box>
@@ -1074,7 +1009,7 @@ export default function ReprintRequest() {
               <Typography color="text.secondary">Loading PDF…</Typography>
             ) : pdfError ? (
               <Typography color="error">{pdfError}</Typography>
-            ) : pdfUrl ? (
+            ) : pdfBase64 ? (
               <Typography color="text.primary">
                 PDF is ready for print. Use the Print button to send only the scanned document to the printer.
               </Typography>
@@ -1421,6 +1356,11 @@ export default function ReprintRequest() {
           </Button>
         </DialogActions>
       </Dialog>
+      <ShowPrinter
+        open={printerDialogOpen}
+        onClose={() => setPrinterDialogOpen(false)}
+        pdfBase64={pdfBase64}
+      />
       <style>{`
         @media print {
           body * {

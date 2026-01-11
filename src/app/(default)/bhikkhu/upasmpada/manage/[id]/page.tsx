@@ -42,10 +42,13 @@ type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
   currentStatus: string;
-  higherOrdinationPlace: string;
+  higherOrdinationPlaceTrn: string;
+  higherOrdinationPlaceDisplay: string;
   higherOrdinationDate: string;
-  karmacharyaName: string;
-  upaddhyayaName: string;
+  karmacharyaRegn: string;
+  karmacharyaDisplay: string;
+  upaddhyayaRegn: string;
+  upaddhyayaDisplay: string;
   assumedName: string;
   higherOrdinationResidenceTrn: string;
   higherOrdinationResidenceDisplay: string;
@@ -65,10 +68,13 @@ const INITIAL_FORM: UpasampadaForm = {
   candidateRegNo: "",
   candidateDisplay: "",
   currentStatus: "",
-  higherOrdinationPlace: "",
+  higherOrdinationPlaceTrn: "",
+  higherOrdinationPlaceDisplay: "",
   higherOrdinationDate: "",
-  karmacharyaName: "",
-  upaddhyayaName: "",
+  karmacharyaRegn: "",
+  karmacharyaDisplay: "",
+  upaddhyayaRegn: "",
+  upaddhyayaDisplay: "",
   assumedName: "",
   higherOrdinationResidenceTrn: "",
   higherOrdinationResidenceDisplay: "",
@@ -103,7 +109,14 @@ const FORM_STEPS = [
 ];
 
 const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
-  1: ["candidateRegNo", "higherOrdinationPlace", "higherOrdinationDate", "karmacharyaName", "upaddhyayaName", "assumedName"],
+  1: [
+    "candidateRegNo",
+    "higherOrdinationPlaceTrn",
+    "higherOrdinationDate",
+    "karmacharyaRegn",
+    "upaddhyayaRegn",
+    "assumedName",
+  ],
   2: ["higherOrdinationResidenceTrn", "permanentResidenceTrn", "declarationResidenceAddress", "tutorsTutorRegNo", "presidingBhikshuRegNo"],
   3: ["currentStatus", "declarationDate"],
 };
@@ -146,10 +159,13 @@ const normalizeRecord = (api: any): NormalizedRecord => {
     candidateRegNo: s(api?.bhr_candidate_regn?.br_regn ?? api?.bhr_candidate_regn ?? api?.bhr_candidate?.br_regn),
     candidateDisplay: bhikkhuDisplay(api?.bhr_candidate ?? api?.bhr_candidate_regn),
     currentStatus: s(api?.bhr_currstat?.st_statcd ?? api?.bhr_currstat),
-    higherOrdinationPlace: s(api?.bhr_higher_ordination_place),
+    higherOrdinationPlaceTrn: templeTrn(api?.bhr_higher_ordination_place),
+    higherOrdinationPlaceDisplay: templeDisplay(api?.bhr_higher_ordination_place),
     higherOrdinationDate: toYYYYMMDD(s(api?.bhr_higher_ordination_date)),
-    karmacharyaName: s(api?.bhr_karmacharya_name),
-    upaddhyayaName: s(api?.bhr_upaddhyaya_name),
+    karmacharyaRegn: bhikkhuRegn(api?.bhr_karmacharya_name),
+    karmacharyaDisplay: bhikkhuDisplay(api?.bhr_karmacharya_name),
+    upaddhyayaRegn: bhikkhuRegn(api?.bhr_upaddhyaya_name),
+    upaddhyayaDisplay: bhikkhuDisplay(api?.bhr_upaddhyaya_name),
     assumedName: s(api?.bhr_assumed_name),
     higherOrdinationResidenceTrn: templeTrn(api?.bhr_residence_higher_ordination_trn),
     higherOrdinationResidenceDisplay: templeDisplay(api?.bhr_residence_higher_ordination_trn),
@@ -160,7 +176,7 @@ const normalizeRecord = (api: any): NormalizedRecord => {
     tutorsTutorDisplay: bhikkhuDisplay(api?.bhr_tutors_tutor_regn),
     presidingBhikshuRegNo: bhikkhuRegn(api?.bhr_presiding_bhikshu_regn),
     presidingBhikshuDisplay: bhikkhuDisplay(api?.bhr_presiding_bhikshu_regn),
-    samaneraSerial: s(api?.bhr_samanera_serial_no),
+    samaneraSerial: bhikkhuRegn(api?.bhr_samanera_serial_no),
     declarationDate: toYYYYMMDD(s(api?.bhr_declaration_date)),
     remarks: s(api?.bhr_remarks),
   };
@@ -199,6 +215,24 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
   const [canAdminActions, setCanAdminActions] = useState(false);
 
   const resolveRecordId = () => recordId ?? (Number(editId) || null);
+
+  const loadRecord = async (targetId: string) => {
+    const res = await _manageHighBhikku({
+      action: "READ_ONE",
+      payload: { bhr_regn: targetId, bhr_id: Number(targetId) || undefined },
+    } as any);
+    const api = (res as any)?.data?.data ?? (res as any)?.data ?? res;
+    const {
+      formPatch,
+      recordId: fetchedId,
+      certificateRegn: fetchedRegn,
+      scannedDocumentPath: fetchedScannedPath,
+    } = normalizeRecord(api);
+    setForm((prev) => ({ ...prev, ...formPatch }));
+    setRecordId(fetchedId ?? null);
+    setCertificateRegn(fetchedRegn ?? "");
+    setScannedDocumentPath(fetchedScannedPath ?? "");
+  };
 
   const tabs = useMemo(
     () => [
@@ -297,22 +331,7 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
     (async () => {
       try {
         setLoading(true);
-        const res = await _manageHighBhikku({
-          action: "READ_ONE",
-          payload: { bhr_regn: editId, bhr_id: Number(editId) || undefined },
-        } as any);
-        const api = (res as any)?.data?.data ?? (res as any)?.data ?? res;
-        const {
-          formPatch,
-          recordId: fetchedId,
-          certificateRegn: fetchedRegn,
-          scannedDocumentPath: fetchedScannedPath,
-        } = normalizeRecord(api);
-        if (cancelled) return;
-        setForm((prev) => ({ ...prev, ...formPatch }));
-        setRecordId(fetchedId ?? null);
-        setCertificateRegn(fetchedRegn ?? "");
-        setScannedDocumentPath(fetchedScannedPath ?? "");
+        await loadRecord(editId);
       } catch (error: any) {
         if (cancelled) return;
         const message = error?.message ?? "Failed to load record.";
@@ -350,10 +369,10 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
         case 1:
           return {
             ...baseIdentifiers,
-            bhr_higher_ordination_place: form.higherOrdinationPlace,
+            bhr_higher_ordination_place: form.higherOrdinationPlaceTrn,
             bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
-            bhr_karmacharya_name: form.karmacharyaName,
-            bhr_upaddhyaya_name: form.upaddhyayaName,
+            bhr_karmacharya_name: form.karmacharyaRegn,
+            bhr_upaddhyaya_name: form.upaddhyayaRegn,
             bhr_assumed_name: form.assumedName,
           };
         case 2:
@@ -385,13 +404,9 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
       toast.success(`"${activeFormStep.title}" updated.`, {
         autoClose: 1200,
       });
+      await loadRecord(resolvedRegn || editId);
 
-      const nextStepId = activeFormStep.id + 1;
-      if (FORM_STEPS.some((step) => step.id === nextStepId)) {
-        setActiveTab(String(nextStepId));
-      } else {
-        setTimeout(() => router.push("/bhikkhu"), 1400);
-      }
+      setActiveTab(String(activeFormStep.id));
     } catch (error: any) {
       const message = error?.message ?? "Failed to update record.";
       toast.error(message);
@@ -526,6 +541,8 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
       setScannedFile(null);
       if (scanPreviewUrl) URL.revokeObjectURL(scanPreviewUrl);
       setScanPreviewUrl(null);
+      await loadRecord(regn);
+      setShowUploadModal(false);
     } catch (error: any) {
       const message = error?.message ?? "Failed to upload file.";
       toast.error(message);
@@ -574,13 +591,21 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                 Linked Bhikkhu cannot be changed in edit mode.
               </p>
             </div>
-            <TextField
-              id="place-higher-ordination"
-              label="Place of Higher Ordination"
-              value={form.higherOrdinationPlace}
-              onChange={(v) => updateField("higherOrdinationPlace", v)}
-              required
-            />
+            <div>
+              <TempleAutocomplete
+                id="place-higher-ordination"
+                label="Place of Higher Ordination"
+                initialDisplay={form.higherOrdinationPlaceDisplay}
+                onPick={({ trn, display }) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    higherOrdinationPlaceTrn: trn ?? "",
+                    higherOrdinationPlaceDisplay: display,
+                  }))
+                }
+                required
+              />
+            </div>
             <DateField
               id="date-higher-ordination"
               label="Date of Higher Ordination"
@@ -588,20 +613,36 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
               onChange={(v) => updateField("higherOrdinationDate", v)}
               required
             />
-            <TextField
-              id="karmacharya-name"
-              label="Name of Karmacharya"
-              value={form.karmacharyaName}
-              onChange={(v) => updateField("karmacharyaName", v)}
-              required
-            />
-            <TextField
-              id="upaddhyaya-name"
-              label="Name of Upaddhyaya at Higher Ordination"
-              value={form.upaddhyayaName}
-              onChange={(v) => updateField("upaddhyayaName", v)}
-              required
-            />
+            <div>
+              <BhikkhuAutocomplete
+                id="karmacharya-name"
+                label="Name of Karmacharya"
+                initialDisplay={form.karmacharyaDisplay}
+                onPick={({ regn, display }) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    karmacharyaRegn: regn ?? "",
+                    karmacharyaDisplay: display,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div>
+              <BhikkhuAutocomplete
+                id="upaddhyaya-name"
+                label="Name of Upaddhyaya at Higher Ordination"
+                initialDisplay={form.upaddhyayaDisplay}
+                onPick={({ regn, display }) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    upaddhyayaRegn: regn ?? "",
+                    upaddhyayaDisplay: display,
+                  }))
+                }
+                required
+              />
+            </div>
             <TextField
               id="assumed-name"
               label="Name assumed at Higher Ordination"
@@ -873,7 +914,7 @@ export default function ManageUpasampadaPage({ params }: PageProps) {
                               style={{ width: "8.5in", height: "14in" }}
                             >
                               <div className="absolute inset-0 pointer-events-none" />
-                              <div className="absolute bottom-20 right-16">
+                              <div className="absolute left-16 top-16">
                                 <div className="rounded-lg border border-slate-200 bg-white p-2">
                                   <QRCode
                                     value={certificateQrValue}
