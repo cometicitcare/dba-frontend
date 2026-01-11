@@ -14,6 +14,8 @@ export type PrinterInfo = {
   isDefault: boolean;
 };
 
+export type PageSize = "legal" | "a4" | "a5";
+
 const VIRTUAL_PATTERNS: RegExp[] = [
   /pdf/i,
   /xps/i,
@@ -47,6 +49,18 @@ function normalizeToArray<T>(val: T | T[] | null | undefined): T[] {
 async function run(cmd: string, args: string[]) {
   const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: "utf8" });
   return { stdout, stderr };
+}
+
+const CUPS_PAGE_SIZES: Record<PageSize, string> = {
+  legal: "legal",
+  a4: "a4",
+  a5: "a5",
+};
+
+function normalizePdfBase64(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^data:application\/pdf;base64,(.+)$/i);
+  return match ? match[1] : trimmed;
 }
 
 async function getWindowsPrinters(): Promise<PrinterInfo[]> {
@@ -186,6 +200,72 @@ export async function printTestPage(printerName: string): Promise<{ jobId: strin
     }
     return { jobId };
   } finally {
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export async function printPdfBase64(
+  printerName: string,
+  pdfBase64: string,
+  pageSize: PageSize = "legal"
+): Promise<{ jobId: string }> {
+  const jobId = String(Date.now());
+  const normalizedBase64 = normalizePdfBase64(pdfBase64);
+  if (!normalizedBase64) {
+    throw new Error("pdfBase64 is required");
+  }
+
+  const pdfBuffer = Buffer.from(normalizedBase64, "base64");
+  if (!pdfBuffer.length) {
+    throw new Error("Invalid pdfBase64 payload");
+  }
+
+  const tmpDir = os.tmpdir();
+  const filePath = path.join(tmpDir, `printer_pdf_${jobId}.pdf`);
+  await fs.writeFile(filePath, pdfBuffer);
+
+  try {
+    if (process.platform === "win32") {
+      const sumatraPath = process.env.SUMATRA_PDF_PATH;
+      if (sumatraPath) {
+        const printSettings = `paper=${pageSize}`;
+        await run(sumatraPath, [
+          "-silent",
+          "-print-to",
+          printerName,
+          "-print-settings",
+          printSettings,
+          filePath,
+        ]);
+      } else {
+        const sanitizedFilePath = filePath.replace(/'/g, "''");
+        const sanitizedPrinter = printerName.replace(/'/g, "''");
+        const ps = `Start-Process -FilePath '${sanitizedFilePath}' -Verb PrintTo -ArgumentList '${sanitizedPrinter}'`;
+        try {
+          await run("powershell", ["-NoProfile", "-Command", ps]);
+        } catch (error: any) {
+          const message = String(error?.message ?? error);
+          if (message.includes("No application is associated")) {
+            throw new Error("Printers are not connected.");
+          }
+          throw error;
+        }
+      }
+    } else {
+      const media = CUPS_PAGE_SIZES[pageSize] ?? "legal";
+      await run("lp", ["-d", printerName, "-o", `media=${media}`, filePath]);
+    }
+
+    return { jobId };
+  } finally {
+    const cleanupDelayMs = process.platform === "win32" ? 5000 : 0;
+    if (cleanupDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, cleanupDelayMs));
+    }
     try {
       await fs.unlink(filePath);
     } catch {

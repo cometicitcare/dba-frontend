@@ -587,9 +587,10 @@ export default function DirectAddPage() {
         br_nikaya: item ? `${item.nikaya.name} - ${item.nikaya.code}` : code,
       }));
 
-      const autoName = item?.main_bhikku?.mahananame ?? "";
-      const autoAddr = item?.main_bhikku?.address ?? "";
       const autoParsha = item?.main_bhikku?.parshawaya ?? "";
+      const matched = item?.parshawayas.find((p) => p.code === autoParsha);
+      const autoName = matched?.nayaka?.mahananame ?? item?.main_bhikku?.mahananame ?? "";
+      const autoAddr = matched?.nayaka?.address ?? item?.main_bhikku?.address ?? "";
 
       handleSetMany({
         br_mahanayaka_name: autoName,
@@ -598,7 +599,6 @@ export default function DirectAddPage() {
       });
 
       if (autoParsha) {
-        const matched = item?.parshawayas.find((p) => p.code === autoParsha);
         if (matched) {
           setDisplay((prev) => ({ ...prev, br_parshawaya: `${matched.name} - ${matched.code}` }));
         }
@@ -611,14 +611,20 @@ export default function DirectAddPage() {
 
   const onPickParshawa = useCallback(
     (code: string) => {
-      handleInputChange("br_parshawaya", code);
       const nikaya = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === values.br_nikaya);
       const parsha = nikaya?.parshawayas.find((p) => p.code === code);
+      handleSetMany({
+        br_parshawaya: code,
+        br_mahanayaka_name: parsha?.nayaka?.mahananame ?? "",
+        br_mahanayaka_address: parsha?.nayaka?.address ?? "",
+      });
       if (parsha) {
         setDisplay((prev) => ({ ...prev, br_parshawaya: `${parsha.name} - ${parsha.code}` }));
+      } else {
+        setDisplay((prev) => ({ ...prev, br_parshawaya: "" }));
       }
     },
-    [values.br_nikaya, handleInputChange]
+    [values.br_nikaya, handleSetMany]
   );
 
   if (accessDenied) {

@@ -7,7 +7,11 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -23,9 +27,12 @@ export type ShowPrinterProps = {
   open: boolean;
   onClose: () => void;
   onPrinterSelect?: (printer: PrinterInfo | null) => void;
+  pdfBase64?: string | null;
+  initialPageSize?: PageSize;
 };
 
 type StatusType = "success" | "error" | "loading";
+type PageSize = "legal" | "a4" | "a5";
 
 type PrinterStats = {
   total: number;
@@ -78,6 +85,8 @@ export default function ShowPrinter({
   open,
   onClose,
   onPrinterSelect,
+  pdfBase64 = null,
+  initialPageSize = "legal",
 }: ShowPrinterProps) {
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinterName, setSelectedPrinterName] = useState<string | null>(null);
@@ -85,6 +94,7 @@ export default function ShowPrinter({
   const [statusMessage, setStatusMessage] = useState("");
   const [isFetching, setIsFetching] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [pageSize, setPageSize] = useState<PageSize>(initialPageSize);
 
   const selectedPrinter = useMemo(
     () => printers.find((printer) => printer.name === selectedPrinterName) ?? null,
@@ -95,6 +105,10 @@ export default function ShowPrinter({
     if (!onPrinterSelect) return;
     onPrinterSelect(selectedPrinter);
   }, [onPrinterSelect, selectedPrinter]);
+
+  useEffect(() => {
+    setPageSize(initialPageSize);
+  }, [initialPageSize]);
 
   const scanPrinters = useCallback(
     async (message = "Scanning for printers...") => {
@@ -144,16 +158,26 @@ export default function ShowPrinter({
     []
   );
 
-  const handlePrintTest = useCallback(async () => {
+  const handlePrint = useCallback(async () => {
     if (!selectedPrinter) return;
+    const pdfPayload = pdfBase64?.trim();
+    const shouldPrintPdf = Boolean(pdfPayload);
     setIsPrinting(true);
     setStatusType("loading");
-    setStatusMessage("Sending a test page...");
+    setStatusMessage(
+      shouldPrintPdf ? "Sending document to printer..." : "Sending a test page..."
+    );
     try {
-      const response = await fetch("/api/print-test", {
+      const response = await fetch(shouldPrintPdf ? "/api/print-pdf" : "/api/print-test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ printerName: selectedPrinter.name }),
+        body: shouldPrintPdf
+          ? JSON.stringify({
+              printerName: selectedPrinter.name,
+              pdfBase64: pdfPayload,
+              pageSize,
+            })
+          : JSON.stringify({ printerName: selectedPrinter.name }),
       });
       const payload = await response.json();
 
@@ -163,14 +187,18 @@ export default function ShowPrinter({
 
       const jobSuffix = payload?.jobId ? ` (Job ID: ${payload.jobId})` : "";
       setStatusType("success");
-      setStatusMessage(`Test page sent to ${selectedPrinter.name}${jobSuffix}.`);
+      setStatusMessage(
+        shouldPrintPdf
+          ? `Document sent to ${selectedPrinter.name}${jobSuffix}.`
+          : `Test page sent to ${selectedPrinter.name}${jobSuffix}.`
+      );
     } catch (error: any) {
       setStatusType("error");
       setStatusMessage(error?.message ?? String(error));
     } finally {
       setIsPrinting(false);
     }
-  }, [selectedPrinter]);
+  }, [pageSize, pdfBase64, selectedPrinter]);
 
   useEffect(() => {
     if (!open) return;
@@ -206,11 +234,26 @@ export default function ShowPrinter({
       <DialogContent className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm text-slate-600">
-              The server running Next.js can see these printers. Select one before you print a test page.
-            </p>
+            
           </div>
           <div className="flex flex-wrap gap-2">
+            <FormControl
+              size="small"
+              className="min-w-[160px]"
+              disabled={isFetching || isPrinting}
+            >
+              <InputLabel id="page-size-label">Page size</InputLabel>
+              <Select
+                labelId="page-size-label"
+                value={pageSize}
+                label="Page size"
+                onChange={(event) => setPageSize(event.target.value as PageSize)}
+              >
+                <MenuItem value="legal">Legal (default)</MenuItem>
+                <MenuItem value="a4">A4</MenuItem>
+                <MenuItem value="a5">A5</MenuItem>
+              </Select>
+            </FormControl>
             <Button
               variant="outlined"
               onClick={() => scanPrinters("Scanning for printers...")}
@@ -224,15 +267,7 @@ export default function ShowPrinter({
               disabled={isFetching || isPrinting}
             >
               Refresh
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handlePrintTest}
-              disabled={!selectedPrinter || isPrinting || isFetching}
-            >
-              {isPrinting ? "Sending test page…" : "Print test page"}
-            </Button>
-          </div>
+            </Button></div>
         </div>
 
         {statusType && statusMessage && (
@@ -309,8 +344,17 @@ export default function ShowPrinter({
         </div>
       </DialogContent>
       <DialogActions>
+        <Button
+          variant="contained"
+          onClick={handlePrint}
+          disabled={!selectedPrinter || isPrinting || isFetching}
+        >
+          {isPrinting ? "Printing..." : "Print"}
+        </Button>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>
   );
 }
+
+
