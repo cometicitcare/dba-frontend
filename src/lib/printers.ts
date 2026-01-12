@@ -47,8 +47,19 @@ function normalizeToArray<T>(val: T | T[] | null | undefined): T[] {
 }
 
 async function run(cmd: string, args: string[]) {
-  const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: "utf8" });
-  return { stdout, stderr };
+  try {
+    const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: "utf8" });
+    return { stdout, stderr };
+  } catch (error: any) {
+    if (error?.code === "ENOENT") {
+      const hint =
+        process.platform === "win32"
+          ? `Required command is missing: ${cmd}.`
+          : `Printer tools are not installed on this server (missing ${cmd}). Install CUPS (lpstat/lp) or run on Windows.`;
+      throw new Error(hint);
+    }
+    throw error;
+  }
 }
 
 const CUPS_PAGE_SIZES: Record<PageSize, string> = {
