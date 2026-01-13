@@ -25,7 +25,6 @@ import {
 } from "@mui/material";
 import { ReprintResponse, _advanceSearch, _getReprintUrl, _searchId } from "@/services/rePrint";
 import { toast } from "react-toastify";
-import ShowPrinter from "@/app/(default)/print-request/ShowPrinter";
 
 type Step = "select" | "verify" | "form";
 type Mode = "list" | "create";
@@ -304,14 +303,14 @@ export default function ReprintRequest() {
   const [selectedRequest, setSelectedRequest] = useState<PrintRequest | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingRequestId, setRejectingRequestId] = useState<number | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
   const [rejectError, setRejectError] = useState<string | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
-  const [printerDialogOpen, setPrinterDialogOpen] = useState(false);
+  const PDF_BASE_URL = "https://api.dbagovlk.com";
 
   const resetFlow = () => {
     setStep("select");
@@ -345,7 +344,7 @@ export default function ReprintRequest() {
   const clearViewer = () => {
     setSelectedRequest(null);
     setPdfError(null);
-    setPdfBase64(null);
+    setPdfUrl(null);
     setApproveError(null);
     setRejectError(null);
   };
@@ -447,14 +446,46 @@ export default function ReprintRequest() {
     }
   };
 
-  const handleOpenPrinter = () => {
-    if (!pdfBase64) {
+  const handleOpenPrinter = async () => {
+    if (!pdfUrl) {
       const message = "PDF is not ready yet. Please wait for the document to finish loading.";
       setRejectError(message);
       toast.error(message);
       return;
     }
-    setPrinterDialogOpen(true);
+    if (!selectedRequest) {
+      const message = "Please select a request before printing.";
+      setRejectError(message);
+      toast.error(message);
+      return;
+    }
+    try {
+      const response = await _searchId<{ flow_status?: string }>({
+        action: "MARK_PRINTED",
+        request_id: selectedRequest.id,
+      });
+      const payload = response?.data;
+      const success = payload?.status === "success" && (payload?.data?.flow_status || payload?.success);
+      if (!success) {
+        const errors = payload?.errors ?? [];
+        const message =
+          errors.find((err: any) => err?.message)?.message ??
+          payload?.message ??
+          "Unable to mark the request as printed.";
+        throw new Error(message);
+      }
+      await fetchRequests();
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.errors?.[0]?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "Unable to mark the request as printed.";
+      setRejectError(message);
+      toast.error(message);
+      return;
+    }
+    window.location.assign(pdfUrl);
   };
 
   const getRecordFieldValue = (label: string) =>
@@ -542,7 +573,7 @@ export default function ReprintRequest() {
   const fetchPdf = async (regn: string) => {
     setPdfLoading(true);
     setPdfError(null);
-    setPdfBase64(null);
+    setPdfUrl(null);
     try {
       const response = await _getReprintUrl<{
         scanned_document_path?: string;
@@ -553,10 +584,11 @@ export default function ReprintRequest() {
       if (payload?.status !== "success" || !data?.scanned_document_path) {
         throw new Error(payload?.message || "PDF not available.");
       }
-      if (!data?.base64_data) {
-        throw new Error("PDF base64 data not available.");
-      }
-      setPdfBase64(data.base64_data);
+      const path = data.scanned_document_path;
+      const resolvedUrl = path.startsWith("http")
+        ? path
+        : new URL(path, PDF_BASE_URL).toString();
+      setPdfUrl(resolvedUrl);
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || "Unable to load PDF.";
       setPdfError(message);
@@ -1009,9 +1041,9 @@ export default function ReprintRequest() {
               <Typography color="text.secondary">Loading PDF…</Typography>
             ) : pdfError ? (
               <Typography color="error">{pdfError}</Typography>
-            ) : pdfBase64 ? (
+            ) : pdfUrl ? (
               <Typography color="text.primary">
-                PDF is ready for print. Use the Print button to send only the scanned document to the printer.
+                PDF is ready. Use the Print button to open the document preview.
               </Typography>
             ) : (
               <Typography color="text.secondary">Select a request to make its scanned document available.</Typography>
@@ -1356,11 +1388,6 @@ export default function ReprintRequest() {
           </Button>
         </DialogActions>
       </Dialog>
-      <ShowPrinter
-        open={printerDialogOpen}
-        onClose={() => setPrinterDialogOpen(false)}
-        pdfBase64={pdfBase64}
-      />
       <style>{`
         @media print {
           body * {
