@@ -1,6 +1,21 @@
 import BackendClient from './backendClient';
 import { baseURL } from "../utils/config";
+
+type DuplicateCheckResponse = {
+  status: "duplicate_found" | "no_duplicate";
+  message: string;
+  data: null | {
+    found_in: string;
+    regn: string;
+    gihiname: string;
+    date_of_birth: string;
+  };
+};
 export const _manageBhikku = (body: any) => BackendClient.post(`${baseURL}/bhikkus/manage`, body);
+export const _checkBhikkhuDuplicate = (gihiname: string, dateOfBirth: string) =>
+  BackendClient.post<DuplicateCheckResponse>(
+    `${baseURL}/bhikkus/check-duplicate?gihiname=${encodeURIComponent(gihiname)}&date_of_birth=${encodeURIComponent(dateOfBirth)}`
+  );
 export const _manageSilmatha = (body: any) => BackendClient.post(`${baseURL}/silmatha-regist/manage`, body);
 export const _approveBhikkhu = (br_regn: any) => BackendClient.post(`${baseURL}/bhikkus/${br_regn}/approve`);
 export const _rejectBhikkhu = (br_regn: any, body: any) => BackendClient.post(`${baseURL}/bhikkus/${br_regn}/reject`, body);
