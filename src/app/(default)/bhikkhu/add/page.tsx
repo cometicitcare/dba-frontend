@@ -3,7 +3,7 @@
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { _manageBhikku } from "@/services/bhikku";
+import { _manageBhikku, _checkBhikkhuDuplicate } from "@/services/bhikku";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -182,7 +182,33 @@ function AddBhikkhuPageInner() {
     return { ok: firstInvalidStep == null, firstInvalidStep };
   };
 
-  const handleNext = () => { if (currentStep < effectiveSteps.length && validateStep(currentStep)) setCurrentStep((s) => s + 1); };
+  const handleNext = async () => {
+    if (currentStep >= effectiveSteps.length) return;
+    if (!validateStep(currentStep)) return;
+
+    if (currentStep === 1 && !bhikkhuId) {
+      const gihiname = String(values.br_gihiname ?? "").trim();
+      const dob = toYYYYMMDD(values.br_dofb);
+      if (gihiname && dob) {
+        try {
+          const res = await _checkBhikkhuDuplicate(gihiname, dob);
+          const status = res?.data?.status;
+          if (status === "duplicate_found") {
+            const regn = res?.data?.data?.regn;
+            const message = res?.data?.message ?? "A duplicate record was found.";
+            toast.error(regn ? `${message} (Regn: ${regn})` : message);
+            return;
+          }
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Failed to check duplicates. Please try again.";
+          toast.error(msg);
+          return;
+        }
+      }
+    }
+
+    setCurrentStep((s) => s + 1);
+  };
   const handlePrevious = () => { if (currentStep > 1) setCurrentStep((s) => s - 1); };
 
   const handleSubmit = async () => {
