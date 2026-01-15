@@ -23,6 +23,8 @@ import {
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
+  ViharadhipathiAppointmentLetter,
+  type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
   type LandInfoRow,
@@ -70,8 +72,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
 
   const majorStepGroups = useMemo(
     () => [
-      { id: 1, steps: effectiveSteps.filter((s) => s.id <= 4) },
-      { id: 2, steps: effectiveSteps.filter((s) => s.id > 4) },
+      { id: 1, steps: effectiveSteps.filter((s) => s.id <= 6) },
+      { id: 2, steps: effectiveSteps.filter((s) => s.id > 6) },
     ],
     [effectiveSteps]
   );
@@ -115,6 +117,34 @@ function AddViharaPageInner({ department }: { department?: string }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const letterData: ViharadhipathiAppointmentLetterData = useMemo(
+    () => ({
+      reference_number: values.mahanayake_letter_nu ?? "",
+      letter_date: values.mahanayake_date ?? today,
+      appointed_monk_name: values.viharadhipathi_name ?? "",
+      appointed_monk_title: "",
+      viharasthana_full_name: values.temple_name ?? "",
+      viharasthana_location: values.temple_address ?? "",
+      viharasthana_area: "",
+      district: values.district ?? "",
+      divisional_secretariat: values.divisional_secretariat ?? "",
+      grama_niladari: values.grama_niladhari_division ?? "",
+      mahanayaka_lt_no: values.mahanayake_letter_nu ?? "",
+      mahanayaka_lt_date: values.mahanayake_date ?? "",
+      secretary_name: "",
+      phone: "",
+      fax: "",
+      email: values.email_address ?? "",
+      remarks: values.mahanayake_remarks ?? "",
+      mahanayaka_name: "",
+      nikaya_full_name: values.nikaya ?? "",
+      temple_name: values.temple_name ?? "",
+      temple_location_1: values.temple_address ?? "",
+      temple_location_2: "",
+      divisional_secretariat_office: values.divisional_secretariat ?? "",
+    }),
+    [today, values]
+  );
 
   const isReview = reviewEnabled && currentStep === effectiveSteps.length;
   const current = effectiveSteps[currentStep - 1];
@@ -477,6 +507,9 @@ function AddViharaPageInner({ department }: { department?: string }) {
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
       vh_period_established: formData.period_established ?? "",
+      vh_mahanayake_date: formData.mahanayake_date ?? "",
+      vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
+      vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
       ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
     };
   };
@@ -632,11 +665,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return "";
   }, []);
 
-  // Auto-populate grama_niladhari_division_ownership from grama_niladhari_division when navigating to step 9
+  // Auto-populate grama_niladhari_division_ownership from grama_niladhari_division when navigating to step 11
   useEffect(() => {
-    if (currentStep === 9 && values.grama_niladhari_division) {
+    if (currentStep === 11 && values.grama_niladhari_division) {
       const gnName = lookupGnName(values.grama_niladhari_division);
-      // Always sync the ownership field with the selected GN division name when on step 9
+      // Always sync the ownership field with the selected GN division name when on step 11
       if (gnName && gnName !== values.grama_niladhari_division_ownership) {
         handleSetMany({ grama_niladhari_division_ownership: gnName });
       }
@@ -644,7 +677,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.grama_niladhari_division, lookupGnName]);
 
-  const gridCols = currentStep === 5 ? "md:grid-cols-3" : "md:grid-cols-2";
+  const gridCols = currentStep === 7 ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -716,9 +749,14 @@ function AddViharaPageInner({ department }: { department?: string }) {
                 <div className="min-h-[360px]">
                   <h2 className="text-xl font-bold text-slate-800 mb-5">{stepTitle}</h2>
 
-                  {!isReview && (
-                    <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
-                      {currentStep === 6 && (
+                    {!isReview && (
+                      <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
+                        {currentStep === 6 && (
+                          <div className="md:col-span-2">
+                            <ViharadhipathiAppointmentLetter data={letterData} />
+                          </div>
+                        )}
+                      {currentStep === 8 && (
                         <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
@@ -743,7 +781,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         </div>
                       )}
 
-                      {currentStep === 7 && (
+                      {currentStep === 9 && (
                         <div className="md:col-span-2">
                           <ResidentBhikkhuTable value={residentBhikkhuRows} onChange={handleResidentBhikkhuChange} error={errors.resident_bhikkhus} />
                           <div className="mt-4">
@@ -762,7 +800,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                       )}
 
                       {/* Step J: Annex II - Special rendering with sub-headers */}
-                      {currentStep === 10 && (
+                      {currentStep === 12 && (
                         <div className="md:col-span-2 space-y-6">
                           {/* Permission for Construction and Maintenance of New Religious Centers */}
                           <div className="space-y-3">
@@ -1073,8 +1111,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         // Textarea fields
                         if (f.type === "textarea") {
                           const idStr = String(f.name);
-                          // For Step 5, make buildings_description span 3 columns, others span 1
-                          const spanClass = currentStep === 5 
+                          // For Step 7, make buildings_description span 3 columns, others span 1
+                          const spanClass = currentStep === 7 
                             ? (idStr === "buildings_description" ? "md:col-span-3" : "")
                             : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                           return (
@@ -1095,7 +1133,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
 
                         // Regular text/email/tel inputs
                         return (
-                          <div key={id} className={currentStep === 5 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
+                          <div key={id} className={currentStep === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
                             <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
                             <input
                               id={id}
@@ -1112,7 +1150,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                       })}
 
                       {/* Step I: Important Notes */}
-                      {currentStep === 9 && (
+                      {currentStep === 11 && (
                         <div className="md:col-span-2">
                           <ImportantNotes>
                             <strong>Important:</strong>
@@ -1137,13 +1175,13 @@ function AddViharaPageInner({ department }: { department?: string }) {
                             <h3 className="text-lg font-semibold text-slate-800">{s.title}</h3>
                             <button className="px-3 py-1.5 text-sm bg-slate-200 rounded-lg hover:bg-slate-300" onClick={() => setCurrentStep(s.id)}>Edit</button>
                           </div>
-                          {s.id === 6 && (
+                          {s.id === 8 && (
                             <div className="mt-4">
                               <p className="text-sm font-medium text-slate-700 mb-2">Land Information:</p>
                               <p className="text-sm text-slate-600">{landInfoRows.length} land record(s) entered</p>
                             </div>
                           )}
-                          {s.id === 7 && (
+                          {s.id === 9 && (
                             <div className="mt-4">
                               <p className="text-sm font-medium text-slate-700 mb-2">Resident Bhikkhus:</p>
                               <p className="text-sm text-slate-600">{residentBhikkhuRows.length} bhikkhu record(s) entered</p>

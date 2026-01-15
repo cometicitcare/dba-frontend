@@ -10,4 +10,6 @@ export { default as BhikkhuStatusSelect } from "./StatusSelect";
 export { default as LandInfoTable } from "./LandInfoTable";
 export { default as ResidentBhikkhuTable } from "./ResidentBhikkhuTable";
 export { default as ImportantNotes } from "./ImportantNotes";
+export { default as ViharadhipathiAppointmentLetter } from "./ViharadhipathiAppointmentLetter";
+export type { ViharadhipathiAppointmentLetterData } from "./ViharadhipathiAppointmentLetter";
 export * from "./steps";
