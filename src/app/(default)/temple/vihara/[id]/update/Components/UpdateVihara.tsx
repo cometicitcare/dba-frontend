@@ -94,7 +94,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
   const canModerate = role === ADMIN_ROLE_LEVEL && !isDivisionalSec;
 
-  const baseSteps = useMemo(() => viharaSteps(), []);
+  const baseSteps = useMemo(() => viharaSteps().filter((s) => s.id !== 6), []);
   const sharedTabs = useMemo(() => {
     const maxBaseStepId = baseSteps.reduce((max, step) => Math.max(max, step.id), 0);
     const certTab: StepConfig<ViharaForm> = {
@@ -116,11 +116,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       return [
         {
           id: 1,
-          tabs: [...baseSteps.filter((s) => s.id <= 6), ...shared],
+          tabs: [...baseSteps.filter((s) => s.id <= 5), ...shared],
         },
         {
           id: 2,
-          tabs: [...baseSteps.filter((s) => s.id > 6), ...shared],
+          tabs: [...baseSteps.filter((s) => s.id > 5), ...shared],
         },
       ];
     },
@@ -1007,40 +1007,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     };
   }, [certificateNumberLabel, display.nikaya, display.parshawaya, values.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
 
-  const acceptanceData = useMemo(() => {
-    const now = new Date();
-    const gYear = now.getFullYear();
-    const gMonthIndex = now.getMonth();
-    const gDay = String(now.getDate()).padStart(2, "0");
-    const gMonth = String(gMonthIndex + 1).padStart(2, "0");
-    const letterDate = `${gYear}.${gMonth}.${gDay}`;
-
-    const addressParts = (values.temple_address || "").split(",");
-
-    return {
-      reference_number: certificateNumberLabel,
-      letter_date: letterDate,
-      mahanayaka_name: values.viharadhipathi_name || "",
-      nikaya_full_name: display.nikaya || values.nikaya || "",
-      temple_name: values.temple_name || "",
-      temple_location_1: addressParts[0]?.trim() || "",
-      temple_location_2: addressParts.slice(1).join(", ").trim(),
-      district: values.district || "",
-      divisional_secretariat: values.divisional_secretariat || "",
-      viharasthana_location: values.grama_niladhari_division || "",
-      viharasthana_area: values.pradeshya_sabha || "",
-      viharasthana_full_name: values.temple_name || "",
-      appointed_monk_title: "Chief Incumbent",
-      appointed_monk_name: values.viharadhipathi_name || "",
-      appointment_letter_date: letterDate,
-      secretary_name: "",
-      phone: "",
-      fax: "",
-      email: "",
-      divisional_secretariat_office: values.divisional_secretariat || "",
-    };
-  }, [certificateNumberLabel, display.nikaya, values.district, values.divisional_secretariat, values.grama_niladhari_division, values.nikaya, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name]);
-
   const handlePrintCertificate = () => {
     const targetId = ensureActivePrintTarget();
     setActivePrintAreaId(targetId);
@@ -1580,59 +1546,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         <section
                                           id={printAreaId}
                                           data-printing={isActivePrint ? "true" : undefined}
-                                          className="certificate-page letter-page relative"
+                                          ref={certificatePaperRef}
+                                          className="certificate-page relative"
                                         >
-                                          <div className="letter-header">
-                                            <div className="font-semibold">
-                                              {acceptanceData.reference_number}
-                                            </div>
-                                            <div className="font-semibold">
-                                              Date: {acceptanceData.letter_date}
-                                            </div>
-                                          </div>
-
-                                          <div className="letter-recipient">
-                                            <div className="recipient-title">
-                                              To, Most Venerable {acceptanceData.mahanayaka_name || "—"}
-                                            </div>
-                                            <div>{acceptanceData.nikaya_full_name || "—"}</div>
-                                            <div>{acceptanceData.temple_name || "—"}</div>
-                                            <div>{acceptanceData.temple_location_1 || ""}</div>
-                                            <div>{acceptanceData.temple_location_2 || ""}</div>
-                                          </div>
-
-                                          <div className="letter-section font-semibold">
-                                            Subject: Appointment of Chief Incumbent
-                                          </div>
-
-                                          <div className="letter-body">
-                                            This is to confirm the appointment of <strong>{acceptanceData.appointed_monk_title} {acceptanceData.appointed_monk_name || "—"}</strong> for {acceptanceData.viharasthana_full_name || "the vihara"} located at {acceptanceData.viharasthana_location || "—"}, {acceptanceData.viharasthana_area || acceptanceData.district || ""}. The appointment letter dated {acceptanceData.appointment_letter_date} is hereby acknowledged.
-                                          </div>
-
-                                          <div className="letter-section">
-                                            Divisional Secretariat: {acceptanceData.divisional_secretariat || "—"}
-                                            <br />
-                                            District: {acceptanceData.district || "—"}
-                                          </div>
-
-                                          <div className="letter-section">
-                                            Thank you.
-                                            <br />
-                                            — Department of Buddhist Affairs
-                                          </div>
-
-                                          <div className="letter-copyto">
-                                            <div className="font-semibold mb-2">Copy to:</div>
-                                            <div>1. {acceptanceData.appointed_monk_title} {acceptanceData.appointed_monk_name || "—"}, {acceptanceData.viharasthana_full_name || ""}, {acceptanceData.viharasthana_location || ""}</div>
-                                            <div>2. Divisional Secretariat Office, {acceptanceData.divisional_secretariat_office || acceptanceData.divisional_secretariat || "—"}</div>
-                                          </div>
-
-                                          <div className="letter-qr">
-                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
-                                            </div>
-                                            <div className="caption">{certificateUrlLabel}</div>
-                                          </div>
+                                          <ViharadhipathiAppointmentLetter data={letterData} />
                                         </section>
                                       </div>
                                     )}
@@ -1644,10 +1561,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
-                                <h3 className="text-lg font-semibold text-slate-800 mb-4">
-                                  Upload Scanned Document
-                                </h3>
-                                {renderExistingScan(activeMajorStep === 1 ? existingScanUrlStageOne : existingScanUrlStageTwo)}
+                                  {activeMajorStep === 1 ? (
+                                    existingScanUrlStageOne ? (
+                                      <ViharadhipathiAppointmentLetter data={letterData} />
+                                    ) : null
+                                  ) : (
+                                    renderExistingScan(existingScanUrlStageTwo)
+                                  )}
                                 <p className="text-sm text-slate-600 mb-6">
                                   Upload the scanned certificate or document after printing. Supported formats: PDF, JPEG, PNG (Max 5MB).
                                 </p>
@@ -1705,11 +1625,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             </div>
                           ) : (
                             <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
-                              {current?.id === 6 && (
-                                <div className="md:col-span-2">
-                                  <ViharadhipathiAppointmentLetter data={letterData} />
-                                </div>
-                              )}
                               {current?.id === 8 && (
                                 <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />

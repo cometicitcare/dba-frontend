@@ -33,21 +33,6 @@ const letterStyles = `
   font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
   line-height: 1.6;
 }
-.letter-controls {
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-bottom: 1px solid #ccc;
-}
-.letter-controls button {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  font-size: 14px;
-}
-.letter-controls button:hover {
-  background: #f8fafc;
-}
 .letter-view .print-area {
   padding: 20px;
   display: flex;
@@ -165,9 +150,6 @@ const letterStyles = `
   display: inline;
 }
 @media print {
-  .letter-controls {
-    display: none;
-  }
   .letter-view .print-area {
     padding: 0;
   }
@@ -195,12 +177,6 @@ export default function ViharadhipathiAppointmentLetter({
   return (
     <div className="letter-view">
       <style>{letterStyles}</style>
-
-      <div className="letter-controls">
-        <button type="button" onClick={() => window.print()}>
-          Print / Save as PDF
-        </button>
-      </div>
 
       <div className="print-area">
         <div className="two-column">
