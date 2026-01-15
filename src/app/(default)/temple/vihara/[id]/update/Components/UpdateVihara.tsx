@@ -9,6 +9,7 @@ import {
   _approveStage,
   _rejectStage,
 } from "@/services/vihara";
+import request from "@/services/backendClient";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -191,6 +192,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
+  const [sasanarakshakaOptions, setSasanarakshakaOptions] = useState<Array<{ id: number; name: string }>>([]);
+  const [sasanarakshakaLoading, setSasanarakshakaLoading] = useState(false);
+  const [sasanarakshakaError, setSasanarakshakaError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -247,6 +251,62 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return `${API_BASE_URL}${normalizedPath}`;
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const getAuthToken = () => {
+      if (typeof window === "undefined") return null;
+      try {
+        const raw = localStorage.getItem("user");
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as any;
+        return (
+          parsed?.token ??
+          parsed?.access_token ??
+          parsed?.accessToken ??
+          parsed?.data?.token ??
+          parsed?.data?.access_token ??
+          parsed?.user?.token ??
+          parsed?.user?.access_token ??
+          null
+        );
+      } catch {
+        return null;
+      }
+    };
+
+    const fetchSasanarakshaka = async () => {
+      try {
+        setSasanarakshakaLoading(true);
+        setSasanarakshakaError(null);
+        const token = getAuthToken();
+        const response = await request.get<{
+          data?: Array<{ sr_id: number; sr_ssbname: string }>;
+        }>("https://api.dbagovlk.com/api/v1/sasanarakshaka", {
+          params: { page: 1, limit: 1000 },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const list = Array.isArray(response?.data?.data) ? response.data.data : [];
+        if (mounted) {
+          setSasanarakshakaOptions(
+            list
+              .filter((item) => item?.sr_ssbname)
+              .map((item) => ({ id: item.sr_id, name: item.sr_ssbname }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load Sasanarakshaka list", err);
+        if (mounted) setSasanarakshakaError("Failed to load list.");
+      } finally {
+        if (mounted) setSasanarakshakaLoading(false);
+      }
+    };
+
+    fetchSasanarakshaka();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
@@ -1815,13 +1875,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 return (
                                   <div key={id}>
                                     <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
-                                    <input
-                                      id={id}
-                                      type="text"
-                                      value={val}
-                                      onChange={(e) => handleInputChange(f.name, e.target.value)}
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                                    />
+                                    {sasanarakshakaLoading ? (
+                                      <div className="text-sm text-slate-600">Loading list...</div>
+                                    ) : sasanarakshakaError ? (
+                                      <div role="alert" className="text-sm text-red-600">{sasanarakshakaError}</div>
+                                    ) : (
+                                      <select
+                                        id={id}
+                                        value={val}
+                                        onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      >
+                                        <option value="">Select Sasanarakshaka Bala Mandalaya</option>
+                                        {sasanarakshakaOptions.map((opt) => (
+                                          <option key={opt.id} value={opt.name}>
+                                            {opt.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
                                     {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                                   </div>
                                 );
