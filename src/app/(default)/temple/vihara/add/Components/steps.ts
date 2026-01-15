@@ -141,7 +141,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Leadership Information",
     fields: [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
-      { name: "viharadhipathi_regn", label: "Chief Nun's Registration Number", type: "text", rules: { required: false } },
+      { name: "viharadhipathi_regn", label: "Chief Monk's Registration Number", type: "text", rules: { required: false } },
       // { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text", rules: { required: true } },
       { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
     ],
