@@ -27,6 +27,8 @@ import {
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
+  ViharadhipathiAppointmentLetter,
+  type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
   type LandInfoRow,
@@ -94,13 +96,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
   const baseSteps = useMemo(() => viharaSteps(), []);
   const sharedTabs = useMemo(() => {
+    const maxBaseStepId = baseSteps.reduce((max, step) => Math.max(max, step.id), 0);
     const certTab: StepConfig<ViharaForm> = {
-      id: baseSteps.length + 1,
+      id: maxBaseStepId + 1,
       title: "Certificates",
       fields: [],
     };
     const scannedTab: StepConfig<ViharaForm> = {
-      id: baseSteps.length + 2,
+      id: maxBaseStepId + 2,
       title: "Upload Scanned Files",
       fields: [],
     };
@@ -113,11 +116,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       return [
         {
           id: 1,
-          tabs: [...baseSteps.filter((s) => s.id <= 4), ...shared],
+          tabs: [...baseSteps.filter((s) => s.id <= 6), ...shared],
         },
         {
           id: 2,
-          tabs: [...baseSteps.filter((s) => s.id > 4), ...shared],
+          tabs: [...baseSteps.filter((s) => s.id > 6), ...shared],
         },
       ];
     },
@@ -198,6 +201,34 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const letterData: ViharadhipathiAppointmentLetterData = useMemo(
+    () => ({
+      reference_number: values.mahanayake_letter_nu ?? "",
+      letter_date: values.mahanayake_date ?? today,
+      appointed_monk_name: values.viharadhipathi_name ?? "",
+      appointed_monk_title: "",
+      viharasthana_full_name: values.temple_name ?? "",
+      viharasthana_location: values.temple_address ?? "",
+      viharasthana_area: "",
+      district: values.district ?? "",
+      divisional_secretariat: values.divisional_secretariat ?? "",
+      grama_niladari: values.grama_niladhari_division ?? "",
+      mahanayaka_lt_no: values.mahanayake_letter_nu ?? "",
+      mahanayaka_lt_date: values.mahanayake_date ?? "",
+      secretary_name: "",
+      phone: "",
+      fax: "",
+      email: values.email_address ?? "",
+      remarks: values.mahanayake_remarks ?? "",
+      mahanayaka_name: "",
+      nikaya_full_name: values.nikaya ?? "",
+      temple_name: values.temple_name ?? "",
+      temple_location_1: values.temple_address ?? "",
+      temple_location_2: "",
+      divisional_secretariat_office: values.divisional_secretariat ?? "",
+    }),
+    [today, values]
+  );
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
@@ -263,13 +294,18 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       nikaya: apiData.vh_nikaya ?? "",
       parshawaya: apiData.vh_parshawa ?? "",
       
-      // Step D: Leadership
-      viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
-      viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
-      period_established: apiData.vh_period_established ?? "",
-      
-      // Step E: Assets & Activities
-      buildings_description: apiData.vh_buildings_description ?? "",
+        // Step D: Leadership
+        viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
+        viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
+        period_established: apiData.vh_period_established ?? "",
+
+        // Step E: Mahanyake Information
+        mahanayake_date: apiData.vh_mahanayake_date ?? "",
+        mahanayake_letter_nu: apiData.vh_mahanayake_letter_nu ?? "",
+        mahanayake_remarks: apiData.vh_mahanayake_remarks ?? "",
+        
+        // Step F: Assets & Activities
+        buildings_description: apiData.vh_buildings_description ?? "",
       dayaka_families_count: apiData.vh_dayaka_families_count ?? "",
       kulangana_committee: apiData.vh_kulangana_committee ?? "",
       dayaka_sabha: apiData.vh_dayaka_sabha ?? "",
@@ -549,6 +585,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         viharadhipathi_name: "vh_viharadhipathi_name",
         viharadhipathi_regn: "vh_viharadhipathi_regn",
         period_established: "vh_period_established",
+        mahanayake_date: "vh_mahanayake_date",
+        mahanayake_letter_nu: "vh_mahanayake_letter_nu",
+        mahanayake_remarks: "vh_mahanayake_remarks",
         buildings_description: "vh_buildings_description",
         dayaka_families_count: "vh_dayaka_families_count",
         kulangana_committee: "vh_kulangana_committee",
@@ -655,8 +694,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_viharadhipathi_name: formData.viharadhipathi_name,
       vh_viharadhipathi_regn: formData.viharadhipathi_regn,
       vh_period_established: formData.period_established,
+      vh_mahanayake_date: formData.mahanayake_date,
+      vh_mahanayake_letter_nu: formData.mahanayake_letter_nu,
+      vh_mahanayake_remarks: formData.mahanayake_remarks,
       
-      // Step E: Assets & Activities
+      // Step F: Assets & Activities
       vh_buildings_description: formData.buildings_description,
       vh_dayaka_families_count: formData.dayaka_families_count,
       vh_kulangana_committee: formData.kulangana_committee,
@@ -769,7 +811,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     handleInputChange("resident_bhikkhus", JSON.stringify(rows));
   };
 
-  const gridCols = current?.id === 5 ? "md:grid-cols-3" : "md:grid-cols-2";
+  const gridCols = current?.id === 7 ? "md:grid-cols-3" : "md:grid-cols-2";
   const certificateTypes = useMemo(
     () => (activeMajorStep === 1 ? CERTIFICATE_TYPES.filter((c) => c.id === "acceptance") : CERTIFICATE_TYPES.filter((c) => c.id === "registration")),
     [activeMajorStep]
@@ -1598,7 +1640,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 );
                               })}
 
-                            </div>
+                              </div>
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
@@ -1663,8 +1705,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             </div>
                           ) : (
                             <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
-                            {current?.id === 6 && (
-                              <div className="md:col-span-2">
+                              {current?.id === 6 && (
+                                <div className="md:col-span-2">
+                                  <ViharadhipathiAppointmentLetter data={letterData} />
+                                </div>
+                              )}
+                              {current?.id === 8 && (
+                                <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
                             <label className="flex items-center gap-2">
@@ -1688,7 +1735,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                         </div>
                       )}
 
-                            {current?.id === 7 && (
+                            {current?.id === 9 && (
                               <div className="md:col-span-2">
                           <ResidentBhikkhuTable value={residentBhikkhuRows} onChange={handleResidentBhikkhuChange} error={errors.resident_bhikkhus} />
                           <div className="mt-4">
@@ -1707,7 +1754,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             )}
 
                             {/* Step J: Annex II - Special rendering with sub-headers */}
-                            {current?.id === 10 && (
+                            {current?.id === 12 && (
                               <div className="md:col-span-2 space-y-6">
                           {/* Permission for Construction and Maintenance of New Religious Centers */}
                           <div className="space-y-3">
@@ -2009,8 +2056,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               // Textarea fields
                               if (f.type === "textarea") {
                                 const idStr = String(f.name);
-                                // For Step 5, make buildings_description span 3 columns, others span 1
-                                const spanClass = current?.id === 5 
+                                // For Step 7, make buildings_description span 3 columns, others span 1
+                                const spanClass = current?.id === 7 
                                   ? (idStr === "buildings_description" ? "md:col-span-3" : "")
                                   : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                                 return (
@@ -2031,7 +2078,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
                               // Regular text/email/tel inputs
                               return (
-                                <div key={id} className={current?.id === 5 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
+                                <div key={id} className={current?.id === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
                                   <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
                                   <input
                                     id={id}
@@ -2047,7 +2094,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                             })}
 
                             {/* Step I: Important Notes */}
-                            {current?.id === 9 && (
+                            {current?.id === 11 && (
                               <div className="md:col-span-2">
                                 <ImportantNotes>
                                   <strong>Important:</strong>
