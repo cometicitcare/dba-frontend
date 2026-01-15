@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageVihara } from "@/services/vihara";
+import request from "@/services/backendClient";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -34,6 +35,7 @@ import {
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Dialog, DialogActions, DialogContent, DialogTitle, TextField, Button as MuiButton } from "@mui/material";
 
 // Types local to page
 type NikayaAPIItem = {
@@ -115,6 +117,20 @@ function AddViharaPageInner({ department }: { department?: string }) {
   const [submitting, setSubmitting] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sasanarakshakaOptions, setSasanarakshakaOptions] = useState<Array<{ id: number; name: string }>>([]);
+  const [sasanarakshakaLoading, setSasanarakshakaLoading] = useState(false);
+  const [sasanarakshakaError, setSasanarakshakaError] = useState<string | null>(null);
+  const [bhikkuModalOpen, setBhikkuModalOpen] = useState(false);
+  const [bhikkuSaving, setBhikkuSaving] = useState(false);
+  const [bhikkuError, setBhikkuError] = useState<string | null>(null);
+  const [bhikkuForm, setBhikkuForm] = useState({
+    tb_name: "",
+    tb_id_number: "",
+    tb_contact_number: "",
+    tb_samanera_name: "",
+    tb_address: "",
+    tb_living_temple: "",
+  });
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const letterData: ViharadhipathiAppointmentLetterData = useMemo(
@@ -171,6 +187,116 @@ function AddViharaPageInner({ department }: { department?: string }) {
     const group = visibleMajorStepGroups.find((g) => g.id === activeMajorStep) ?? visibleMajorStepGroups[0];
     return group?.steps?.length ? group.steps : steps;
   }, [activeMajorStep, steps, visibleMajorStepGroups]);
+
+  const getAuthToken = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as any;
+      return (
+        parsed?.token ??
+        parsed?.access_token ??
+        parsed?.accessToken ??
+        parsed?.data?.token ??
+        parsed?.data?.access_token ??
+        parsed?.user?.token ??
+        parsed?.user?.access_token ??
+        null
+      );
+    } catch {
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchSasanarakshaka = async () => {
+      try {
+        setSasanarakshakaLoading(true);
+        setSasanarakshakaError(null);
+        const token = getAuthToken();
+        const response = await request.get<{
+          data?: Array<{ sr_id: number; sr_ssbname: string }>;
+        }>("https://api.dbagovlk.com/api/v1/sasanarakshaka", {
+          params: { page: 1, limit: 1000 },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        const list = Array.isArray(response?.data?.data) ? response.data.data : [];
+        if (mounted) {
+          setSasanarakshakaOptions(
+            list
+              .filter((item) => item?.sr_ssbname)
+              .map((item) => ({ id: item.sr_id, name: item.sr_ssbname }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to load Sasanarakshaka list", err);
+        if (mounted) setSasanarakshakaError("Failed to load list.");
+      } finally {
+        if (mounted) setSasanarakshakaLoading(false);
+      }
+    };
+
+    fetchSasanarakshaka();
+    return () => {
+      mounted = false;
+    };
+  }, [getAuthToken]);
+
+  const handleOpenBhikkuModal = () => {
+    setBhikkuError(null);
+    setBhikkuModalOpen(true);
+  };
+
+  const handleCloseBhikkuModal = () => {
+    if (bhikkuSaving) return;
+    setBhikkuModalOpen(false);
+  };
+
+  const handleBhikkuFieldChange = (key: keyof typeof bhikkuForm, value: string) => {
+    setBhikkuForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleCreateBhikku = async () => {
+    try {
+      setBhikkuSaving(true);
+      setBhikkuError(null);
+      const token = getAuthToken();
+      const response = await request.post<{
+        data?: { tb_id?: number | string; tb_name?: string };
+      }>(
+        "https://api.dbagovlk.com/api/v1/temporary-bhikku/manage",
+        {
+          action: "CREATE",
+          payload: { data: { ...bhikkuForm } },
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      const created = response?.data?.data;
+      if (created?.tb_name) {
+        handleSetMany({
+          viharadhipathi_name: String(created.tb_name),
+          viharadhipathi_regn: created.tb_id != null ? String(created.tb_id) : "",
+        });
+      }
+      toast.success("Bhikku created.", { autoClose: 1200 });
+      setBhikkuForm({
+        tb_name: "",
+        tb_id_number: "",
+        tb_contact_number: "",
+        tb_samanera_name: "",
+        tb_address: "",
+        tb_living_temple: "",
+      });
+      setBhikkuModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create bhikku", err);
+      setBhikkuError("Failed to create bhikku. Please try again.");
+    } finally {
+      setBhikkuSaving(false);
+    }
+  };
 
   const getFirstStepIndexForGroup = useCallback(
     (groupId: number) => {
@@ -957,13 +1083,25 @@ function AddViharaPageInner({ department }: { department?: string }) {
                           return (
                             <div key={id}>
                               <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
-                              <input
-                                id={id}
-                                type="text"
-                                value={val}
-                                onChange={(e) => handleInputChange(f.name, e.target.value)}
-                                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                              />
+                              {sasanarakshakaLoading ? (
+                                <div className="text-sm text-slate-600">Loading list...</div>
+                              ) : sasanarakshakaError ? (
+                                <div role="alert" className="text-sm text-red-600">{sasanarakshakaError}</div>
+                              ) : (
+                                <select
+                                  id={id}
+                                  value={val}
+                                  onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                  className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                >
+                                  <option value="">Select Sasanarakshaka Bala Mandalaya</option>
+                                  {sasanarakshakaOptions.map((opt) => (
+                                    <option key={opt.id} value={opt.name}>
+                                      {opt.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                             </div>
                           );
@@ -1045,6 +1183,16 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                   });
                                 }}
                               />
+                              <div className="mt-3 text-sm text-slate-600">
+                                <span>Cannot find the bhikku from the list? </span>
+                                <button
+                                  type="button"
+                                  onClick={handleOpenBhikkuModal}
+                                  className="font-semibold text-slate-900 underline underline-offset-4 hover:text-slate-700"
+                                >
+                                  Add new bhikku here.
+                                </button>
+                              </div>
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                             </div>
                           );
@@ -1254,6 +1402,60 @@ function AddViharaPageInner({ department }: { department?: string }) {
       </div>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
+      <Dialog open={bhikkuModalOpen} onClose={handleCloseBhikkuModal} fullWidth maxWidth="sm">
+        <DialogTitle>Add New Bhikku</DialogTitle>
+        <DialogContent dividers>
+          <div className="space-y-4">
+            <TextField
+              label="Bhikku Name"
+              fullWidth
+              value={bhikkuForm.tb_name}
+              onChange={(e) => handleBhikkuFieldChange("tb_name", e.target.value)}
+            />
+            <TextField
+              label="ID Number"
+              fullWidth
+              value={bhikkuForm.tb_id_number}
+              onChange={(e) => handleBhikkuFieldChange("tb_id_number", e.target.value)}
+            />
+            <TextField
+              label="Contact Number"
+              fullWidth
+              value={bhikkuForm.tb_contact_number}
+              onChange={(e) => handleBhikkuFieldChange("tb_contact_number", e.target.value)}
+            />
+            <TextField
+              label="Samanera Name"
+              fullWidth
+              value={bhikkuForm.tb_samanera_name}
+              onChange={(e) => handleBhikkuFieldChange("tb_samanera_name", e.target.value)}
+            />
+            <TextField
+              label="Address"
+              fullWidth
+              multiline
+              minRows={3}
+              value={bhikkuForm.tb_address}
+              onChange={(e) => handleBhikkuFieldChange("tb_address", e.target.value)}
+            />
+            <TextField
+              label="Living Temple"
+              fullWidth
+              value={bhikkuForm.tb_living_temple}
+              onChange={(e) => handleBhikkuFieldChange("tb_living_temple", e.target.value)}
+            />
+            {bhikkuError ? <p className="text-sm text-red-600">{bhikkuError}</p> : null}
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={handleCloseBhikkuModal} disabled={bhikkuSaving}>
+            Cancel
+          </MuiButton>
+          <MuiButton variant="contained" onClick={handleCreateBhikku} disabled={bhikkuSaving}>
+            {bhikkuSaving ? "Saving..." : "Create"}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
