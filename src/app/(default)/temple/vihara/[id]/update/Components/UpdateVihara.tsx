@@ -58,6 +58,33 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
   ? ((selectionsData as any).nikayas as NikayaAPIItem[])
   : [];
 
+type GnDivision = {
+  gn_gnc: string;
+  gn_gnname: string;
+};
+
+type Division = {
+  dv_dvcode: string;
+  dv_dvname: string;
+  gn_divisions?: GnDivision[];
+};
+
+type District = {
+  dd_dcode: string;
+  dd_dname: string;
+  divisional_secretariats?: Division[];
+};
+
+type Province = {
+  cp_code: string;
+  cp_name: string;
+  districts: District[];
+};
+
+const STATIC_PROVINCES: Province[] = Array.isArray((selectionsData as any)?.provinces)
+  ? ((selectionsData as any).provinces as Province[])
+  : [];
+
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/vihara/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
@@ -205,6 +232,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const locationNames = useMemo(() => {
+    const province = STATIC_PROVINCES.find((p) => p.cp_code === values.province);
+    const district = province?.districts.find((d) => d.dd_dcode === values.district);
+    const division = district?.divisional_secretariats?.find(
+      (dv) => dv.dv_dvcode === values.divisional_secretariat
+    );
+    const gnDivision = division?.gn_divisions?.find(
+      (gn) => gn.gn_gnc === values.grama_niladhari_division
+    );
+
+    return {
+      province: province?.cp_name ?? values.province ?? "",
+      district: district?.dd_dname ?? values.district ?? "",
+      divisional_secretariat: division?.dv_dvname ?? values.divisional_secretariat ?? "",
+      grama_niladhari_division: gnDivision?.gn_gnname ?? values.grama_niladhari_division ?? "",
+    };
+  }, [values.divisional_secretariat, values.district, values.grama_niladhari_division, values.province]);
   const letterData: ViharadhipathiAppointmentLetterData = useMemo(
     () => ({
       reference_number: values.mahanayake_letter_nu ?? "",
@@ -214,9 +258,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       viharasthana_full_name: values.temple_name ?? "",
       viharasthana_location: values.temple_address ?? "",
       viharasthana_area: "",
-      district: values.district ?? "",
-      divisional_secretariat: values.divisional_secretariat ?? "",
-      grama_niladari: values.grama_niladhari_division ?? "",
+      district: locationNames.district,
+      divisional_secretariat: locationNames.divisional_secretariat,
+      grama_niladari: locationNames.grama_niladhari_division,
       mahanayaka_lt_no: values.mahanayake_letter_nu ?? "",
       mahanayaka_lt_date: values.mahanayake_date ?? "",
       secretary_name: "",
@@ -229,9 +273,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       temple_name: values.temple_name ?? "",
       temple_location_1: values.temple_address ?? "",
       temple_location_2: "",
-      divisional_secretariat_office: values.divisional_secretariat ?? "",
+      divisional_secretariat_office: locationNames.divisional_secretariat,
     }),
-    [today, values]
+    [locationNames.divisional_secretariat, locationNames.district, locationNames.grama_niladhari_division, today, values]
   );
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
@@ -1053,7 +1097,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       registration_number: certificateNumberLabel,
       viharasthana_name: values.temple_name ?? "",
       viharasthana_address: values.temple_address ?? "",
-      regional_committee_divisional_secretariat: values.divisional_secretariat ?? values.pradeshya_sabha ?? "",
+      regional_committee_divisional_secretariat:
+        locationNames.divisional_secretariat || values.pradeshya_sabha || "",
       nikaya: display.nikaya || values.nikaya || "",
       parshwaya: display.parshawaya || values.parshawaya || "",
       establishment_period: values.period_established ? toYYYYMMDD(values.period_established) : "",
@@ -1065,7 +1110,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       gregorian_month: monthName,
       gregorian_day: gDay,
     };
-  }, [certificateNumberLabel, display.nikaya, display.parshawaya, values.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
+  }, [certificateNumberLabel, display.nikaya, display.parshawaya, locationNames.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
 
   const handlePrintCertificate = () => {
     const targetId = ensureActivePrintTarget();
