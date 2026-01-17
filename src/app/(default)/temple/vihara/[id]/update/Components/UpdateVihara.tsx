@@ -222,6 +222,17 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [sasanarakshakaOptions, setSasanarakshakaOptions] = useState<Array<{ id: number; name: string }>>([]);
   const [sasanarakshakaLoading, setSasanarakshakaLoading] = useState(false);
   const [sasanarakshakaError, setSasanarakshakaError] = useState<string | null>(null);
+  const [bhikkuModalOpen, setBhikkuModalOpen] = useState(false);
+  const [bhikkuSaving, setBhikkuSaving] = useState(false);
+  const [bhikkuError, setBhikkuError] = useState<string | null>(null);
+  const [bhikkuForm, setBhikkuForm] = useState({
+    tb_name: "",
+    tb_id_number: "",
+    tb_contact_number: "",
+    tb_samanera_name: "",
+    tb_address: "",
+    tb_living_temple: "",
+  });
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -296,28 +307,29 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return `${API_BASE_URL}${normalizedPath}`;
   };
 
+  const getAuthToken = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as any;
+      return (
+        parsed?.token ??
+        parsed?.access_token ??
+        parsed?.accessToken ??
+        parsed?.data?.token ??
+        parsed?.data?.access_token ??
+        parsed?.user?.token ??
+        parsed?.user?.access_token ??
+        null
+      );
+    } catch {
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
-    const getAuthToken = () => {
-      if (typeof window === "undefined") return null;
-      try {
-        const raw = localStorage.getItem("user");
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as any;
-        return (
-          parsed?.token ??
-          parsed?.access_token ??
-          parsed?.accessToken ??
-          parsed?.data?.token ??
-          parsed?.data?.access_token ??
-          parsed?.user?.token ??
-          parsed?.user?.access_token ??
-          null
-        );
-      } catch {
-        return null;
-      }
-    };
 
     const fetchSasanarakshaka = async () => {
       try {
@@ -350,7 +362,61 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [getAuthToken]);
+
+  const handleOpenBhikkuModal = () => {
+    setBhikkuError(null);
+    setBhikkuModalOpen(true);
+  };
+
+  const handleCloseBhikkuModal = () => {
+    if (bhikkuSaving) return;
+    setBhikkuModalOpen(false);
+  };
+
+  const handleBhikkuFieldChange = (key: keyof typeof bhikkuForm, value: string) => {
+    setBhikkuForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleCreateBhikku = async () => {
+    try {
+      setBhikkuSaving(true);
+      setBhikkuError(null);
+      const token = getAuthToken();
+      const response = await request.post<{
+        data?: { tb_id?: number | string; tb_name?: string };
+      }>(
+        "https://api.dbagovlk.com/api/v1/temporary-bhikku/manage",
+        {
+          action: "CREATE",
+          payload: { data: { ...bhikkuForm } },
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      );
+      const created = response?.data?.data;
+      if (created?.tb_name) {
+        handleSetMany({
+          viharadhipathi_name: String(created.tb_name),
+          viharadhipathi_regn: created.tb_id != null ? String(created.tb_id) : "",
+        });
+      }
+      toast.success("Bhikku created.", { autoClose: 1200 });
+      setBhikkuForm({
+        tb_name: "",
+        tb_id_number: "",
+        tb_contact_number: "",
+        tb_samanera_name: "",
+        tb_address: "",
+        tb_living_temple: "",
+      });
+      setBhikkuModalOpen(false);
+    } catch (err) {
+      console.error("Failed to create bhikku", err);
+      setBhikkuError("Failed to create bhikku. Please try again.");
+    } finally {
+      setBhikkuSaving(false);
+    }
+  };
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
@@ -2022,6 +2088,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         });
                                       }}
                                     />
+                                    <div className="mt-3 text-sm text-slate-600">
+                                      <span>Cannot find the bhikku from the list? </span>
+                                      <button
+                                        type="button"
+                                        onClick={handleOpenBhikkuModal}
+                                        className="font-semibold text-slate-900 underline underline-offset-4 hover:text-slate-700"
+                                      >
+                                        Add new bhikku here.
+                                      </button>
+                                    </div>
                                     {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                                   </div>
                                 );
@@ -2320,6 +2396,61 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                       </MuiButton>
                     </DialogActions>
                   </Dialog>
+
+      <Dialog open={bhikkuModalOpen} onClose={handleCloseBhikkuModal} fullWidth maxWidth="sm">
+        <DialogTitle>Add New Bhikku</DialogTitle>
+        <DialogContent dividers>
+          <div className="space-y-4">
+            <TextField
+              label="Bhikku Name"
+              fullWidth
+              value={bhikkuForm.tb_name}
+              onChange={(e) => handleBhikkuFieldChange("tb_name", e.target.value)}
+            />
+            <TextField
+              label="ID Number"
+              fullWidth
+              value={bhikkuForm.tb_id_number}
+              onChange={(e) => handleBhikkuFieldChange("tb_id_number", e.target.value)}
+            />
+            <TextField
+              label="Contact Number"
+              fullWidth
+              value={bhikkuForm.tb_contact_number}
+              onChange={(e) => handleBhikkuFieldChange("tb_contact_number", e.target.value)}
+            />
+            <TextField
+              label="Samanera Name"
+              fullWidth
+              value={bhikkuForm.tb_samanera_name}
+              onChange={(e) => handleBhikkuFieldChange("tb_samanera_name", e.target.value)}
+            />
+            <TextField
+              label="Address"
+              fullWidth
+              multiline
+              minRows={3}
+              value={bhikkuForm.tb_address}
+              onChange={(e) => handleBhikkuFieldChange("tb_address", e.target.value)}
+            />
+            <TextField
+              label="Living Temple"
+              fullWidth
+              value={bhikkuForm.tb_living_temple}
+              onChange={(e) => handleBhikkuFieldChange("tb_living_temple", e.target.value)}
+            />
+            {bhikkuError ? <p className="text-sm text-red-600">{bhikkuError}</p> : null}
+          </div>
+        </DialogContent>
+        <DialogActions>
+          <MuiButton onClick={handleCloseBhikkuModal} disabled={bhikkuSaving}>
+            Cancel
+          </MuiButton>
+          <MuiButton variant="contained" onClick={handleCreateBhikku} disabled={bhikkuSaving}>
+            {bhikkuSaving ? "Saving..." : "Create"}
+          </MuiButton>
+        </DialogActions>
+      </Dialog>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
