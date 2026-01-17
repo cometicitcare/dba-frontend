@@ -113,6 +113,25 @@ type CertificateMeta = {
   url: string;
 };
 
+const formatSlashDate = (value?: string | null): string => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return "";
+  const ddmmyyyy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyy) {
+    const [, dd, mm, yyyy] = ddmmyyyy;
+    return `${yyyy}/${mm}/${dd}`;
+  }
+  const yyyymmdd = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (yyyymmdd) {
+    const [, yyyy, mm, dd] = yyyymmdd;
+    return `${yyyy}/${mm}/${dd}`;
+  }
+  const yyyymmddSlash = trimmed.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (yyyymmddSlash) return trimmed;
+  const normalized = toYYYYMMDD(trimmed);
+  return normalized ? normalized.replace(/-/g, "/") : trimmed;
+};
+
 export const dynamic = "force-dynamic";
 
 function UpdateViharaPageInner({ role, department }: { role: string | undefined; department?: string }) {
@@ -467,7 +486,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         // Step D: Leadership
         viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
         viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
-        period_established: apiData.vh_period_established ?? "",
+        period_established: formatSlashDate(apiData.vh_period_established ?? ""),
 
         // Step E: Mahanyake Information
         mahanayake_date: apiData.vh_mahanayake_date ?? "",
@@ -2098,6 +2117,24 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         Add new bhikku here.
                                       </button>
                                     </div>
+                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                  </div>
+                                );
+                              }
+
+                              if (id === "period_established") {
+                                const displayValue = formatSlashDate(val);
+                                return (
+                                  <div key={id}>
+                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                    <input
+                                      id={id}
+                                      type="text"
+                                      value={displayValue}
+                                      onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      placeholder="YYYY/MM/DD"
+                                    />
                                     {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                                   </div>
                                 );
