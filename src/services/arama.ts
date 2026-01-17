@@ -3,6 +3,7 @@ import { baseURL } from "../utils/config";
 import axios from 'axios';
 
 export const _manageArama = (body: any) => BackendClient.post(`${baseURL}/arama-data/manage`, body);
+export const _manageTempArama = (body: any) => BackendClient.post(`${baseURL}/temporary-arama/manage`, body);
 
 export const _uploadScannedDocument = async (arId: number, file: File) => {
   const formData = new FormData();
