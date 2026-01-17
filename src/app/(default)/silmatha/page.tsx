@@ -35,6 +35,12 @@ type WorkflowStatusOption = {
   label: string
 }
 
+type WorkflowStatusMeta = {
+  label: string
+  textColor: string
+  bgColor: string
+}
+
 type StatusOption = {
   st_statcd: string
   st_descr: string
@@ -64,6 +70,36 @@ const WORKFLOW_STATUS_OPTIONS = selectionData.workflowStatuses?.length
 const WORKFLOW_STATUS_LABEL_MAP = new Map<string, string>(
   WORKFLOW_STATUS_OPTIONS.map((status) => [status.code, status.label])
 )
+
+function normalizeWorkflowKey(value?: string | null) {
+  if (typeof value !== 'string') return ''
+  return value.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase()
+}
+
+const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
+  (selectionsData as any)?.workflowStatuses
+)
+  ? ((selectionsData as any).workflowStatuses as any[]).reduce(
+      (acc: Record<string, WorkflowStatusMeta>, item) => {
+        const meta: WorkflowStatusMeta = {
+          label: item?.label ?? item?.code ?? '-',
+          textColor: item?.textColor ?? '#1f2937',
+          bgColor: item?.bgColor ?? '#e5e7eb',
+        }
+        const keys = [
+          normalizeWorkflowKey(item?.code),
+          normalizeWorkflowKey(item?.label),
+        ].filter(Boolean) as string[]
+
+        keys.forEach((key) => {
+          if (!acc[key]) acc[key] = meta
+        })
+
+        return acc
+      },
+      {}
+    )
+  : {}
 
 type FilterState = {
   searchKey: string
@@ -108,6 +144,7 @@ type SilmathaRow = {
   mahananame: string
   requestDate: string
   workflowStatus: string
+  workflowStatusCode: string
   currentStatus: string
   province: string
   district: string
@@ -365,7 +402,7 @@ function SilmathaDashboard() {
         {filterPanelOpen && (
           <div
             ref={filterPanelRef}
-            className="absolute right-0 z-30 mt-4  border border-slate-200 bg-white p-6 shadow-2xl"
+            className="absolute right-0 z-30 mt-4 max-h-[70vh] overflow-y-auto border border-slate-200 bg-white p-6 shadow-2xl"
             style={{ width: "min(90vw, 440px)" }}
             role="dialog"
             aria-label="Silmatha filters"
@@ -548,7 +585,9 @@ function SilmathaDashboard() {
               <tr key={row.regn} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-800">{row.regn}</td>
                 <td className="px-4 py-3 text-sm text-gray-700">{row.mahananame}</td>
-                <td className="px-4 py-3 text-sm text-gray-700">{row.workflowStatus}</td>
+                <td className="px-4 py-3 text-sm text-gray-700">
+                  {renderWorkflowStatusBadge(row.workflowStatusCode, row.workflowStatus)}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-700">{row.currentStatus}</td>
                 <td className="px-4 py-3 text-sm text-gray-700">{row.province}</td>
                 <td className="px-4 py-3 text-sm text-gray-700">{row.district}</td>
@@ -698,6 +737,7 @@ function pickSilmathaRecords(payload: unknown): SilmathaRecord[] {
 }
 
 function normalizeRecord(record: SilmathaRecord): SilmathaRow {
+  const workflowCode = record.sil_workflow_status ?? ''
   const workflowLabel =
     (record.sil_workflow_status && WORKFLOW_STATUS_LABEL_MAP.get(record.sil_workflow_status)) ??
     record.sil_workflow_status ??
@@ -714,6 +754,7 @@ function normalizeRecord(record: SilmathaRecord): SilmathaRow {
     mahananame: record.sil_mahananame ?? 'N/A',
     requestDate: record.sil_reqstdate ?? 'N/A',
     workflowStatus: workflowLabel,
+    workflowStatusCode: workflowCode,
     currentStatus,
     province: record.sil_province?.pr_name ?? record.sil_province?.pr_code ?? 'N/A',
     district: record.sil_district?.ds_name ?? record.sil_district?.ds_code ?? 'N/A',
@@ -726,4 +767,23 @@ function parseTotalRecords(payload: any, fallback: number) {
     payload?.totalRecords ?? payload?.total_records ?? payload?.count ?? fallback
   const parsed = Number(candidate)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
+  const code = normalizeWorkflowKey(statusCode)
+  const meta =
+    (code ? WORKFLOW_STATUS_META[code] : undefined) ||
+    (fallbackLabel ? WORKFLOW_STATUS_META[normalizeWorkflowKey(fallbackLabel)] : undefined)
+  const label = meta?.label ?? fallbackLabel ?? statusCode ?? '-'
+
+  if (!meta) return label
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  )
 }
