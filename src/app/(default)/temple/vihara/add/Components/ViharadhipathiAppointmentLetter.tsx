@@ -309,24 +309,14 @@ export default function ViharadhipathiAppointmentLetter({
                 <br />
                 <br />
                 ................................. 
-                <div className="signature-name">
-                  <span
-                    data-field="secretary_name"
-                    style={{ fontWeight: "bold", fontSize: "1.2em" }}
-                  >
-                    {valueOrBlank(data.secretary_name)}
-                  </span>
-                </div>
-                <div className="signature-title">
-                  බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,
-                </div>
+                <div className="signature-title">ආර්.එම්.ජේ.සෙනෙවිරත්න</div>
+                <div className="signature-title">බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,</div>
                 <div className="contact-info">
-                  දුරකථනය <span data-field="phone">{valueOrBlank(data.phone)}</span>
+                  දුරකථනය : 0113159682
                   <br />
-                  ෆැක්ස් <span data-field="fax">{valueOrBlank(data.fax)}</span>
+                  ෆැක්ස් : 0112337335
                   <br />
-                  විද්‍යුත් තැපෑල{" "}
-                  <span data-field="email">{valueOrBlank(data.email)}</span>
+                  විද්‍යුත් තැපෑල : dbavihara@gmail.com
                 </div>
               </div>
 
@@ -344,36 +334,20 @@ export default function ViharadhipathiAppointmentLetter({
                 <div className="copy-to-header">පිටපත් :</div>
                 <ul className="copy-to-list">
                   <li>
-                    1. අතිපූජ්‍ය{" "}
-                    <span data-field="mahanayaka_name">
-                      {valueOrBlank(data.mahanayaka_name)}
+                    1.{" "}
+                    <span data-field="appointed_monk_title">
+                      {valueOrBlank(data.appointed_monk_title)}
                     </span>{" "}
-                    මහානායක ස්වාමීන් වහන්සේගේ - ගෞරවණීය දැන ගැනීම සඳහා
+                    <span data-field="appointed_monk_name">
+                      {valueOrBlank(data.appointed_monk_name)}
+                    </span>{" "}
+                    අතිපූජ්‍ය ඉත්තෑපාන ධම්මාලංකාර මහානායක ස්වාමීන් වහන්සේගේ - ගෞරවණීය දැන
+                    ගැනීම සඳහා - ගෞරවණීය දැන ගැනීම සඳහා මහා විහාරවංශික ස්‍යාමෝපාලී
+                    මහා නිකායේ කෝට්ටේ ශ්‍රී කල්‍යාණී සාමග්‍රී ධර්ම මහා සංඝ සභාව
                     <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;
-                    <span data-field="nikaya_full_name">
-                      {valueOrBlank(data.nikaya_full_name)}
-                    </span>
-                    ,
-                    <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;
-                    <span data-field="temple_name">
-                      {valueOrBlank(data.temple_name)}
-                    </span>
-                    ,
-                    <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;
-                    <span data-field="temple_location_1">
-                      {valueOrBlank(data.temple_location_1)}
-                    </span>
-                    ,
-                    <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;
-                    <span data-field="temple_location_2">
-                      {valueOrBlank(data.temple_location_2)}
-                    </span>
-                    ,
-                    <br />
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span>ශ්‍රී ධර්ම විජයාලෝක මහා විහාරය</span>,{" "}
+                    <span>රුක්මලේ, </span>
+                    <span>පන්නිපිටිය</span>
                   </li>
                   <li>
                     2. ප්‍රාදේශීය ලේකම්, - කාරුණීක දැන ගැනීමට සහ අවශ්‍ය කටයුතු සදහා

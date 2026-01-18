@@ -1,379 +1,407 @@
 <!doctype html>
 <html lang="en">
-<head>
+  <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Viharadhipathi Appointment Confirmation Letter (A4)</title>
     <style>
-        /* Basic styles for layout and print */
-        body {
-            font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-        }
-        .controls {
-            padding: 10px;
-            background-color: #f0f0f0;
-            border-bottom: 1px solid #ccc;
-        }
-        /* Centering and layout tweaks */
-        .print-area {
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .two-column {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            align-items: flex-start;
-            width: 100%;
-        }
-        .right-panel {
-            flex: 0 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        /* Page setup for A4 size (8.27" x 11.69") */
+      /* Basic styles for layout and print */
+      body {
+        font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        line-height: 1.6;
+      }
+      .controls {
+        padding: 10px;
+        background-color: #f0f0f0;
+        border-bottom: 1px solid #ccc;
+      }
+      /* Centering and layout tweaks */
+      .print-area {
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+      }
+      .two-column {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        align-items: flex-start;
+        width: 100%;
+      }
+      .right-panel {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* Page setup for A4 size (8.27" x 11.69") */
+      .page {
+        page-break-after: always;
+        margin: 0 auto 20px;
+        width: 8.27in;
+        height: 11.69in;
+        max-width: calc(100% - 30px);
+        position: relative;
+        background-color: white;
+        box-sizing: border-box;
+        padding: 0.75in 1in;
+      }
+
+      /* Make the preview look clean on-screen */
+      @media screen {
         .page {
-            page-break-after: always;
-            margin: 0 auto 20px;
-            width: 8.27in;
-            height: 11.69in;
-            max-width: calc(100% - 30px);
-            position: relative;
-            background-color: white;
-            box-sizing: border-box;
-            padding: 0.75in 1in;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
         }
+      }
 
-        /* Make the preview look clean on-screen */
-        @media screen {
-            .page {
-                box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-            }
-        }
+      /* Header section */
+      .letter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 30px;
+        font-size: 14px;
+      }
 
-        /* Header section */
-        .letter-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
+      .reference-number {
+        font-weight: 600;
+      }
 
-        .reference-number {
-            font-weight: 600;
-        }
+      .date {
+        font-weight: 600;
+      }
 
-        .date {
-            font-weight: 600;
-        }
+      /* Recipient address */
+      .recipient-address {
+        margin-bottom: 30px;
+        line-height: 1.8;
+      }
 
-        /* Recipient address */
-        .recipient-address {
-            margin-bottom: 30px;
-            line-height: 1.8;
-        }
+      .recipient-title {
+        font-weight: 600;
+        font-size: 15px;
+      }
 
-        .recipient-title {
-            font-weight: 600;
-            font-size: 15px;
-        }
+      /* Salutation */
+      .salutation {
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
 
-        /* Salutation */
-        .salutation {
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
+      /* Subject line */
+      .subject {
+        margin-bottom: 20px;
+        font-weight: 600;
+        text-decoration: underline;
+      }
 
-        /* Subject line */
-        .subject {
-            margin-bottom: 20px;
-            font-weight: 600;
-            text-decoration: underline;
-        }
+      /* Body text */
+      .letter-body {
+        margin-bottom: 30px;
+        text-align: justify;
+        line-height: 1.8;
+      }
 
-        /* Body text */
-        .letter-body {
-            margin-bottom: 30px;
-            text-align: justify;
-            line-height: 1.8;
-        }
+      /* Closing */
+      .closing {
+        margin-bottom: 40px;
+      }
 
-        /* Closing */
-        .closing {
-            margin-bottom: 40px;
-        }
+      /* Signature section */
+      .signature-section {
+        margin-bottom: 30px;
+      }
 
-        /* Signature section */
-        .signature-section {
-            margin-bottom: 30px;
-        }
+      .signature-name {
+        font-weight: 600;
+      }
 
-        .signature-name {
-            font-weight: 600;
-        }
+      .signature-title {
+        font-weight: 500;
+      }
 
-        .signature-title {
-            font-weight: 500;
-        }
+      .contact-info {
+        font-size: 13px;
+        line-height: 1.6;
+      }
 
-        .contact-info {
-            font-size: 13px;
-            line-height: 1.6;
-        }
+      /* Copy to section */
+      .copy-to {
+        margin-top: 40px;
+        font-size: 14px;
+      }
 
-        /* Copy to section */
-        .copy-to {
-            margin-top: 40px;
-            font-size: 14px;
-        }
+      .copy-to-header {
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
 
-        .copy-to-header {
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
+      .copy-to-list {
+        list-style-type: none;
+        padding-left: 0;
+        line-height: 1.8;
+      }
 
-        .copy-to-list {
-            list-style-type: none;
-            padding-left: 0;
-            line-height: 1.8;
-        }
+      .copy-to-list li {
+        margin-bottom: 8px;
+      }
 
-        .copy-to-list li {
-            margin-bottom: 8px;
-        }
+      /* QR Code section */
+      .qr-container {
+        position: absolute;
+        right: 1in;
+        bottom: 0.75in;
+        width: 80px;
+        height: 80px;
+        text-align: center;
+      }
 
-        /* QR Code section */
-        .qr-container {
-            position: absolute;
-            right: 1in;
-            bottom: 0.75in;
-            width: 80px;
-            height: 80px;
-            text-align: center;
-        }
-        
-        .qr-container img {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        .qr-container .caption {
-            font-size: 9px;
-            color: #000;
-            margin-top: 4px;
-        }
+      .qr-container img {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
 
-        /* Dynamic field highlighting for development */
-        [data-field] {
-            display: inline;
-        }
+      .qr-container .caption {
+        font-size: 9px;
+        color: #000;
+        margin-top: 4px;
+      }
 
-        /* Multi-language support */
-        .sinhala { display: inline; }
-        .tamil { display: none; }
-        .eng { display: none; }
+      /* Dynamic field highlighting for development */
+      [data-field] {
+        display: inline;
+      }
 
-        @media print {
-            .controls {
-                display: none;
-            }
-            .print-area {
-                padding: 0;
-            }
-            .page {
-                page-break-after: always;
-                margin: 0;
-                width: 8.27in;
-                height: 11.69in;
-                max-width: 100%;
-                box-shadow: none;
-            }
+      /* Multi-language support */
+      .sinhala {
+        display: inline;
+      }
+      .tamil {
+        display: none;
+      }
+      .eng {
+        display: none;
+      }
+
+      @media print {
+        .controls {
+          display: none;
         }
+        .print-area {
+          padding: 0;
+        }
+        .page {
+          page-break-after: always;
+          margin: 0;
+          width: 8.27in;
+          height: 11.69in;
+          max-width: 100%;
+          box-shadow: none;
+        }
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="controls">
-        <button onclick="populateWithSample()">Load sample data</button>
-        <button onclick="window.print()">Print / Save as PDF</button>
+      <button onclick="populateWithSample()">Load sample data</button>
+      <button onclick="window.print()">Print / Save as PDF</button>
     </div>
 
     <div class="print-area">
-        <div class="two-column">
-            <main class="right-panel">
-                <!-- Single Page Letter -->
-                <section class="page" id="page-1" role="document" aria-label="Viharadhipathi Appointment Confirmation Letter">
-                    
-                    <!-- Header with reference number and date -->
-                    <div class="letter-header">
-                        <div class="reference-number">
-                            <span data-field="reference_number"></span>
-                        </div>
-                        <div class="date">
-                            දිනය: <span data-field="letter_date"></span>
-                        </div>
-                    </div>
+      <div class="two-column">
+        <main class="right-panel">
+          <!-- Single Page Letter -->
+          <section
+            class="page"
+            id="page-1"
+            role="document"
+            aria-label="Viharadhipathi Appointment Confirmation Letter"
+          >
+            <!-- Header with reference number and date -->
+            <div class="letter-header">
+              <div class="reference-number">
+                <span data-field="reference_number"></span>
+              </div>
+              <div class="date">
+                දිනය: <span data-field="letter_date"></span>
+              </div>
+            </div>
 
-                    <!-- Recipient Address -->
-                    <div class="recipient-address">
-                        <div class="recipient-title">
-                            අතිපූජ්‍ය <span data-field="mahanayaka_name"></span> මහානායක ස්වාමීන් වහන්සේ,
-                        </div>
-                        <div>
-                            <span data-field="nikaya_full_name"></span>,
-                        </div>
-                        <div>
-                            <span data-field="temple_name"></span>,
-                        </div>
-                        <div>
-                            <span data-field="temple_location_1"></span>,
-                        </div>
-                        <div>
-                            <span data-field="temple_location_2"></span>.
-                        </div>
-                    </div>
+            <!-- Recipient Address -->
+            <div class="recipient-address">
+              <div class="recipient-title">
+                අතිපූජ්‍ය <span data-field="mahanayaka_name"></span> මහානායක
+                ස්වාමීන් වහන්සේ,
+              </div>
+              <div><span data-field="nikaya_full_name"></span>,</div>
+              <div><span data-field="temple_name"></span>,</div>
+              <div><span data-field="temple_location_1"></span>,</div>
+              <div><span data-field="temple_location_2"></span>.</div>
+            </div>
 
-                    <!-- Salutation -->
-                    <div class="salutation">
-                        අතිපූජ්‍ය මහානායක ස්වාමීන් වහන්සේ,
-                    </div>
+            <!-- Salutation -->
+            <div class="salutation">අතිපූජ්‍ය මහානායක ස්වාමීන් වහන්සේ,</div>
 
-                    <!-- Subject -->
-                    <div class="subject">
-                        විහාරාධිපති ධුරය පත් කීරීමෙ ලිපිය පිළිගත් බවට දැනුම්දීම.
-                    </div>
+            <!-- Subject -->
+            <div class="subject">
+              විහාරාධිපති ධුරය පත් කීරීමෙ ලිපිය පිළිගත් බවට දැනුම්දීම.
+            </div>
 
-                    <!-- Letter Body -->
-                    <div class="letter-body">
-                        <span data-field="district"></span> දිස්ත්‍රික්කයේ <span data-field="divisional_secretariat"></span> ප්‍රාදේශීය ලේකම් කොට්ඨාසයේ <span data-field="viharasthana_location"></span>, <span data-field="viharasthana_area"></span> <span data-field="viharasthana_full_name"></span> විහාරස්ථනයේ විහාරාධිපති ධුරයට <span data-field="appointed_monk_title"></span> <span data-field="appointed_monk_name"></span> ස්වාමීන් වහන්සේ පත් කල බව දක්වා ඔබ වහන්සේ විසින් මා වෙත යොමුකර ඇති <span data-field="appointment_letter_date"></span> දිනැති ලිපිය පිළිගත් බව ගෞරව පූර්වකව දන්වා සිටිමි.
-                    </div>
+            <!-- Letter Body -->
+            <div class="letter-body">
+              <span data-field="district"></span> දිස්ත්‍රික්කයේ
+              <span data-field="divisional_secretariat"></span> ප්‍රාදේශීය ලේකම්
+              කොට්ඨාසයේ <span data-field="viharasthana_location"></span>,
+              <span data-field="viharasthana_area"></span>
+              <span data-field="viharasthana_full_name"></span> විහාරස්ථනයේ
+              විහාරාධිපති ධුරයට <span data-field="appointed_monk_title"></span>
+              <span data-field="appointed_monk_name"></span> ස්වාමීන් වහන්සේ පත්
+              කල බව දක්වා ඔබ වහන්සේ විසින් මා වෙත යොමුකර ඇති
+              <span data-field="appointment_letter_date"></span> දිනැති ලිපිය
+              පිළිගත් බව ගෞරව පූර්වකව දන්වා සිටිමි.
+            </div>
 
-                    <!-- Closing -->
-                    <div class="closing">
-                        මෙයට - සසුන් ලැදී,
-                    </div>
+            <!-- Closing -->
+            <div class="closing">මෙයට - සසුන් ලැදී,</div>
 
-                    <!-- Signature Section -->
-                    <div class="signature-section">
-                        <div class="signature-name">
-                            <span data-field="secretary_name"></span>
-                        </div>
-                        <div class="signature-title">
-                            බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,
-                        </div>
-                        <div class="contact-info">
-                            දුරකථනය <span data-field="phone"></span><br/>
-                            ෆැක්ස් <span data-field="fax"></span><br/>
-                            විද්‍යුත් තැපෑල <span data-field="email"></span>
-                        </div>
-                    </div>
+            <!-- Signature Section -->
+            <div class="signature-section">
+              <div class="signature-name">
+                <span data-field="secretary_name"></span>
+              </div>
+              <div class="signature-title">ආර්.එම්.ජේ.සෙනෙවිරත්න</div>
+              <div class="signature-title">බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,</div>
+              <div class="contact-info">
+                දුරකථනය : 0113159682 <span data-field="phone"></span><br />
+                ෆැක්ස් : 0112337335<span data-field="fax"></span><br />
+                විද්‍යුත් තැපෑල : dbavihara@gmail.com
+                <span data-field="email"></span>
+              </div>
+            </div>
 
-                    <!-- Copy To Section -->
-                    <div class="copy-to">
-                        <div class="copy-to-header">පිටපත් :</div>
-                        <ul class="copy-to-list">
-                            <li>
-                                1. <span data-field="appointed_monk_title"></span> <span data-field="appointed_monk_name"></span> ස්වාමීන් වහන්සේ - ගෞරවණීය දැන ගැනීම සඳහා<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;<span data-field="viharasthana_full_name"></span>, <span data-field="viharasthana_location"></span>
-                            </li>
-                            <li>
-                                2. ප්‍රාදේශීය ලේකම්, - කාරුණීක දැන ගැනීමට සහ අවශ්‍ය කටයුතු සදහා<br/>
-                                &nbsp;&nbsp;&nbsp;&nbsp;ලේකම් කාර්යාලය, <span data-field="divisional_secretariat_office"></span>
-                            </li>
-                        </ul>
-                    </div>
+            <!-- Copy To Section -->
+            <div class="copy-to">
+              <div class="copy-to-header">පිටපත් :</div>
+              <ul class="copy-to-list">
+                <li>
+                  1. <span data-field="appointed_monk_title"></span>
+                  <span data-field="appointed_monk_name"></span> අතිපූජ්‍ය
+                  ඉත්තෑපාන ධම්මාලංකාර මහානායක ස්වාමීන් වහන්සේගේ - ගෞරවණීය දැන
+                  ගැනීම සඳහා - ගෞරවණීය දැන ගැනීම සඳහා මහා විහාරවංශික ස්‍යාමෝපාලී
+                  මහා නිකායේ කෝට්ටේ ශ්‍රී කල්‍යාණී සාමග්‍රී ධර්ම මහා සංඝ සභාව<br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;<span
+                    >ශ්‍රී ධර්ම විජයාලෝක මහා විහාරය</span
+                  >, <span>රුක්මලේ</span><span>පන්නිපිටිය</span>
+                </li>
+                <li>
+                  2. ප්‍රාදේශීය ලේකම්, - කාරුණීක දැන ගැනීමට සහ අවශ්‍ය කටයුතු
+                  සදහා<br />
+                  &nbsp;&nbsp;&nbsp;&nbsp;ලේකම් කාර්යාලය,
+                  <span data-field="divisional_secretariat_office"></span>
+                </li>
+              </ul>
+            </div>
 
-                    <!-- QR code for letter verification -->
-                    <div class="qr-container" id="qr-container">
-                        <a id="letterLink" href="#" target="_blank" aria-label="Letter Verification URL">
-                            <img id="qrCode" src="" alt="QR code" />
-                        </a>
-                        <div class="caption" id="qrLabel"></div>
-                    </div>
-
-                </section>
-            </main>
-        </div>
+            <!-- QR code for letter verification -->
+            <div class="qr-container" id="qr-container">
+              <a
+                id="letterLink"
+                href="#"
+                target="_blank"
+                aria-label="Letter Verification URL"
+              >
+                <img id="qrCode" src="" alt="QR code" />
+              </a>
+              <div class="caption" id="qrLabel"></div>
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
 
     <script>
-        // Populate fields from data object
-        function populateFields(data) {
-            document.querySelectorAll('[data-field]').forEach(function(el) {
-                var key = el.getAttribute('data-field');
-                if (data && data[key] !== undefined && data[key] !== null) {
-                    el.textContent = data[key];
-                } else {
-                    el.textContent = '';
-                }
-            });
+      // Populate fields from data object
+      function populateFields(data) {
+        document.querySelectorAll("[data-field]").forEach(function (el) {
+          var key = el.getAttribute("data-field");
+          if (data && data[key] !== undefined && data[key] !== null) {
+            el.textContent = data[key];
+          } else {
+            el.textContent = "";
+          }
+        });
 
-            // QR code: build URL using the reference number
-            try {
-                var refNum = (data && data.reference_number) ? data.reference_number : 'sample-ref';
-                var url = 'https://buddhistaffairs.gov.lk/letters/' + encodeURIComponent(refNum);
-                var qrImg = document.getElementById('qrCode');
-                if (qrImg) {
-                    // Use a public QR generator to create a QR image
-                    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=' + encodeURIComponent(url);
-                }
-                var letterLink = document.getElementById('letterLink');
-                if (letterLink) { 
-                    letterLink.href = url; 
-                    letterLink.title = url; 
-                }
-                var qrLabel = document.getElementById('qrLabel');
-                if (qrLabel) { 
-                    qrLabel.textContent = url; 
-                }
-            } catch (e) {
-                console.warn('QR generation failed', e);
-            }
+        // QR code: build URL using the reference number
+        try {
+          var refNum =
+            data && data.reference_number
+              ? data.reference_number
+              : "sample-ref";
+          var url =
+            "https://buddhistaffairs.gov.lk/letters/" +
+            encodeURIComponent(refNum);
+          var qrImg = document.getElementById("qrCode");
+          if (qrImg) {
+            // Use a public QR generator to create a QR image
+            qrImg.src =
+              "https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=" +
+              encodeURIComponent(url);
+          }
+          var letterLink = document.getElementById("letterLink");
+          if (letterLink) {
+            letterLink.href = url;
+            letterLink.title = url;
+          }
+          var qrLabel = document.getElementById("qrLabel");
+          if (qrLabel) {
+            qrLabel.textContent = url;
+          }
+        } catch (e) {
+          console.warn("QR generation failed", e);
         }
+      }
 
-        // Load sample data
-        function populateWithSample() {
-            const sample = {
-                // Header
-                reference_number: "බෞකො/විහාදේ/03/21/025",
-                letter_date: "2025.11.25",
-                
-                // Recipient
-                mahanayaka_name: "ඉත්තෑපාන ධම්මාලංකාර",
-                nikaya_full_name: "මහා විහාරවංශික ස්‍යාමෝපාලී මහා නිකායේ කෝට්ටේ ශ්‍රී කල්‍යාණී සාමග්‍රී ධර්ම මහා සංඝ සභාව",
-                temple_name: "ශ්‍රී ධර්ම විජයාලෝක මහා විහාරය",
-                temple_location_1: "රුක්මලේ",
-                temple_location_2: "පන්නිපිටිය",
-                
-                // Body content
-                district: "කළුතර",
-                divisional_secretariat: "කළුතර",
-                viharasthana_location: "නාගොඩ",
-                viharasthana_area: "කළුතර දකුණේ",
-                viharasthana_full_name: "ශ්‍රී සෝභිත සංඝාරාම විහාරස්ථානය",
-                appointed_monk_title: "පූජ්‍ය",
-                appointed_monk_name: "මාලේවන පුඤ්ඤරතන",
-                appointment_letter_date: "2025.09.10",
-                
-                // Signature
-                secretary_name: "ආර්.එම්.ජේ.සෙනෙවිරත්න",
-                phone: "0113159682",
-                fax: "0112337335",
-                email: "dbavihara@gmail.com",
-                
-                // Copy to
-                divisional_secretariat_office: "කළුතර"
-            };
+      // Load sample data
+      function populateWithSample() {
+        const sample = {
+          // Header
+          reference_number: "බෞකො/විහාදේ/03/21/025",
+          letter_date: "2025.11.25",
 
-            populateFields(sample);
-        }
+          // Recipient
+          mahanayaka_name: "ඉත්තෑපාන ධම්මාලංකාර",
+          nikaya_full_name:
+            "මහා විහාරවංශික ස්‍යාමෝපාලී මහා නිකායේ කෝට්ටේ ශ්‍රී කල්‍යාණී සාමග්‍රී ධර්ම මහා සංඝ සභාව",
+          temple_name: "ශ්‍රී ධර්ම විජයාලෝක මහා විහාරය",
+          temple_location_1: "රුක්මලේ",
+          temple_location_2: "පන්නිපිටිය",
+
+          // Body content
+          district: "කළුතර",
+          divisional_secretariat: "කළුතර",
+          viharasthana_location: "නාගොඩ",
+          viharasthana_area: "කළුතර දකුණේ",
+          viharasthana_full_name: "ශ්‍රී සෝභිත සංඝාරාම විහාරස්ථානය",
+          appointed_monk_title: "පූජ්‍ය",
+          appointed_monk_name: "මාලේවන පුඤ්ඤරතන",
+          appointment_letter_date: "2025.09.10",
+
+          // Signature
+          secretary_name: "ආර්.එම්.ජේ.සෙනෙවිරත්න",
+          phone: "0113159682",
+          fax: "0112337335",
+          email: "dbavihara@gmail.com",
+
+          // Copy to
+          divisional_secretariat_office: "කළුතර",
+        };
+
+        populateFields(sample);
+      }
     </script>
-</body>
+  </body>
 </html>
