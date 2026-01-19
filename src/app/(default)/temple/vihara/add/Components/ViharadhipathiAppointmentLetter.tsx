@@ -341,9 +341,7 @@ export default function ViharadhipathiAppointmentLetter({
                     <span data-field="appointed_monk_title">
                       {valueOrBlank(data.appointed_monk_title)}
                     </span>{" "}
-                    <span data-field="appointed_monk_name">
-                      {valueOrBlank(data.appointed_monk_name)}
-                    </span>{" "}
+                    
                     <span data-field="br_mahananame">
                       {valueOrBlank(data.br_mahananame)}
                     </span>{" "}
@@ -377,7 +375,7 @@ export default function ViharadhipathiAppointmentLetter({
                 >
                   <QRCode value={qrUrl} size={80} className="h-20 w-20" />
                 </a>
-                <div className="caption">{qrUrl}</div>
+                
               </div>
             </section>
           </main>

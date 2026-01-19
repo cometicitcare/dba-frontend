@@ -1023,7 +1023,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         </div>
                       )}
 
-                      {currentStep !== 6 && currentStep !== 7 && currentStep !== 10 && current.fields.map((f) => {
+                      {currentStep !== 7 && currentStep !== 8 && currentStep !== 11 && current.fields.map((f) => {
                         const id = String(f.name);
                         const rawVal = (values[f.name] as unknown as string) ?? "";
                         const val = f.type === "date" ? toYYYYMMDD(rawVal) : rawVal;
@@ -1031,6 +1031,20 @@ function AddViharaPageInner({ department }: { department?: string }) {
 
                         // Skip table fields in regular rendering
                         if (id === "temple_owned_land" || id === "resident_bhikkhus") return null;
+
+                        if (f.type === "date") {
+                          return (
+                            <DateField
+                              key={id}
+                              id={id}
+                              label={f.label}
+                              value={val}
+                              onChange={(next) => handleInputChange(f.name, next)}
+                              required={!!f.rules?.required}
+                              error={err}
+                            />
+                          );
+                        }
 
                         // Step B: Administrative Divisions - use LocationPicker
                         if (currentStep === 2 && id === "district") {
@@ -1299,7 +1313,6 @@ function AddViharaPageInner({ department }: { department?: string }) {
                               type={f.type}
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
-                              max={f.type === "date" ? today : undefined}
                               disabled={isDisabled}
                               className={`w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${isDisabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                               placeholder={f.placeholder}
