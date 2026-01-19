@@ -55,9 +55,7 @@ export type ViharaForm = {
   mahanayake_letter_nu: string;
   mahanayake_remarks: string;
 
-  // Step F: View Letter
-
-  // Step G: Temple Assets & Activities
+  // Step F: Temple Assets & Activities
   buildings_description: string;
   dayaka_families_count: string;
   kulangana_committee: string;
@@ -65,19 +63,19 @@ export type ViharaForm = {
   temple_working_committee: string;
   other_associations: string;
 
-  // Step H: Temple-Owned Land Information (stored as JSON array)
+  // Step G: Temple-Owned Land Information (stored as JSON array)
   temple_owned_land: string; // JSON string of LandInfoRow[]
   land_info_certified: boolean;
 
-  // Step I: Resident Bhikkhus (stored as JSON array)
+  // Step H: Resident Bhikkhus (stored as JSON array)
   resident_bhikkhus: string; // JSON string of ResidentBhikkhuRow[]
   resident_bhikkhus_certified: boolean;
 
-  // Step J: Report and Inspection
+  // Step I: Report and Inspection
   inspection_report: string; // Report text
   inspection_code: string;
 
-  // Step K: Ownership and Recommendation
+  // Step J: Ownership and Recommendation
   grama_niladhari_division_ownership: string;
   sanghika_donation_deed: boolean;
   government_donation_deed: boolean;
@@ -86,7 +84,7 @@ export type ViharaForm = {
   recommend_new_center: boolean;
   recommend_registered_temple: boolean;
 
-  // Step L: Annex II
+  // Step K: Annex II
   annex2_recommend_construction: boolean;
   annex2_land_ownership_docs: boolean;
   annex2_chief_incumbent_letter: boolean;
@@ -155,24 +153,19 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
   },
   {
     id: 5,
-    title: "Mahanyake Information",
+    title: "Mahanyake thero Information",
     fields: [
-      { name: "mahanayake_date", label: "Mahanyake Date", type: "date", rules: { required: false } },
-      { name: "mahanayake_letter_nu", label: "Mahanyake Letter Number", type: "text", rules: { required: false } },
+      { name: "mahanayake_date", label: "Mahanyake Thero Letter Date", type: "date", rules: { required: false } },
+      { name: "mahanayake_letter_nu", label: "Mahanyake Thero Letter Number", type: "text", rules: { required: false } },
       {
         name: "mahanayake_remarks",
-        label: "Mahanyake Remarks",
+        label: "Letter Remarks",
         type: "textarea",
         rows: 4,
         placeholder: "Add detailed remarks about the Mahanyake letter, guidance provided, or any special notes that should be kept with this registration.",
         rules: { required: false },
       },
     ],
-  },
-  {
-    id: 6,
-    title: "View Letter",
-    fields: [],
   },
   {
     id: 7,
