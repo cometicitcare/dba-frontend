@@ -1388,20 +1388,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
   const handleApprove = async () => {
     if (!canModerate) return;
-    if (
-      !window.confirm(
-        activeMajorStep === 1
-          ? "Approve Stage 1? This action may be irreversible."
-          : "Approve Stage 2? This action may be irreversible."
-      )
-    )
-      return;
     try {
       setApproving(true);
       if (!viharaId) throw new Error("Missing vihara id");
       const stage = activeMajorStep === 1 ? 1 : 2;
       await _approveStage(Number(viharaId), stage);
       toast.success(stage === 1 ? "Stage 1 approved." : "Stage 2 approved.", { autoClose: 1200 });
+      router.push("/temple/vihara");
     } catch (e: unknown) {
       const msg = extractApiMessage(e, "Failed to approve. Please try again.");
       toast.error(msg);
@@ -1425,6 +1418,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       const stage = activeMajorStep === 1 ? 1 : 2;
       await _rejectStage(Number(viharaId), stage, reason);
       toast.success(stage === 1 ? "Stage 1 rejected." : "Stage 2 rejected.", { autoClose: 1200 });
+      router.push("/temple/vihara");
       setRejectionReason("");
     } catch (e: unknown) {
       const errMsg = extractApiMessage(e, "Failed to reject. Please try again.");
@@ -1488,7 +1482,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                   
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleApprove}
+                      onClick={handleOpenApproveDialog}
                       disabled={loading || saving || approving}
                       className={`px-4 py-2 rounded-lg font-medium transition-all
                         ${
