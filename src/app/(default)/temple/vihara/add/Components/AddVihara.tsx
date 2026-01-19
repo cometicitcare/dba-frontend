@@ -24,8 +24,6 @@ import {
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
-  ViharadhipathiAppointmentLetter,
-  type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
   type LandInfoRow,
@@ -49,33 +47,6 @@ type NikayaAPIItem = {
 
 const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any)?.nikayas)
   ? ((selectionsData as any).nikayas as NikayaAPIItem[])
-  : [];
-
-type GnDivision = {
-  gn_gnc: string;
-  gn_gnname: string;
-};
-
-type Division = {
-  dv_dvcode: string;
-  dv_dvname: string;
-  gn_divisions?: GnDivision[];
-};
-
-type District = {
-  dd_dcode: string;
-  dd_dname: string;
-  divisional_secretariats?: Division[];
-};
-
-type Province = {
-  cp_code: string;
-  cp_name: string;
-  districts: District[];
-};
-
-const STATIC_PROVINCES: Province[] = Array.isArray((selectionsData as any)?.provinces)
-  ? ((selectionsData as any).provinces as Province[])
   : [];
 
 export const dynamic = "force-dynamic";
@@ -160,51 +131,6 @@ function AddViharaPageInner({ department }: { department?: string }) {
   });
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const locationNames = useMemo(() => {
-    const province = STATIC_PROVINCES.find((p) => p.cp_code === values.province);
-    const district = province?.districts.find((d) => d.dd_dcode === values.district);
-    const division = district?.divisional_secretariats?.find(
-      (dv) => dv.dv_dvcode === values.divisional_secretariat
-    );
-    const gnDivision = division?.gn_divisions?.find(
-      (gn) => gn.gn_gnc === values.grama_niladhari_division
-    );
-
-    return {
-      province: province?.cp_name ?? values.province ?? "",
-      district: district?.dd_dname ?? values.district ?? "",
-      divisional_secretariat: division?.dv_dvname ?? values.divisional_secretariat ?? "",
-      grama_niladhari_division: gnDivision?.gn_gnname ?? values.grama_niladhari_division ?? "",
-    };
-  }, [values.divisional_secretariat, values.district, values.grama_niladhari_division, values.province]);
-  const letterData: ViharadhipathiAppointmentLetterData = useMemo(
-    () => ({
-      reference_number: values.mahanayake_letter_nu ?? "",
-      letter_date: values.mahanayake_date ?? today,
-      appointed_monk_name: values.viharadhipathi_name ?? "",
-      appointed_monk_title: "",
-      viharasthana_full_name: values.temple_name ?? "",
-      viharasthana_location: values.temple_address ?? "",
-      viharasthana_area: "",
-      district: locationNames.district,
-      divisional_secretariat: locationNames.divisional_secretariat,
-      grama_niladari: locationNames.grama_niladhari_division,
-      mahanayaka_lt_no: values.mahanayake_letter_nu ?? "",
-      mahanayaka_lt_date: values.mahanayake_date ?? "",
-      secretary_name: "",
-      phone: "",
-      fax: "",
-      email: values.email_address ?? "",
-      remarks: values.mahanayake_remarks ?? "",
-      mahanayaka_name: "",
-      nikaya_full_name: values.nikaya ?? "",
-      temple_name: values.temple_name ?? "",
-      temple_location_1: values.temple_address ?? "",
-      temple_location_2: "",
-      divisional_secretariat_office: locationNames.divisional_secretariat,
-    }),
-    [locationNames.divisional_secretariat, locationNames.district, locationNames.grama_niladhari_division, today, values]
-  );
 
   const isReview = reviewEnabled && currentStep === effectiveSteps.length;
   const current = effectiveSteps[currentStep - 1];
@@ -507,6 +433,32 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return null;
   };
 
+  const collectApiErrors = (source: any) => {
+    const container = source?.data ?? source;
+    const rawErrors =
+      container?.errors ??
+      container?.[""] ??
+      container?.data?.errors ??
+      container?.data?.[""];
+    const messages = Array.isArray(rawErrors)
+      ? rawErrors
+          .map((err) => {
+            if (!err) return "";
+            const msg = err.message ?? err.msg ?? "";
+            const field = err.field ?? err.name ?? "";
+            if (field && msg) return `${field}: ${msg}`;
+            if (msg) return msg;
+            return field ? `${field}: Validation failed.` : "";
+          })
+          .filter(Boolean)
+      : [];
+    const fallback =
+      container?.message ??
+      container?.data?.message ??
+      "Failed to save Stage 1. Please try again.";
+    return { messages, fallback };
+  };
+
   const handleSaveFlowOne = async () => {
     if (!validateStep(currentStep)) return;
 
@@ -518,6 +470,14 @@ function AddViharaPageInner({ department }: { department?: string }) {
         payload: { data: stageOnePayload },
       } as any);
 
+      const payload = (response as any)?.data ?? response;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApiErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+
       const newId = extractViharaId(response);
       if (newId) setCreatedViharaId(newId);
 
@@ -527,7 +487,12 @@ function AddViharaPageInner({ department }: { department?: string }) {
       });
       setTimeout(() => router.push("/temple/vihara"), 1400);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.";
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApiErrors(data);
+      const msg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.");
       toast.error(msg);
     } finally {
       setSubmitting(false);
@@ -835,11 +800,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return "";
   }, []);
 
-  // Auto-populate grama_niladhari_division_ownership from grama_niladhari_division when navigating to step 11
+  // Auto-populate grama_niladhari_division_ownership from grama_niladhari_division when navigating to step 10
   useEffect(() => {
-    if (currentStep === 11 && values.grama_niladhari_division) {
+    if (currentStep === 10 && values.grama_niladhari_division) {
       const gnName = lookupGnName(values.grama_niladhari_division);
-      // Always sync the ownership field with the selected GN division name when on step 11
+    // Always sync the ownership field with the selected GN division name when on step 10
       if (gnName && gnName !== values.grama_niladhari_division_ownership) {
         handleSetMany({ grama_niladhari_division_ownership: gnName });
       }
@@ -847,7 +812,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.grama_niladhari_division, lookupGnName]);
 
-  const gridCols = currentStep === 7 ? "md:grid-cols-3" : "md:grid-cols-2";
+  const gridCols = currentStep === 6 ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -921,12 +886,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
 
                     {!isReview && (
                       <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
-                        {currentStep === 6 && (
-                          <div className="md:col-span-2">
-                            <ViharadhipathiAppointmentLetter data={letterData} />
-                          </div>
-                        )}
-                      {currentStep === 8 && (
+                      {currentStep === 7 && (
                         <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
                           <div className="mt-4">
@@ -951,7 +911,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         </div>
                       )}
 
-                      {currentStep === 9 && (
+                      {currentStep === 8 && (
                         <div className="md:col-span-2">
                           <ResidentBhikkhuTable value={residentBhikkhuRows} onChange={handleResidentBhikkhuChange} error={errors.resident_bhikkhus} />
                           <div className="mt-4">
@@ -969,8 +929,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         </div>
                       )}
 
-                      {/* Step J: Annex II - Special rendering with sub-headers */}
-                      {currentStep === 12 && (
+                      {/* Step K: Annex II - Special rendering with sub-headers */}
+                      {currentStep === 11 && (
                         <div className="md:col-span-2 space-y-6">
                           {/* Permission for Construction and Maintenance of New Religious Centers */}
                           <div className="space-y-3">
@@ -1226,6 +1186,12 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                     viharadhipathi_regn: picked.regn ?? "",
                                   });
                                 }}
+                                onInputChange={(value) => {
+                                  handleSetMany({
+                                    viharadhipathi_name: value,
+                                    viharadhipathi_regn: "",
+                                  });
+                                }}
                               />
                               <div className="mt-3 text-sm text-slate-600">
                                 <span>Cannot find the bhikku from the list? </span>
@@ -1304,7 +1270,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         if (f.type === "textarea") {
                           const idStr = String(f.name);
                           // For Step 7, make buildings_description span 3 columns, others span 1
-                          const spanClass = currentStep === 7 
+                          const spanClass = currentStep === 6 
                             ? (idStr === "buildings_description" ? "md:col-span-3" : "")
                             : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                           return (
@@ -1324,8 +1290,9 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         }
 
                         // Regular text/email/tel inputs
+                        const isDisabled = id === "viharadhipathi_regn";
                         return (
-                          <div key={id} className={currentStep === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
+                          <div key={id} className={currentStep === 6 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
                             <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
                             <input
                               id={id}
@@ -1333,7 +1300,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
                               max={f.type === "date" ? today : undefined}
-                              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                              disabled={isDisabled}
+                              className={`w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${isDisabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
                               placeholder={f.placeholder}
                             />
                             {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
@@ -1341,8 +1309,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         );
                       })}
 
-                      {/* Step I: Important Notes */}
-                      {currentStep === 11 && (
+                      {/* Step J: Important Notes */}
+                      {currentStep === 10 && (
                         <div className="md:col-span-2">
                           <ImportantNotes>
                             <strong>Important:</strong>

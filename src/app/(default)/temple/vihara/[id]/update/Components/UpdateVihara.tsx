@@ -230,6 +230,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [printingMarking, setPrintingMarking] = useState(false);
   const [activePrintAreaId, setActivePrintAreaId] = useState<CertificateTypeId | null>(null);
+  const [nikayaLetterInfo, setNikayaLetterInfo] = useState({
+    br_mahananame: "",
+    nk_nname: "",
+    br_fathrsaddrs: "",
+  });
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const locationNames = useMemo(() => {
@@ -274,8 +279,18 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       temple_location_1: values.temple_address ?? "",
       temple_location_2: "",
       divisional_secretariat_office: locationNames.divisional_secretariat,
+      br_mahananame: nikayaLetterInfo.br_mahananame,
+      nk_nname: nikayaLetterInfo.nk_nname,
+      br_fathrsaddrs: nikayaLetterInfo.br_fathrsaddrs,
     }),
-    [locationNames.divisional_secretariat, locationNames.district, locationNames.grama_niladhari_division, today, values]
+    [
+      locationNames.divisional_secretariat,
+      locationNames.district,
+      locationNames.grama_niladhari_division,
+      nikayaLetterInfo,
+      today,
+      values,
+    ]
   );
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
@@ -478,6 +493,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         };
         setValues(filledValues);
         console.log("Form values auto-filled:", filledValues);
+
+        const mainBhikkuInfo = apiData?.nikaya_info?.main_bhikku_info;
+        setNikayaLetterInfo({
+          br_mahananame: mainBhikkuInfo?.br_mahananame ?? "",
+          nk_nname: apiData?.nikaya_info?.nk_nname ?? "",
+          br_fathrsaddrs: mainBhikkuInfo?.br_fathrsaddrs ?? "",
+        });
         
         // Update display state for nikaya and parshawaya
         if (filledValues.nikaya) {

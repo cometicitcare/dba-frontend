@@ -26,6 +26,9 @@ export type ViharadhipathiAppointmentLetterData = {
   temple_location_1?: string;
   temple_location_2?: string;
   divisional_secretariat_office?: string;
+  br_mahananame?: string;
+  nk_nname?: string;
+  br_fathrsaddrs?: string;
 };
 
 const letterStyles = `
@@ -341,13 +344,18 @@ export default function ViharadhipathiAppointmentLetter({
                     <span data-field="appointed_monk_name">
                       {valueOrBlank(data.appointed_monk_name)}
                     </span>{" "}
-                    අතිපූජ්‍ය ඉත්තෑපාන ධම්මාලංකාර මහානායක ස්වාමීන් වහන්සේගේ - ගෞරවණීය දැන
-                    ගැනීම සඳහා - ගෞරවණීය දැන ගැනීම සඳහා මහා විහාරවංශික ස්‍යාමෝපාලී
-                    මහා නිකායේ කෝට්ටේ ශ්‍රී කල්‍යාණී සාමග්‍රී ධර්ම මහා සංඝ සභාව
+                    <span data-field="br_mahananame">
+                      {valueOrBlank(data.br_mahananame)}
+                    </span>{" "}
+                    මහානායක ස්වාමීන් වහන්සේගේ - ගෞරවණීය දැන ගැනීම සඳහා{" "}
+                    <span data-field="nk_nname">
+                      {valueOrBlank(data.nk_nname)}
+                    </span>
                     <br />
-                    &nbsp;&nbsp;&nbsp;&nbsp;<span>ශ්‍රී ධර්ම විජයාලෝක මහා විහාරය</span>,{" "}
-                    <span>රුක්මලේ, </span>
-                    <span>පන්නිපිටිය</span>
+                    &nbsp;&nbsp;&nbsp;&nbsp;
+                    <span data-field="br_fathrsaddrs">
+                      {valueOrBlank(data.br_fathrsaddrs)}
+                    </span>
                   </li>
                   <li>
                     2. ප්‍රාදේශීය ලේකම්, - කාරුණීක දැන ගැනීමට සහ අවශ්‍ය කටයුතු සදහා
