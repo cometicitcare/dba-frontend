@@ -1883,7 +1883,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                             )}
 
-                            {current?.id !== 6 && current?.id !== 7 && current?.id !== 10 && current?.fields.map((f) => {
+                            {current?.id !== 8 && current?.id !== 9 && current?.id !== 12 && current?.fields.map((f) => {
                               const id = String(f.name);
                               const val = (values[f.name] as unknown as string) ?? "";
                               const err = errors[f.name];
