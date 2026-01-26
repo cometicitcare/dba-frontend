@@ -29,6 +29,7 @@ import {
   type ResidentBhikkhuRow,
 } from "./";
 import BhikkhuAutocomplete from "@/components/Bhikku/Add/AutocompleteBhikkhu";
+import ViharaAngaMultipleSelector from "../../Components/ViharaAngaMultipleSelector";
 
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
@@ -1267,6 +1268,24 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                               />
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                            </div>
+                          );
+                        }
+
+                        if (id === "buildings_description") {
+                          const idStr = String(f.name);
+                          const spanClass = currentStep === 6 ? "md:col-span-3" : "md:col-span-2";
+                          return (
+                            <div key={idStr} className={spanClass}>
+                              <ViharaAngaMultipleSelector
+                                id={idStr}
+                                label={f.label}
+                                value={val}
+                                onChange={(next) => handleInputChange(f.name, next)}
+                                required={!!f.rules?.required}
+                                error={err}
+                                placeholder="Select existing temple buildings/structures"
+                              />
                             </div>
                           );
                         }
