@@ -452,7 +452,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       <main className="p-6">
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Records</h1>
+              <h1 className="text-2xl font-bold text-gray-800">Vihara</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -498,8 +498,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             {filterPanelOpen && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-                style={{ width: "min(90vw, 900px)" }}
+                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
+                style={{ width: "300px", height: "400px" }}
                 role="dialog"
                 aria-label="Bhikku filters"
               >
@@ -516,8 +516,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                     <XIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <label className="flex flex-col gap-1">
                       <span className="text-sm text-gray-600">Search</span>
                       <input
@@ -536,7 +536,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   </div>
 
                   {/* Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -574,7 +574,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   </div>
 
                   {/* Child Temple Autocomplete (uses TRN) */}
-                  <div className="lg:col-span-1">
+                  <div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
                         <TempleAutocomplete
@@ -672,7 +672,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                     </select>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
+                  <div>
                     <LocationPicker
                       value={locationSelection}
                       onChange={(sel) => handleLocationChange(sel)}

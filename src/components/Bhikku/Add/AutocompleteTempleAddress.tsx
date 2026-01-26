@@ -55,8 +55,6 @@ export default function TempleAutocompleteAddress({
   const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [newBhikkhuName, setNewBhikkhuName] = useState("");
-  const [newBhikkhuNic, setNewBhikkhuNic] = useState("");
-  const [newBhikkhuMobile, setNewBhikkhuMobile] = useState("");
   const [newViharaName, setNewViharaName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newOrdainedDate, setNewOrdainedDate] = useState("");
@@ -89,8 +87,6 @@ export default function TempleAutocompleteAddress({
 
   const resetAddForm = () => {
     setNewBhikkhuName("");
-    setNewBhikkhuNic("");
-    setNewBhikkhuMobile("");
     setNewViharaName("");
     setNewAddress("");
     setNewOrdainedDate("");
@@ -204,7 +200,6 @@ export default function TempleAutocompleteAddress({
                   const payloadData = {
                     tv_name: newViharaName.trim(),
                     tv_address: newAddress.trim(),
-                    tv_contact_number: newBhikkhuMobile.trim(),
                     tv_district: districtName,
                     tv_province: provinceName,
                     tv_viharadhipathi_name: newBhikkhuName.trim(),
@@ -249,28 +244,6 @@ export default function TempleAutocompleteAddress({
                     type="text"
                     value={newBhikkhuName}
                     onChange={(e) => setNewBhikkhuName(e.target.value)}
-                    required
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                  />
-                </label>
-                <label className="block text-sm font-medium text-slate-700">
-                  NIC
-                  <input
-                    type="text"
-                    value={newBhikkhuNic}
-                    onChange={(e) => setNewBhikkhuNic(e.target.value.toUpperCase())}
-                    placeholder="123456789V"
-                    required
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
-                  />
-                </label>
-                <label className="block text-sm font-medium text-slate-700">
-                  Contact Number
-                  <input
-                    type="tel"
-                    value={newBhikkhuMobile}
-                    onChange={(e) => setNewBhikkhuMobile(e.target.value)}
-                    placeholder="0771234567"
                     required
                     className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   />

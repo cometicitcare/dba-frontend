@@ -13,7 +13,6 @@ import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 import {
   DateField,
   LocationPicker,
-  BhikkhuAutocomplete,
   TempleAutocomplete,
   TempleAutocompleteAddress,
   viharaSteps,
@@ -29,6 +28,7 @@ import {
   type LandInfoRow,
   type ResidentBhikkhuRow,
 } from "./";
+import BhikkhuAutocomplete from "@/components/Bhikku/Add/AutocompleteBhikkhu";
 
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
@@ -1194,10 +1194,11 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                 required={!!f.rules?.required}
                                 initialDisplay={displayValue}
                                 placeholder="Type a Bhikkhu name or registration number"
+                                storeRegn={false}
                                 onPick={(picked) => {
                                   handleSetMany({
                                     viharadhipathi_name: picked.name ?? "",
-                                    viharadhipathi_regn: picked.regn ?? "",
+                                    viharadhipathi_regn: String(picked.data?.br_regn ?? ""),
                                   });
                                 }}
                                 onInputChange={(value) => {
@@ -1207,16 +1208,6 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                   });
                                 }}
                               />
-                              <div className="mt-3 text-sm text-slate-600">
-                                <span>Cannot find the bhikku from the list? </span>
-                                <button
-                                  type="button"
-                                  onClick={handleOpenBhikkuModal}
-                                  className="font-semibold text-slate-900 underline underline-offset-4 hover:text-slate-700"
-                                >
-                                  Add new bhikku here.
-                                </button>
-                              </div>
                               {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
                             </div>
                           );

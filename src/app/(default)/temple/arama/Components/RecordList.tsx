@@ -14,9 +14,9 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageArama } from "@/services/arama";
-import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
+import LocationPickerStacked from "@/components/Bhikku/Filter/LocationPickerStacked";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
-import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
+import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerStacked";
 import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -32,6 +32,7 @@ type AramaRow = {
   district?: string;
   nikaya?: string;
   workflow_status?: string;
+  workflowStatusCode?: string;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -99,6 +100,62 @@ type RawNikayaEntry = {
   nikaya: { code: string; name: string };
   parshawayas?: Array<{ code: string; name: string }>;
 };
+
+type WorkflowStatusMeta = {
+  label: string;
+  textColor: string;
+  bgColor: string;
+};
+
+// Normalize codes/labels to a single key so slight spelling or spacing differences still match colors
+function normalizeWorkflowKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
+const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
+  (selectionsData as any)?.workflowStatuses
+)
+  ? ((selectionsData as any).workflowStatuses as any[]).reduce(
+      (acc: Record<string, WorkflowStatusMeta>, item) => {
+        const meta: WorkflowStatusMeta = {
+          label: item?.label ?? item?.code ?? "-",
+          textColor: item?.textColor ?? "#1f2937",
+          bgColor: item?.bgColor ?? "#e5e7eb",
+        };
+        const keys = [
+          normalizeWorkflowKey(item?.code),
+          normalizeWorkflowKey(item?.label),
+        ].filter(Boolean) as string[];
+
+        keys.forEach((key) => {
+          if (!acc[key]) acc[key] = meta;
+        });
+
+        return acc;
+      },
+      {}
+    )
+  : {};
+
+function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
+  const code = normalizeWorkflowKey(statusCode);
+  const meta =
+    (code ? WORKFLOW_STATUS_META[code] : undefined) ||
+    (fallbackLabel ? WORKFLOW_STATUS_META[normalizeWorkflowKey(fallbackLabel)] : undefined);
+  const label = meta?.label ?? fallbackLabel ?? statusCode ?? "-";
+
+  if (!meta) return label || "-";
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
 
 const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
   (selectionsData as any)?.nikayas
@@ -214,7 +271,13 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
       { key: "name", label: "Arama Name", sortable: true },
       { key: "mobile", label: "Mobile" },
       { key: "email", label: "Email" },
-      { key: "workflow_status", label: "Status", sortable: true },
+      {
+        key: "workflow_status",
+        label: "Status",
+        sortable: true,
+        render: (row: AramaRow) =>
+          renderWorkflowStatusBadge(row.workflowStatusCode, row.workflow_status),
+      },
     ],
     []
   );
@@ -232,18 +295,47 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
       const apiData = pickRows<any>(response.data);
       const total = (response.data as any)?.totalRecords ?? apiData.length;
 
-      const cleaned: AramaRow[] = apiData.map((row: any) => ({
-        ar_id: row?.ar_id ?? 0,
-        ar_trn: String(row?.ar_trn ?? ""),
-        name: String(row?.ar_vname ?? ""),
-        mobile: row?.ar_mobile ?? "",
-        email: row?.ar_email ?? "",
-        address: row?.ar_addrs ?? "",
-        province: row?.ar_province ?? "",
-        district: row?.ar_district ?? "",
-        nikaya: row?.ar_nikaya ?? "",
-        workflow_status: row?.ar_workflow_status ?? "",
-      }));
+      const cleaned: AramaRow[] = apiData.map((row: any) => {
+        const workflowRaw = row?.ar_workflow_status;
+        const workflowStatusCode = normalizeWorkflowKey(
+          typeof workflowRaw === "string"
+            ? workflowRaw
+            : workflowRaw?.code ??
+                workflowRaw?.status ??
+                workflowRaw?.st_statcd ??
+                workflowRaw?.st_code ??
+                workflowRaw?.status_code ??
+                workflowRaw?.statusCode ??
+                ""
+        );
+        const workflowLabel =
+          typeof workflowRaw === "string"
+            ? workflowRaw
+            : workflowRaw?.st_descr ??
+              workflowRaw?.description ??
+              workflowRaw?.label ??
+              workflowRaw?.name ??
+              "";
+        const workflow_status =
+          WORKFLOW_STATUS_META[workflowStatusCode]?.label ||
+          workflowLabel ||
+          workflowStatusCode ||
+          "";
+
+        return {
+          ar_id: row?.ar_id ?? 0,
+          ar_trn: String(row?.ar_trn ?? ""),
+          name: String(row?.ar_vname ?? ""),
+          mobile: row?.ar_mobile ?? "",
+          email: row?.ar_email ?? "",
+          address: row?.ar_addrs ?? "",
+          province: row?.ar_province ?? "",
+          district: row?.ar_district ?? "",
+          nikaya: row?.ar_nikaya ?? "",
+          workflow_status,
+          workflowStatusCode,
+        };
+      });
 
       setRecords(cleaned);
       setTotalRecords(total);
@@ -382,7 +474,7 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
       <main className="p-6">
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Records</h1>
+              <h1 className="text-2xl font-bold text-gray-800">Arama</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
@@ -428,8 +520,8 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
             {filterPanelOpen && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-                style={{ width: "min(90vw, 900px)" }}
+                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
+                style={{ width: "300px", height: "400px" }}
                 role="dialog"
                 aria-label="Arama filters"
               >
@@ -446,8 +538,8 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
                     <XIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                  <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <label className="flex flex-col gap-1">
                       <span className="text-sm text-gray-600">Search</span>
                       <input
@@ -465,7 +557,7 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
                     </label>
                   </div>
 
-                  <div className="lg:col-span-1">
+                  <div>
                     <label className="flex flex-col gap-1">
                       <span className="text-sm text-gray-600">Arama TRN</span>
                       <input
@@ -544,8 +636,8 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
                     </select>
                   </div>
 
-                  <div className="col-span-1 md:col-span-2 lg:col-span-3">
-                    <LocationPicker
+                  <div>
+                    <LocationPickerStacked
                       value={locationSelection}
                       onChange={(sel) => handleLocationChange(sel)}
                       className="w-full"
