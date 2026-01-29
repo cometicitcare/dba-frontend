@@ -19,7 +19,7 @@ export async function fetchSilmathaOptions(q: string, limit = 200): Promise<Silm
   const rows: any[] = res?.data?.data ?? [];
   return rows.map((row) => ({
     regn: row.sil_regn,
-    name: row.sil_gihiname || row.sil_reqstdate || row.sil_regn,
+    name: row.sil_mahananame || row.sil_regn,
     district: row.sil_district?.ds_name,
     province: row.sil_province?.pr_name,
   }));
