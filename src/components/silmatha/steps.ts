@@ -62,7 +62,7 @@ export const silmathaSteps: StepConfig<SilmathaForm>[] = [
     fields: [
       {
         name: "sm_viharadhipathi",
-        label: "Name of Viharadhipathi of temple of residence",
+        label: "Chief Silmatha of the silmatha Arama of Residence",
         type: "text",
         rules: { required: true },
       },
