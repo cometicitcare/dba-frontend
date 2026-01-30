@@ -25,6 +25,7 @@ import {
   type ResidentSilmathaRow,
 } from "../../../add/Components";
 import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
+import selectionsData from "@/utils/selectionsData.json";
 
 import { Tabs } from "@/components/ui/Tabs";
 
@@ -109,6 +110,43 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const certificateNumberLabel = certificateMeta.number || "Pending assignment";
   const certificateUrlLabel = certificateMeta.url || "Not assigned yet";
   const certificateQrValue = certificateMeta.url || SAMPLE_CERT_URL;
+  const locationNames = useMemo(() => {
+    const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
+    let districtName = "";
+    let divisionName = "";
+    let gnName = "";
+
+    if (values.district) {
+      for (const province of provinces) {
+        for (const district of province.districts || []) {
+          if (district.dd_dcode === values.district) {
+            districtName = district.dd_dname || "";
+            if (values.divisional_secretariat) {
+              for (const division of district.divisional_secretariats || []) {
+                if (division.dv_dvcode === values.divisional_secretariat) {
+                  divisionName = division.dv_dvname || "";
+                  if (values.grama_niladhari_division) {
+                    for (const gn of division.gn_divisions || []) {
+                      const code = gn.gn_gnc || gn.gn_code;
+                      if (code === values.grama_niladhari_division) {
+                        gnName = gn.gn_gnname || "";
+                        break;
+                      }
+                    }
+                  }
+                  break;
+                }
+              }
+            }
+            break;
+          }
+        }
+        if (districtName) break;
+      }
+    }
+
+    return { districtName, divisionName, gnName };
+  }, [values.district, values.divisional_secretariat, values.grama_niladhari_division]);
   const certificateStyles = `
     .aramaya-certificate {
       position: relative;
@@ -120,6 +158,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       overflow: hidden;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      font-family: "Times New Roman", "Georgia", serif;
+      color: #000;
     }
     .aramaya-content {
       position: absolute;
@@ -129,34 +169,40 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       bottom: 20%;
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
+      gap: 0.55rem;
       pointer-events: none;
       box-sizing: border-box;
     }
     .aramaya-row {
       display: grid;
-      grid-template-columns: 8% 32% 1fr;
-      align-items: center;
+      grid-template-columns: 30px 34% 1fr;
+      align-items: start;
       column-gap: 10px;
-      row-gap: 4px;
+      row-gap: 6px;
       width: 100%;
       box-sizing: border-box;
+      line-height: 1.35;
     }
     .aramaya-label {
-      font-size: 14px;
+      font-size: 13px;
       color: #000;
     }
     .aramaya-value {
-      font-size: 17px;
+      font-size: 15px;
       color: #000;
       font-weight: 600;
       word-break: break-word;
     }
     .aramaya-multi {
       display: grid;
-      grid-template-columns: 40px 1fr;
-      gap: 8px;
+      grid-template-columns: 18px 1fr;
+      gap: 6px;
       align-items: center;
+    }
+    .aramaya-sublist {
+      display: grid;
+      gap: 6px;
+      padding-top: 2px;
     }
     .aramaya-footer {
       position: absolute;
@@ -257,6 +303,30 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
     }, 50);
   };
 
+  const valueOrCode = (field: any, codeKeys: string[]) => {
+    if (!field) return "";
+    if (typeof field === "string" || typeof field === "number") return String(field);
+    for (const key of codeKeys) {
+      const value = field?.[key];
+      if (value != null) return String(value);
+    }
+    return "";
+  };
+
+  const valueOrName = (field: any, nameKeys: string[], codeKeys: string[] = []) => {
+    if (!field) return "";
+    if (typeof field === "string" || typeof field === "number") return String(field);
+    for (const key of nameKeys) {
+      const value = field?.[key];
+      if (value != null) return String(value);
+    }
+    for (const key of codeKeys) {
+      const value = field?.[key];
+      if (value != null) return String(value);
+    }
+    return "";
+  };
+
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<AramaForm> => {
     // Map arama_lands array fields - handle both camelCase and snake_case from API
@@ -295,11 +365,11 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       email_address: apiData.ar_email ?? "",
       
       // Step 2: Location Details
-      province: apiData.ar_province ?? "",
-      district: apiData.ar_district ?? "",
-      divisional_secretariat: apiData.ar_divisional_secretariat ?? "",
+      province: valueOrCode(apiData.ar_province, ["cp_code", "code"]),
+      district: valueOrCode(apiData.ar_district, ["dd_dcode", "code"]),
+      divisional_secretariat: valueOrCode(apiData.ar_divisional_secretariat, ["dv_dvcode", "dd_dcode", "code"]),
       provincial_sasanaarakshaka_council: apiData.ar_pradeshya_sabha ?? "",
-      grama_niladhari_division: apiData.ar_gndiv ?? "",
+      grama_niladhari_division: valueOrCode(apiData.ar_gndiv, ["gn_gnc", "gn_code", "code"]),
       
       // Step 3: Administrative Details
       chief_nun_name: apiData.ar_viharadhipathi_name ?? "",
@@ -327,9 +397,17 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       inspection_code: apiData.ar_inspection_code ?? "",
       
       // Step 8: Ownership
-      ownership_district: apiData.ar_district ?? "",
-      ownership_divisional_secretariat: apiData.ar_divisional_secretariat ?? "",
-      ownership_grama_niladhari_division: apiData.ar_grama_niladhari_division_ownership ?? "",
+      ownership_district: valueOrName(apiData.ar_district, ["dd_dname", "name"], ["dd_dcode", "code"]),
+      ownership_divisional_secretariat: valueOrName(
+        apiData.ar_divisional_secretariat,
+        ["dv_dvname", "dd_dname", "name"],
+        ["dv_dvcode", "dd_dcode", "code"]
+      ),
+      ownership_grama_niladhari_division: valueOrName(
+        apiData.ar_grama_niladhari_division_ownership,
+        ["gn_gnname", "name"],
+        ["gn_gnc", "gn_code", "code"]
+      ),
       ownership_arama_name: apiData.ar_vname ?? "",
       pooja_deed_obtained: apiData.ar_sanghika_donation_deed ?? false,
       government_pooja_deed_obtained: apiData.ar_government_donation_deed ?? false,
@@ -345,9 +423,17 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       annex2_institution_consent: false, // Not in API response
       annex2_district_association_recommendation: apiData.ar_annex2_coordinator_recommendation ?? false,
       annex2_divisional_secretary_recommendation: apiData.ar_annex2_divisional_secretary_recommendation ?? false,
-      annex2_recommend_district: apiData.ar_district ?? "",
-      annex2_recommend_divisional_secretariat: apiData.ar_divisional_secretariat ?? "",
-      annex2_recommend_grama_niladhari_division: apiData.ar_gndiv ?? "",
+      annex2_recommend_district: valueOrName(apiData.ar_district, ["dd_dname", "name"], ["dd_dcode", "code"]),
+      annex2_recommend_divisional_secretariat: valueOrName(
+        apiData.ar_divisional_secretariat,
+        ["dv_dvname", "dd_dname", "name"],
+        ["dv_dvcode", "dd_dcode", "code"]
+      ),
+      annex2_recommend_grama_niladhari_division: valueOrName(
+        apiData.ar_gndiv,
+        ["gn_gnname", "name"],
+        ["gn_gnc", "gn_code", "code"]
+      ),
       annex2_recommend_arama_name: apiData.ar_vname ?? "",
       
       // Step 10: Secretary Approval
@@ -857,8 +943,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       registration_number: certificateNumberLabel,
       aramaya_name: values.arama_name || "",
       aramaya_address: values.arama_address || "",
-      district: values.district || "",
-      divisional_secretariat: values.divisional_secretariat || "",
+      district: locationNames.districtName || values.district || "",
+      divisional_secretariat: locationNames.divisionName || values.divisional_secretariat || "",
       regional_committee: values.provincial_sasanaarakshaka_council || "",
       establishment_period: values.established_period || "",
       aramadipati_name: values.chief_nun_name || "",
@@ -875,6 +961,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
     };
   }, [
     certificateNumberLabel,
+    locationNames.districtName,
+    locationNames.divisionName,
     residentSilmathaRows,
     values.arama_address,
     values.arama_name,
@@ -1163,12 +1251,12 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                               <div className="aramaya-label">
                                 Number and names of other resident nuns at the time of registration
                               </div>
-                              <div className="space-y-1">
+                              <div className="aramaya-sublist">
                                 {[["a", "resident_nun_a"], ["b", "resident_nun_aa"], ["c", "resident_nun_ae"], ["d", "resident_nun_aae"], ["e", "resident_nun_i"], ["f", "resident_nun_ii"], ["g", "resident_nun_u"], ["h", "resident_nun_uu"]].map(
                                   ([code, key]) => (
                                     <div className="aramaya-multi" key={key}>
-                                      <span className="text-sm">{code}.</span>
-                                      <span className="aramaya-value text-base">
+                                      <span className="aramaya-label">{code}.</span>
+                                      <span className="aramaya-value">
                                         {(aramaCertificateData as any)[key] || ""}
                                       </span>
                                     </div>
