@@ -1,27 +1,11 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboardIcon, UsersIcon } from "lucide-react";
-
+import { LayoutDashboardIcon } from "lucide-react";
+import { getStoredUserData, UserData } from "@/utils/userData";
+import { SIDEBAR_ACCESS_MAP } from "@/utils/config";
 interface SidebarProps {
   isOpen: boolean;
-}
-
-interface UserData {
-  ua_user_id: string;
-  ua_username: string;
-  ua_email: string;
-  ua_first_name: string;
-  ua_last_name: string;
-  ua_phone: string;
-  ua_status: string;
-  ro_role_id: string;
-  role_ids: string[];
-  role: {
-    ro_role_id: string;
-    ro_role_name: string;
-    ro_description: string;
-  };
 }
 
 /** ✅ Icon component type so both Lucide icons and our custom image work */
@@ -37,6 +21,72 @@ const MonkIcon: IconComponent = ({ className }) => (
   />
 );
 
+type SidebarItem = {
+  icon: IconComponent;
+  label: string;
+  path: string;
+};
+
+const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
+  {
+    icon: LayoutDashboardIcon,
+    label: "Dashboard",
+    path: "/",
+  },
+  {
+    icon: MonkIcon,
+    label: "Bhikku",
+    path: "/bhikkhu",
+  },
+  {
+    icon: MonkIcon,
+    label: "Silmatha",
+    path: "/silmatha",
+  },
+  {
+    icon: MonkIcon,
+    label: "Vihara",
+    path: "/temple/vihara",
+  },
+  {
+    icon: MonkIcon,
+    label: "Devala",
+    path: "/temple/dewala",
+  },
+  {
+    icon: MonkIcon,
+    label: "Donations",
+    path: "/teachers",
+  },
+  {
+    icon: MonkIcon,
+    label: "Security Councils",
+    path: "/admin",
+  },
+  {
+    icon: MonkIcon,
+    label: "Arama",
+    path: "/temple/arama",
+  },
+  {
+    icon: MonkIcon,
+    label: "Objections",
+    path: "/objections",
+  },
+  {
+    icon: MonkIcon,
+    label: "Re Print",
+    path: "/print-request",
+  },
+  {
+    icon: MonkIcon,
+    label: "QR Scan",
+    path: "/qr-scan",
+  }
+];
+
+const PUBLIC_ONLY_PATHS = ["/", "/objections", "/print-request", "/qr-scan"];
+
 export function Sidebar({ isOpen }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,41 +94,32 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // ✅ Load user data from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      const normalized: UserData | null =
-        parsed && typeof parsed === "object"
-          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
-          : null;
-      if (normalized) setUser(normalized);
-    } catch (err) {
-      console.error("Invalid user data in localStorage", err);
-    }
+    const stored = getStoredUserData();
+    if (stored) setUser(stored);
   }, []);
 
-  // ✅ Menu items with roles from config
-  const allItems: Array<{
-    icon: IconComponent;
-    label: string;
-    path: string;
-  }> = [
-    {
-      icon: LayoutDashboardIcon,
-      label: "Dashboard",
-      path: "/",
-    },
-    {
-      icon: MonkIcon, // ✅ use the custom SVG icon here
-      label: "Bhikku",
-      path: "/bhikkhu",
-    },
-    // If you still need the Lucide UsersIcon elsewhere, you can add it too:
-    // { icon: UsersIcon, label: "Users", path: "/users", roles: [...] },
-  ];
+  const items = useMemo(() => {
+    if (!user) return BASE_SIDEBAR_ITEMS;
+    const primaryRoleLevel = user.roles?.[0]?.ro_level ?? user.roleLevel;
+    if (primaryRoleLevel === "PUBLIC") {
+      return BASE_SIDEBAR_ITEMS.filter((it) => PUBLIC_ONLY_PATHS.includes(it.path));
+    }
 
-  const items = allItems;
+    const dedupDepartments = Array.from(
+      new Set([
+        ...(user.departments ?? []),
+        ...(user.department ? [user.department] : []),
+      ].filter(Boolean) as string[])
+    );
+
+    if (!dedupDepartments.length) return BASE_SIDEBAR_ITEMS;
+
+    return BASE_SIDEBAR_ITEMS.filter((it) => {
+      const allowedDepartments = SIDEBAR_ACCESS_MAP[it.path];
+      if (!allowedDepartments) return false;
+      return dedupDepartments.some((dep) => allowedDepartments.includes(dep));
+    });
+  }, [user]);
   if (!isOpen) return null;
 
   return (
@@ -104,7 +145,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto overflow-x-auto">
         {items.map((it) => {
           const Icon = it.icon;
           const active = pathname === it.path;

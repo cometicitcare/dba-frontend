@@ -23,10 +23,11 @@ type Props = {
   required?: boolean;
   initialDisplay?: string;
   onPick: (picked: { regn?: string; name?: string; display: string }) => void;
+  onInputChange?: (value: string) => void;
   storeRegn?: boolean;
 };
 
-export default function BhikkhuAutocomplete({ id, label, placeholder, required, initialDisplay = "", onPick, storeRegn = true }: Props) {
+export default function BhikkhuAutocomplete({ id, label, placeholder, required, initialDisplay = "", onPick, onInputChange, storeRegn = true }: Props) {
   const [input, setInput] = useState<string>(initialDisplay);
   const [options, setOptions] = useState<BhikkhuOption[]>([]);
   const [open, setOpen] = useState(false);
@@ -52,7 +53,7 @@ export default function BhikkhuAutocomplete({ id, label, placeholder, required, 
 
   const handleSelect = (opt: BhikkhuOption) => {
     const display = `${opt.name} — ${opt.regn}`;
-    onPick(storeRegn ? { regn: opt.regn, display } : { name: opt.name, display });
+    onPick(storeRegn ? { regn: opt.regn, name: opt.name, display } : { name: opt.name, display });
     setInput(display);
     setOpen(false);
   };
@@ -64,7 +65,13 @@ export default function BhikkhuAutocomplete({ id, label, placeholder, required, 
         id={id}
         type="text"
         value={input}
-        onChange={(e) => { setInput(e.target.value); setDebounceKey((k) => k + 1); setOpen(true); }}
+        onChange={(e) => {
+          const next = e.target.value;
+          setInput(next);
+          onInputChange?.(next);
+          setDebounceKey((k) => k + 1);
+          setOpen(true);
+        }}
         onFocus={() => { setFocused(true); setOpen(true); }}
         onBlur={() => { setFocused(false); setOpen(false); }}
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}

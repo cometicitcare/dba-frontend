@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Viharasthana Registration Certificate (Legal Size)</title>
+    <style>
+        /* Basic styles for layout and print */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .controls {
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ccc;
+        }
+        /* Centering and layout tweaks */
+        .print-area {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .two-column {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .right-panel {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        /* Page setup for Legal size (8.5" x 14") */
+        .page {
+            page-break-after: always;
+            margin: 0 auto 20px;
+            width: 8.5in;
+            height: 14in;
+            max-width: calc(100% - 30px);
+            position: relative;
+            background-repeat: no-repeat;
+            background-position: center top;
+            background-size: contain;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            box-sizing: border-box;
+            overflow: visible;
+        }
+
+        /* Make the preview look clean on-screen */
+        @media screen {
+            .page {
+                box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+                background-size: 100% 100%;
+            }
+        }
+
+        /* Background images controlled by JavaScript */
+        .page.no-background {
+            border: 1px solid #ddd;
+        }
+
+        /* Overlay fields placed above the background artwork */
+        .field {
+            position: absolute;
+            color: #000;
+            font-size: 13px;
+            background: rgba(255,255,255,0.0);
+            padding: 2px 4px;
+            white-space: pre-wrap;
+        }
+
+        /* Content area layout */
+        .page .content {
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            top: 20%;
+            bottom: 20%;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            align-items: flex-start;
+            pointer-events: none;
+            padding: 0.5rem 0;
+            gap: 0.4rem;
+        }
+
+        /* Row-based layout with 3 columns */
+        .page .row {
+            display: grid;
+            grid-template-columns: 6% 34% 1fr;
+            align-items: center;
+            column-gap: 8px;
+            row-gap: 4px;
+            margin: 4px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .page .row .num-col { 
+            box-sizing: border-box;
+            font-weight: 500;
+        }
+        .page .row .label { 
+            box-sizing: border-box;
+        }
+        .page .row .value { 
+            box-sizing: border-box;
+        }
+        .page .label { 
+            font-size: 14px; 
+            color: #000;
+        }
+        .page .value { 
+            font-size: 17px; 
+            color: #000; 
+            font-weight: 500;
+        }
+
+        /* Multi-language support */
+        .sinhala { display: inline; }
+        .tamil { display: none; }
+        .eng { display: none; }
+
+        /* Language toggle classes */
+        body.show-tamil .sinhala { display: none; }
+        body.show-tamil .tamil { display: inline; }
+        body.show-tamil .eng { display: none; }
+        
+        body.show-english .sinhala { display: none; }
+        body.show-english .tamil { display: none; }
+        body.show-english .eng { display: inline; }
+
+        /* QR container positioned at bottom right */
+        .page .qr-container {
+            position: absolute;
+            right: 15%;
+            bottom: 3%;
+            width: 75px;
+            height: 75px;
+            box-sizing: border-box;
+            z-index: 10;
+            text-align: center;
+            pointer-events: auto;
+        }
+        .page .qr-container img { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+        }
+        .page .qr-container .caption {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #000;
+            white-space: nowrap;
+            margin-top: 4px;
+        }
+
+        /* Footer section for signatures and stamps */
+        .footer-section {
+            position: absolute;
+            left: 10%;
+            right: 10%;
+            bottom: 5%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .disclaimer-text {
+            font-size: 11px;
+            line-height: 1.5;
+            text-align: justify;
+            margin-bottom: 20px;
+        }
+
+        .signature-area {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-top: 20px;
+        }
+
+        .signature-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .signature-label {
+            font-size: 11px;
+            text-align: center;
+        }
+
+        @media print {
+            .controls {
+                display: none;
+            }
+            .print-area {
+                padding: 0;
+            }
+            .page {
+                page-break-after: always;
+                margin: 0;
+                background-color: white;
+                width: 8.5in;
+                max-width: 100%;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="populateWithSample()">Load sample data</button>
+        <button onclick="window.print()">Print / Save as PDF</button>
+        <label style="margin-left: 20px;">
+            <input type="checkbox" id="showBackgroundToggle" checked onchange="toggleBackground()"> 
+            Show Background Images
+        </label>
+    </div>
+
+    <div class="print-area">
+        <div class="two-column">
+            <main class="right-panel">
+                <!-- Single Page Certificate -->
+                <section class="page page-1" id="page-1" role="document" aria-label="Viharasthana Registration Certificate">
+                    <div class="content">
+                        <div class="row">
+                            <div class="num-col"></div>
+                            <div class="label">
+                                <span class="sinhala">ලියාපදිංචි අංකය :</span>
+                                <span class="tamil">பதிவு எண் :</span>
+                                <span class="eng">Registration Number :</span>
+                            </div>
+                            <div class="value"><span data-field="registration_number"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">01.</div>
+                            <div class="label">
+                                <span class="sinhala">විහාරස්ථානයේ නම</span>
+                                <span class="tamil">விஹாரஸ்தானத்தின் பெயர்</span>
+                                <span class="eng">Name of Viharasthana</span>
+                            </div>
+                            <div class="value"><span data-field="viharasthana_name"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">02.</div>
+                            <div class="label">
+                                <span class="sinhala">විහාරස්ථානයේ ලිපිනය</span>
+                                <span class="tamil">விஹாரஸ்தானத்தின் முகவரி</span>
+                                <span class="eng">Address of Viharasthana</span>
+                            </div>
+                            <div class="value"><span data-field="viharasthana_address"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">03.</div>
+                            <div class="label">
+                                <span class="sinhala">ප්‍රාදේශීය ශාසනාරක්ෂක මණ්ඩලය / ප්‍රාදේශීය ලේකම් කොට්ඨාශය</span>
+                                <span class="tamil">பிரதேச சாசன காப்பு மன்றம் / பிரதேச செயலாளர் பிரிவு</span>
+                                <span class="eng">Regional Sasana Protection Committee / Divisional Secretariat</span>
+                            </div>
+                            <div class="value"><span data-field="regional_committee_divisional_secretariat"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">04-1.</div>
+                            <div class="label">
+                                <span class="sinhala">විහාරස්ථානය අයත් නිකාය</span>
+                                <span class="tamil">விஹாரஸ்தானம் சார்ந்த நிகாயா</span>
+                                <span class="eng">Nikaya to which Viharasthana belongs</span>
+                            </div>
+                            <div class="value"><span data-field="nikaya"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">04-2.</div>
+                            <div class="label">
+                                <span class="sinhala">පාර්ශවය</span>
+                                <span class="tamil">பார்ஷ்வய</span>
+                                <span class="eng">Parshwaya (Chapter)</span>
+                            </div>
+                            <div class="value"><span data-field="parshwaya"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">05.</div>
+                            <div class="label">
+                                <span class="sinhala">විහාස්ථානය ආරම්භ කාල වකවානුව</span>
+                                <span class="tamil">விஹாரஸ்தானம் தொடங்கிய காலம்</span>
+                                <span class="eng">Period when Viharasthana was established</span>
+                            </div>
+                            <div class="value"><span data-field="establishment_period"></span></div>
+                        </div>
+
+                        <div class="row">
+                            <div class="num-col">06.</div>
+                            <div class="label">
+                                <span class="sinhala">ලියාපදිංචි කරන අවස්ථාවේ වැඩ සිටින විහාරාධිපතීන් වහන්සේ</span>
+                                <span class="tamil">பதிவு செய்யும் நேரத்தில் தங்கியிருக்கும் விஹாராதிபதி ஸ்வாமி</span>
+                                <span class="eng">Viharadhipathi (Chief Monk) at the time of registration</span>
+                            </div>
+                            <div class="value"><span data-field="viharadhipathi_name"></span></div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Section -->
+                    <div class="footer-section">
+                        <div class="disclaimer-text">
+                            <span class="sinhala">
+                                ඉහත විස්තරය සදහන් විහාරස්ථනය බෞද්ධ කටයුතු දෙපාර්තුමේන්තුවේ බෞද්ධ විහාරස්ථානයක් වශයෙන් ලියාපදිංචි කර ඇති බව සහතික කරමි.
+                            </span>
+                            <span class="tamil">
+                                மேலே குறிப்பிடப்பட்ட விவரங்கள் கொண்ட விஹாரஸ்தானம் புத்த விவகார திணைக்களத்தில் புத்த விஹாரஸ்தானமாக பதிவு செய்யப்பட்டுள்ளது என்பதை உறுதிப்படுத்துகிறேன்.
+                            </span>
+                            <span class="eng">
+                                I hereby certify that the above-mentioned Viharasthana has been registered as a Buddhist Temple in the Department of Buddhist Affairs.
+                            </span>
+                        </div>
+
+                        <div class="signature-area">
+                            <div class="signature-block">
+                                <div class="signature-label">
+                                    <span class="sinhala">
+                                        ශ්‍රී බුද්ධ වර්ෂ: <span data-field="buddha_year"></span> <span data-field="buddha_month"></span> මස <span data-field="buddha_day"></span> දින හෙවත් ව්‍යවහාර වර්ෂ <span data-field="gregorian_year"></span> <span data-field="gregorian_month"></span> මස <span data-field="gregorian_day"></span> වන දින,<br/>
+                                        ශ්‍රීමත් අනගාරික ධර්මපාල මාවතේ අංක 135 හි පිහිටි බෞද්ධ කටයුතු පිළිබද දෙපාර්තුමේන්තුවේ දී!
+                                    </span>
+                                    <span class="tamil">
+                                        ஸ்ரீ புத்த வருடம்: <span data-field="buddha_year"></span> <span data-field="buddha_month"></span> மாதம் <span data-field="buddha_day"></span> நாள் அதாவது வியவஹார வருடம் <span data-field="gregorian_year"></span> <span data-field="gregorian_month"></span> மாதம் <span data-field="gregorian_day"></span> நாள்,<br/>
+                                        ஸ்ரீமத் அனகாரிக தர்மபால வீதி எண் 135 இல் அமைந்துள்ள புத்த விவகார திணைக்களத்தில்!
+                                    </span>
+                                    <span class="eng">
+                                        Sri Buddha Year: <span data-field="buddha_year"></span>, <span data-field="buddha_month"></span> Month, <span data-field="buddha_day"></span> Day, i.e., Gregorian Year <span data-field="gregorian_year"></span>, <span data-field="gregorian_month"></span> Month, <span data-field="gregorian_day"></span> Day,<br/>
+                                        At the Department of Buddhist Affairs, No. 135, Sri Anagarika Dharmapala Mawatha!
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QR code for registration -->
+                    <div class="qr-container" id="qr-container">
+                        <a id="certLink" href="#" target="_blank" aria-label="Registration URL">
+                            <img id="qrCode" src="" alt="QR code" />
+                        </a>
+                        <div class="caption" id="qrLabel" aria-hidden="true"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Toggle background images on/off
+        function toggleBackground() {
+            const checkbox = document.getElementById('showBackgroundToggle');
+            const page1 = document.querySelector('.page.page-1');
+            
+            if (checkbox.checked) {
+                // Enable background - replace with your actual background image path
+                page1.style.backgroundImage = 'url("viharasthana-certificate-bg.png")';
+                page1.classList.remove('no-background');
+            } else {
+                // Disable background
+                page1.style.backgroundImage = 'none';
+                page1.classList.add('no-background');
+            }
+        }
+        
+        // Initialize backgrounds on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            toggleBackground();
+        });
+
+        // Populate fields from data object
+        function populateFields(data) {
+            document.querySelectorAll('[data-field]').forEach(function(el) {
+                var key = el.getAttribute('data-field');
+                if (data && data[key] !== undefined && data[key] !== null) {
+                    el.textContent = data[key];
+                } else {
+                    el.textContent = '';
+                }
+            });
+
+            // QR code: build URL using the registration number
+            try {
+                var regId = (data && data.registration_number) ? data.registration_number : 'sample-reg';
+                var url = 'https://buddhistaffairs.gov.lk/viharasthana/' + encodeURIComponent(regId);
+                var qrImg = document.getElementById('qrCode');
+                if (qrImg) {
+                    // Use a public QR generator to create a QR image
+                    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=75x75&data=' + encodeURIComponent(url);
+                }
+                var certLink = document.getElementById('certLink');
+                if (certLink) { 
+                    certLink.href = url; 
+                    certLink.title = url; 
+                }
+                var qrLabel = document.getElementById('qrLabel');
+                if (qrLabel) { 
+                    qrLabel.textContent = url; 
+                }
+            } catch (e) {
+                console.warn('QR generation failed', e);
+            }
+        }
+
+        // Load sample data
+        function populateWithSample() {
+            const sample = {
+                registration_number: "බෞකො/විහාදේ/21/30/055",
+                viharasthana_name: "හෝනගල බෝධිමළු විහාරස්ථානය",
+                viharasthana_address: "හෝනගල ඉඹුල්පිටිය, ගොඩාගම්පල, පරකඩුව",
+                regional_committee_divisional_secretariat: "දෙහිඕවිට",
+                nikaya: "ශ්‍රී ලංකා අමරපුර නිකාය",
+                parshwaya: "එක්නැලිගොඩ විහාර පාර්ශවය",
+                establishment_period: "1990",
+                viharadhipathi_name: "පූජ්‍ය අම්බලම්පිටියේ සද්ධානන්ද ස්වාමීන් වහන්සේ",
+                // Buddhist calendar date fields
+                buddha_year: "2569",
+                buddha_month: "නිකිණි",
+                buddha_day: "25",
+                // Gregorian calendar date fields
+                gregorian_year: "2025",
+                gregorian_month: "අගෝස්තු",
+                gregorian_day: "26"
+            };
+
+            populateFields(sample);
+        }
+    </script>
+</body>
+</html>

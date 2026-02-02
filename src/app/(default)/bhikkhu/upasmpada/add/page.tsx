@@ -1,18 +1,20 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { FooterBar } from "@/components/FooterBar";
-import { BhikkhuAutocomplete, DateField, TempleAutocomplete, toYYYYMMDD } from "@/components/Bhikku/Add";
+import { BhikkhuAutocomplete, BhikkhuStatusSelect, DateField, TempleAutocomplete, toYYYYMMDD } from "@/components/Bhikku/Add";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { _manageHighBhikku } from "@/services/bhikku";
-
+import { getStoredUserData, UserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
   candidateRegNo: string;
   candidateDisplay: string;
+  currentStatus: string;
   higherOrdinationPlace: string;
   higherOrdinationDate: string;
   karmacharyaName: string;
@@ -35,6 +37,7 @@ type UpasampadaForm = {
 const INITIAL_FORM: UpasampadaForm = {
   candidateRegNo: "",
   candidateDisplay: "",
+  currentStatus: "",
   higherOrdinationPlace: "",
   higherOrdinationDate: "",
   karmacharyaName: "",
@@ -75,7 +78,7 @@ const FORM_STEPS = [
 const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
   1: ["candidateRegNo", "higherOrdinationPlace", "higherOrdinationDate", "karmacharyaName", "upaddhyayaName", "assumedName"],
   2: ["higherOrdinationResidenceTrn", "permanentResidenceTrn", "declarationResidenceAddress", "tutorsTutorRegNo", "presidingBhikshuRegNo"],
-  3: ["declarationDate"],
+  3: ["currentStatus", "declarationDate"],
 };
 
 const UPASAMPADA_CATEGORY_CODE = "CAT02";
@@ -86,7 +89,12 @@ export default function AddUpasampadaPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [higherOrdinationPlaceDisplay, setHigherOrdinationPlaceDisplay] = useState("");
+  const [karmacharyaDisplay, setKarmacharyaDisplay] = useState("");
+  const [upaddhyayaDisplay, setUpaddhyayaDisplay] = useState("");
+  const [userData, setUserData] = useState<UserData | null>(null);
   const totalSteps = FORM_STEPS.length;
   const currentStepConfig = FORM_STEPS[currentStep - 1];
   const stepRequirements = REQUIRED_BY_STEP[currentStep] ?? [];
@@ -110,29 +118,37 @@ export default function AddUpasampadaPage() {
     if (!isLastStep || !stepIsValid || submitting) return;
     setSubmitting(true);
 
-    const payload = {
-      cc_code: UPASAMPADA_CATEGORY_CODE,
-      candidate_regn: form.candidateRegNo,
-      higher_ordination_place: form.higherOrdinationPlace,
-      higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
-      karmacharya_name: form.karmacharyaName,
-      upaddhyaya_name: form.upaddhyayaName,
-      assumed_name: form.assumedName,
-      residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
-      residence_permanent_trn: form.permanentResidenceTrn,
-      declaration_residence_address: form.declarationResidenceAddress,
-      tutors_tutor_regn: form.tutorsTutorRegNo,
-      presiding_bhikshu_regn: form.presidingBhikshuRegNo,
-      samanera_serial: form.samaneraSerial,
-      declaration_date: toYYYYMMDD(form.declarationDate),
-      remarks: form.remarks,
+    const today = toYYYYMMDD(new Date().toISOString());
+
+    const requestBody = {
+      action: "CREATE",
+      payload: {
+        data: {
+          bhr_reqstdate: today,
+          bhr_currstat: form.currentStatus,
+          bhr_parshawaya: "",
+          bhr_livtemple: form.permanentResidenceTrn || form.higherOrdinationResidenceTrn || "",
+          bhr_candidate_regn: form.candidateRegNo,
+          bhr_cc_code: UPASAMPADA_CATEGORY_CODE,
+          bhr_samanera_serial_no: form.samaneraSerial,
+          bhr_higher_ordination_place: form.higherOrdinationPlace,
+          bhr_higher_ordination_date: toYYYYMMDD(form.higherOrdinationDate),
+          bhr_karmacharya_name: form.karmacharyaName,
+          bhr_upaddhyaya_name: form.upaddhyayaName,
+          bhr_assumed_name: form.assumedName,
+          bhr_residence_higher_ordination_trn: form.higherOrdinationResidenceTrn,
+          bhr_residence_permanent_trn: form.permanentResidenceTrn,
+          bhr_declaration_residence_address: form.declarationResidenceAddress,
+          bhr_tutors_tutor_regn: form.tutorsTutorRegNo,
+          bhr_presiding_bhikshu_regn: form.presidingBhikshuRegNo,
+          bhr_declaration_date: toYYYYMMDD(form.declarationDate),
+          bhr_remarks: form.remarks,
+        },
+      },
     };
 
     try {
-      await _manageHighBhikku({
-        action: "CREATE",
-        payload: { data: payload },
-      } as any);
+      await _manageHighBhikku(requestBody as any);
 
       toast.success("Upasampada record saved.", {
         autoClose: 1200,
@@ -146,6 +162,36 @@ export default function AddUpasampadaPage() {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => {
+  const stored = getStoredUserData();
+  if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+    setAccessDenied(true);
+    router.replace('/');
+    return;
+  }
+
+  setUserData(stored);
+  setAccessChecked(true);
+  }, [router]);
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
 
   const renderStep = () => {
     switch (currentStep) {
@@ -162,6 +208,7 @@ export default function AddUpasampadaPage() {
                     ...prev,
                     candidateRegNo: regn ?? "",
                     candidateDisplay: display,
+                    samaneraSerial: regn ?? prev.samaneraSerial,
                   }))
                 }
                 required
@@ -170,13 +217,18 @@ export default function AddUpasampadaPage() {
                 <p className="mt-2 text-sm text-slate-500">Linked Bhikkhu: {form.candidateDisplay}</p>
               ) : null}
             </div>
-            <TextField
-              id="place-higher-ordination"
-              label="Place of Higher Ordination"
-              value={form.higherOrdinationPlace}
-              onChange={(v) => updateField("higherOrdinationPlace", v)}
-              required
-            />
+            <div className="md:col-span-2">
+              <TempleAutocomplete
+                id="bhr_higher_ordination_place"
+                label="Place of Higher Ordination"
+                required
+                initialDisplay={higherOrdinationPlaceDisplay}
+                onPick={({ trn, display }) => {
+                  updateField("higherOrdinationPlace", trn ?? display ?? "");
+                  setHigherOrdinationPlaceDisplay(display ?? trn ?? "");
+                }}
+              />
+            </div>
             <DateField
               id="date-higher-ordination"
               label="Date of Higher Ordination"
@@ -184,20 +236,32 @@ export default function AddUpasampadaPage() {
               onChange={(v) => updateField("higherOrdinationDate", v)}
               required
             />
-            <TextField
-              id="karmacharya-name"
-              label="Name of Karmacharya"
-              value={form.karmacharyaName}
-              onChange={(v) => updateField("karmacharyaName", v)}
-              required
-            />
-            <TextField
-              id="upaddhyaya-name"
-              label="Name of Upaddhyaya at Higher Ordination"
-              value={form.upaddhyayaName}
-              onChange={(v) => updateField("upaddhyayaName", v)}
-              required
-            />
+            <div key="karmacharya">
+              <BhikkhuAutocomplete
+                id="bhr_karmacharya_name"
+                label="Name of Karmacharya"
+                required
+                initialDisplay={karmacharyaDisplay}
+                storeRegn
+                onPick={({ regn, display }) => {
+                  updateField("karmacharyaName", regn ?? "");
+                  setKarmacharyaDisplay(display ?? regn ?? "");
+                }}
+              />
+            </div>
+            <div key="upaddhyaya">
+              <BhikkhuAutocomplete
+                id="bhr_upaddhyaya_name"
+                label="Name of Upaddhyaya at Higher Ordination"
+                required
+                initialDisplay={upaddhyayaDisplay}
+                storeRegn
+                onPick={({ regn, display }) => {
+                  updateField("upaddhyayaName", regn ?? "");
+                  setUpaddhyayaDisplay(display ?? regn ?? "");
+                }}
+              />
+            </div>
             <TextField
               id="assumed-name"
               label="Name assumed at Higher Ordination"
@@ -210,7 +274,7 @@ export default function AddUpasampadaPage() {
       case 2:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+            <div key="residence-ho">
               <TempleAutocomplete
                 id="residence-ho"
                 label="Residence at time of Higher Ordination"
@@ -225,7 +289,7 @@ export default function AddUpasampadaPage() {
                 required
               />
             </div>
-            <div>
+            <div key="residence-permanent">
               <TempleAutocomplete
                 id="residence-permanent"
                 label="Permanent Residence"
@@ -248,7 +312,7 @@ export default function AddUpasampadaPage() {
               required
               rows={4}
             />
-            <div>
+            <div key="tutors-tutor">
               <BhikkhuAutocomplete
                 id="tutors-tutor"
                 label="Name of Tutor of Tudors presenting for Higher Ordination"
@@ -263,7 +327,7 @@ export default function AddUpasampadaPage() {
                 required
               />
             </div>
-            <div>
+            <div key="presiding-bhikshu">
               <BhikkhuAutocomplete
                 id="presiding-bhikshu"
                 label="Name of Bhikshu presiding at Higher Ordination"
@@ -284,6 +348,13 @@ export default function AddUpasampadaPage() {
       default:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BhikkhuStatusSelect
+              id="current-status"
+              label="Current Status"
+              value={form.currentStatus}
+              required
+              onPick={({ code }) => updateField("currentStatus", code)}
+            />
             <TextField
               id="samanera-serial"
               label="Serial Number in Samanera Register, if any"
@@ -372,7 +443,7 @@ export default function AddUpasampadaPage() {
 
                   <div className="min-h-[360px]">{renderStep()}</div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-40 border-t border-slate-100">
                     <button
                       type="button"
                       onClick={goBack}

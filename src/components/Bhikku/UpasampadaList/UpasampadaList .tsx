@@ -13,7 +13,7 @@ import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
-import { _manageBhikku } from "@/services/bhikku";
+import { _manageHighBhikku } from "@/services/bhikku";
 import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
 import LocationPickerStacked from "@/components/Bhikku/Filter/LocationPickerStacked";
 import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
@@ -21,16 +21,23 @@ import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerStacked";
 import selectionsData from "@/utils/selectionsData.json";
 
-type BhikkuRow = {
+type UpasampadaRow = {
+  id: number;
   regNo: string;
-  name: string;
-  fatherName?: string;
-  mobile?: string;
-  email?: string;
-  mahanayaka?: string;
-  remarks?: string;
-  category?: string;
+  highBhikkhuName: string;
+  parshawaya?: string;
+  livtemple?: string;
   status?: string;
+  workflowStatus?: string;
+  workflowStatusCode?: string;
+  formType?: string;
+  bhrId: number | null;
+  bhrRegn: string;
+};
+
+type UpasampadaListProps = {
+  canDelete?: boolean;
+  canAdd?: boolean;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -42,6 +49,29 @@ function pickRows<T>(res: unknown): T[] {
   if (Array.isArray(r?.data)) return (r.data as unknown as T[]);
   if (Array.isArray(res)) return res as T[];
   return [];
+}
+
+function extractTotalRecords(res: unknown): number | undefined {
+  const response = res as ApiResponse<unknown>;
+  const mainData = response?.data as Record<string, unknown> | undefined;
+  const candidateSources = [
+    mainData?.totalRecords,
+    (res as Record<string, unknown>)?.totalRecords,
+    mainData?.data && (mainData.data as Record<string, unknown>)?.totalRecords,
+    mainData?.rows && (mainData.rows as Record<string, unknown>)?.totalRecords,
+  ];
+
+  for (const candidate of candidateSources) {
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate;
+    }
+    if (typeof candidate === "string") {
+      const parsed = Number(candidate);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+
+  return undefined;
 }
 
 // tiny inline spinner (why: avoid adding dependency)
@@ -106,6 +136,88 @@ type RawNikayaEntry = {
   parshawayas?: Array<{ code: string; name: string }>;
 };
 
+type WorkflowStatusMeta = {
+  label: string;
+  textColor: string;
+  bgColor: string;
+};
+
+// Normalize codes/labels to a single key so slight spelling or spacing differences still match colors
+function normalizeWorkflowKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
+const WORKFLOW_STATUS_META: Record<string, WorkflowStatusMeta> = Array.isArray(
+  (selectionsData as any)?.workflowStatuses
+)
+  ? ((selectionsData as any).workflowStatuses as any[]).reduce(
+      (acc: Record<string, WorkflowStatusMeta>, item) => {
+        const meta: WorkflowStatusMeta = {
+          label: item?.label ?? item?.code ?? "-",
+          textColor: item?.textColor ?? "#1f2937",
+          bgColor: item?.bgColor ?? "#e5e7eb",
+        };
+        const keys = [
+          normalizeWorkflowKey(item?.code),
+          normalizeWorkflowKey(item?.label),
+        ].filter(Boolean) as string[];
+
+        keys.forEach((key) => {
+          if (!acc[key]) acc[key] = meta;
+        });
+
+        return acc;
+      },
+      {}
+    )
+  : {};
+
+const FORM_TYPE_META: Record<string, WorkflowStatusMeta> = {
+  DIRECT: { label: "Direct", textColor: "#025f37", bgColor: "#d1f0dc" },
+  NOTDIRECT: { label: "Not Direct", textColor: "#044a8c", bgColor: "#d7e9ff" },
+};
+
+function normalizeFormTypeKey(value?: string | null) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^a-zA-Z0-9]/g, "").trim().toUpperCase();
+}
+
+function renderWorkflowStatusBadge(statusCode?: string, fallbackLabel?: string) {
+  const code = normalizeWorkflowKey(statusCode);
+  const meta =
+    (code ? WORKFLOW_STATUS_META[code] : undefined) ||
+    (fallbackLabel ? WORKFLOW_STATUS_META[normalizeWorkflowKey(fallbackLabel)] : undefined);
+  const label = meta?.label ?? fallbackLabel ?? statusCode ?? "-";
+
+  if (!meta) return label || "-";
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: meta.textColor, backgroundColor: meta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function renderFormTypeBadge(formType?: string) {
+  const key = normalizeFormTypeKey(formType);
+  const meta = FORM_TYPE_META[key];
+  const label = meta?.label ?? formType ?? "-";
+  const pillMeta = meta ?? { textColor: "#1f2937", bgColor: "#e5e7eb", label };
+
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+      style={{ color: pillMeta.textColor, backgroundColor: pillMeta.bgColor }}
+    >
+      {label}
+    </span>
+  );
+}
+
 const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
   (selectionsData as any)?.nikayas
 )
@@ -167,11 +279,16 @@ function buildFilterPayload(f: FilterState) {
   return payload;
 }
 
-export default function UpasampadaList () {
+export default function UpasampadaList({
+  canDelete = false,
+  canAdd = true,
+}: UpasampadaListProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [records, setRecords] = useState<BhikkuRow[]>([]);
+  const [records, setRecords] = useState<UpasampadaRow[]>([]);
+  console.log("recordsrecordsrecordsrecords",records)
+  const [totalRecords, setTotalRecords] = useState<number | undefined>();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
@@ -222,13 +339,27 @@ export default function UpasampadaList () {
     }));
   }, []);
 
-  const columns: Column[] = useMemo(
+  const columns: Column<UpasampadaRow>[] = useMemo(
     () => [
-      { key: "regNo", label: "Reg. No", sortable: true },
-      { key: "name", label: "Name", sortable: true },
-      { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
-      { key: "status", label: "Status", sortable: true },
+      { key: "regNo", label: "REG.NO", sortable: true },
+      { key: "highBhikkhuName", label: "UPASAMPADA NAME", sortable: true },
+      { key: "livtemple", label: "LIVING TEMPLE" },
+      {
+        key: "formType",
+        label: "Form Type",
+        sortable: true,
+        render: (row) => renderFormTypeBadge(row.formType),
+      },
+      {
+        key: "workflowStatus",
+        label: "Workflow Status",
+        render: (row) =>
+          renderWorkflowStatusBadge(
+            row.workflowStatusCode,
+            row.workflowStatus
+          ),
+      },
+      { key: "status", label: "STATUS", sortable: true }
     ],
     []
   );
@@ -242,25 +373,64 @@ export default function UpasampadaList () {
           payload: buildFilterPayload(f),
         };
         // @ts-expect-error: service typing may be loose
-        const res = await _manageBhikku(body, { signal });
+        const res = await _manageHighBhikku(body, { signal });
         const raw = pickRows<any>(res);
-        const cleaned: BhikkuRow[] = raw.map((row: any) => ({
-          regNo: String(row?.br_regn ?? ""),
-          name: String(row?.br_gihiname ?? ""),
-          fatherName: row?.br_fathrname ?? "",
-          mobile: row?.br_mobile ?? "",
-          email: row?.br_email ?? "",
-          mahanayaka: row?.br_mahananame ?? "",
-          remarks: row?.br_remarks ?? "",
-          category: row?.br_cat ?? "",
-          status: row?.br_currstat?.st_descr ?? "",
-        }));
+        const cleaned: UpasampadaRow[] = raw.map((row: any) => {
+          const workflowRaw = row?.bhr_workflow_status;
+          const workflowStatusCode = normalizeWorkflowKey(
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.code ??
+                  workflowRaw?.status ??
+                  workflowRaw?.st_statcd ??
+                  workflowRaw?.st_code ??
+                  workflowRaw?.status_code ??
+                  workflowRaw?.statusCode ??
+                  ""
+          );
+          const workflowLabel =
+            typeof workflowRaw === "string"
+              ? workflowRaw
+              : workflowRaw?.st_descr ??
+                workflowRaw?.description ??
+                workflowRaw?.label ??
+                workflowRaw?.name ??
+                "";
+          const workflowStatus =
+            WORKFLOW_STATUS_META[workflowStatusCode]?.label ||
+            workflowLabel ||
+            workflowStatusCode;
+
+          return {
+            id: Number(row?.bhr_id ?? 0),
+            regNo: String(row?.bhr_regn ?? ""),
+            highBhikkhuName: String(row?.bhr_assumed_name ?? ""),
+            parshawaya:
+              row?.bhr_parshawaya?.name || row?.bhr_parshawaya?.code || "",
+            livtemple:
+              row?.bhr_livtemple?.vh_vname || row?.bhr_livtemple?.vh_trn || "",
+            status: row?.bhr_currstat?.st_descr || row?.bhr_currstat || "",
+            workflowStatus,
+            workflowStatusCode,
+            formType: String(row?.form_type ?? ""),
+            bhrId:row?.bhr_id,
+            bhrRegn: String(row?.bhr_regn ?? ""),
+          };
+        });
         setRecords(cleaned);
-        setHasMoreResults(cleaned.length === f.limit);
+        const total = extractTotalRecords(res);
+        setTotalRecords(total);
+        const nextHasMoreResults =
+          typeof total === "number"
+            ? f.page * f.limit < total
+            : cleaned.length === f.limit;
+        setHasMoreResults(nextHasMoreResults);
       } catch (e: any) {
         if (e?.name !== "AbortError") {
           console.error("Fetch Error:", e);
           setRecords([]);
+          setTotalRecords(undefined);
+          setHasMoreResults(false);
         }
       } finally {
         setLoading(false);
@@ -277,36 +447,50 @@ export default function UpasampadaList () {
   }, []); // initial load only
 
   const handleAdd = useCallback(() => {
-    router.push("/bhikkhu/add");
-  }, [router]);
-
-  const handleAddSilmatha = useCallback(() => {
-    router.push("/silmatha/add");
-  }, [router]);
-
-  const handleAddUpasampada = useCallback(() => {
     router.push("/bhikkhu/upasmpada/add");
   }, [router]);
 
+  const handleAddDirect = useCallback(() => {
+    router.push("/bhikkhu/upasmpada/direct-add");
+  }, [router]);
+
   const handleEdit = useCallback(
-    (item: BhikkuRow) => {
-      router.push(`/bhikkhu/manage/${encodeURIComponent(item.regNo)}`);
+    (item: UpasampadaRow) => {
+      const normalizedForm = (item.formType ?? "").trim().toLowerCase();
+      if (normalizedForm === "direct") {
+        const targetId = item.bhrId;
+        router.push(
+          `/bhikkhu/upasmpada/direct-manage/${encodeURIComponent(
+            String(targetId ?? "")
+          )}`
+        );
+        return;
+      }
+
+      if (normalizedForm === "not_direct") {
+        router.push(
+          `/bhikkhu/upasmpada/manage/${encodeURIComponent(item.bhrRegn)}`
+        );
+        return;
+      }
+
+      
     },
     [router]
   );
 
   const handleDelete = useCallback(
-    async (item: BhikkuRow) => {
+    async (item: UpasampadaRow) => {
       const ok =
         typeof window !== "undefined"
-          ? window.confirm(`Delete Bhikku ${item.regNo}?`)
+          ? window.confirm(`Delete Upasampada ${item.regNo}?`)
           : true;
       if (!ok) return;
       setLoading(true);
       try {
-        await _manageBhikku({
+        await _manageHighBhikku({
           action: "DELETE",
-          payload: { br_regn: item.regNo },
+          payload: { bhr_id: item.id },
         });
         await fetchData(undefined, filters);
       } catch (e) {
@@ -380,21 +564,41 @@ export default function UpasampadaList () {
     };
   }, [filterPanelOpen]);
 
+  const startIndex = (filters.page - 1) * filters.limit + 1;
+  const endIndex = startIndex + records.length - 1;
+  const summaryText = records.length
+    ? `Showing ${startIndex} to ${endIndex}${
+        typeof totalRecords === "number" ? ` of ${totalRecords}` : ""
+      }`
+    : "No records to display";
+
   return (
     <div >
       <main >
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Bhikku List</h1>
+              <h1 className="text-2xl font-bold text-gray-800">UPASAMPADA BHIKKHU LIST</h1>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={handleAdd}
-                  disabled={loading}
-                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <PlusIcon className="w-5 h-5" />
-                  Add Bhikku
-                </button>
+                {canAdd && (
+                  <>
+                    <button
+                      onClick={handleAdd}
+                      disabled={loading}
+                      className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <PlusIcon className="w-5 h-5" />
+                      Add High Bhikkhu
+                    </button>
+                    <button
+                      onClick={handleAddDirect}
+                      disabled={loading}
+                      className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                      <PlusIcon className="w-5 h-5" />
+                      Add Direct High Bhikkhu
+                    </button>
+                  </>
+                )}
                 {/* <button
                   onClick={handleAddSilmatha}
                   disabled={loading}
@@ -665,7 +869,7 @@ export default function UpasampadaList () {
               columns={columns}
               data={records}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
             {loading && (
@@ -679,15 +883,7 @@ export default function UpasampadaList () {
           </div>
 
           <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-slate-600">
-              {records.length
-                ? `Showing ${
-                    (filters.page - 1) * filters.limit + 1
-                  } to ${
-                    (filters.page - 1) * filters.limit + records.length
-                  }`
-                : "No records to display"}
-            </div>
+            <div className="text-sm text-slate-600">{summaryText}</div>
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 Rows per page

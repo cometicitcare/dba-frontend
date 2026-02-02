@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { DataGrid, GridColDef, GridActionsCellItem } from "@mui/x-data-grid";
 import type { ResidentBhikkhuRow } from "./steps";
+import BhikkhuAutocomplete from "./AutocompleteBhikkhu";
 
 type Props = {
   value: ResidentBhikkhuRow[];
@@ -95,6 +96,31 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
           + Add Row
         </button>
       </div>
+      <div className="mb-4">
+        <BhikkhuAutocomplete
+          id="resident-bhikkhu-search"
+          label="Search Bhikkhu to add"
+          placeholder="Type a name or registration number"
+          onPick={(picked) => {
+            const regn = picked.regn || "";
+            const name = picked.name || picked.display || "";
+            const exists = rows.some(
+              (r) => (regn && r.registrationNumber === regn) || (!regn && r.bhikkhuName === name)
+            );
+            if (exists) return;
+            const newRow: ResidentBhikkhuRow = {
+              id: `bhikkhu-${regn || Date.now()}`,
+              serialNumber: rows.length + 1,
+              bhikkhuName: name,
+              registrationNumber: regn,
+              occupationEducation: "",
+            };
+            const updated = [...rows, newRow];
+            setRows(updated);
+            onChange(updated);
+          }}
+        />
+      </div>
       <div style={{ height: 400, width: "100%" }} className="bg-white">
         <DataGrid<ResidentBhikkhuRow>
           rows={rows}
@@ -123,4 +149,3 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
     </div>
   );
 }
-

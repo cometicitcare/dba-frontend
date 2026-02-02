@@ -20,8 +20,14 @@ import {
   FileTextIcon,
   EditIcon,
   TrashIcon,
+  User,
 } from "lucide-react";
-
+import { useRouter } from 'next/navigation'
+import { getStoredUserData, type UserData } from "@/utils/userData";
+import {
+  PUBLIC_MANAGEMENT_DEPARTMENT,
+  SIDEBAR_ACCESS_MAP,
+} from "@/utils/config";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -30,49 +36,113 @@ const SERVICE_MAP: Record<
   "/bhikkhu": [
     { icon: EyeIcon, label: "View", action: "view-bhikku", route: "/bhikkhu" },
     { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/bhikkhu/add" },
-    { icon: SearchIcon, label: "Search", action: "search-bhikku", route: "/bhikkhu/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-bhikku", route: "/bhikkhu/reports" },
-    { icon: EditIcon, label: "Update", action: "update-bhikku", route: "/bhikkhu/update" },
   ],
   "/temples": [
     { icon: EyeIcon, label: "View", action: "view-temple", route: "/temple/view" },
     { icon: PlusIcon, label: "Add", action: "add-temple", route: "/temple/add" },
-    { icon: SearchIcon, label: "Search", action: "search-temple", route: "/temple/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-temple", route: "/temple/reports" },
-    { icon: EditIcon, label: "Manage", action: "manage-temple", route: "/temple/manage" },
   ],
   "/dhamma-school": [
     { icon: EyeIcon, label: "View", action: "view-school", route: "/school/view" },
     { icon: PlusIcon, label: "Add", action: "add-school", route: "/school/add" },
-    { icon: SearchIcon, label: "Search", action: "search-school", route: "/school/search" },
     { icon: FileTextIcon, label: "Reports", action: "reports-school", route: "/school/reports" },
-    { icon: UsersIcon, label: "Students", action: "students-school", route: "/school/students" },
+  ],
+  "/silmatha": [
+    { icon: EyeIcon, label: "View", action: "view-bhikku", route: "/silmatha" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/silmatha/add" },
+  ],
+  "/temple/vihara": [
+    { icon: BuildingIcon, label: "View Viharas", action: "view-vihara", route: "/temple/vihara" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/temple/vihara/add" },
+  ],
+  "/temple/arama": [
+    { icon: BuildingIcon, label: "View Arama", action: "view-arama", route: "/temple/arama" },
+    { icon: PlusIcon, label: "Add", action: "add-bhikku", route: "/temple/arama/add" },
   ],
   "/teachers": [
-    { icon: EyeIcon, label: "View", action: "view-teachers", route: "/teachers/view" },
-    { icon: PlusIcon, label: "Add", action: "add-teachers", route: "/teachers/add" },
-    { icon: SearchIcon, label: "Search", action: "search-teachers", route: "/teachers/search" },
-    { icon: FileTextIcon, label: "Reports", action: "reports-teachers", route: "/teachers/reports" },
-    { icon: EditIcon, label: "Update", action: "update-teachers", route: "/teachers/update" },
+    { icon: BuildingIcon, label: "View Donations", action: "view-Donations", route: "/teachers" },
   ],
   "/admin": [
-    { icon: UsersIcon, label: "Users", action: "users-admin", route: "/admin/users" },
-    { icon: SettingsIcon, label: "Settings", action: "settings-admin", route: "/admin/settings" },
-    { icon: FileTextIcon, label: "Logs", action: "logs-admin", route: "/admin/logs" },
-    { icon: EditIcon, label: "Config", action: "config-admin", route: "/admin/config" },
-    { icon: TrashIcon, label: "Cleanup", action: "cleanup-admin", route: "/admin/cleanup" },
+    { icon: BuildingIcon, label: "View Security Councils", action: "view-Security-Councils", route: "/admin" },
   ],
-  "/analytics": [{ icon: EyeIcon, label: "View", action: "view-analytics", route: "/analytics" }],
+  "/ojections": [
+    { icon: EyeIcon, label: "View Ojections", action: "view-ojections", route: "/ojections" },
+  ],
+  "/print-request": [
+    { icon: EyeIcon, label: "View Requests", action: "view-print", route: "/print-request" },
+  ],
+  "/qr-scan": [
+    { icon: EyeIcon, label: "Scan Codes", action: "scan-qr", route: "/qr-scan" },
+    { icon: SearchIcon, label: "History", action: "history-qr", route: "/qr-scan/history" },
+  ]
+
 };
 
-const modules = [
-  { icon: UsersIcon, label: "Bhikku & Sirimatha", color: "from-orange-400 to-orange-500", path: "/bhikkhu" },
-  { icon: BuildingIcon, label: "Temple & Devala", color: "from-purple-400 to-purple-500", path: "/temples" },
-  { icon: GraduationCapIcon, label: "Dhamma School", color: "from-blue-400 to-blue-500", path: "/dhamma-school" },
-  { icon: BookOpenIcon, label: "Dhamma Teachers", color: "from-green-400 to-green-500", path: "/teachers" },
-  { icon: SettingsIcon, label: "System Admin", color: "from-red-400 to-red-500", path: "/admin" },
-  { icon: BarChartIcon, label: "Analytics", color: "from-teal-400 to-teal-500", path: "/analytics" },
+const MODULE_CARD_DEFINITIONS: { path: string; label: string; icon: any; color: string }[] = [
+  {
+    path: "/bhikkhu",
+    label: "Bhikku",
+    icon: UsersIcon,
+    color: "from-orange-400 to-orange-500",
+  },
+  {
+    path: "/silmatha",
+    label: "Silmatha",
+    icon: GraduationCapIcon,
+    color: "from-purple-500 to-indigo-600",
+  },
+  {
+    path: "/temple/vihara",
+    label: "Vihara",
+    icon: BuildingIcon,
+    color: "from-sky-400 to-blue-600",
+  },
+  {
+    path: "/temple/arama",
+    label: "Arama",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/temple/dewala",
+    label: "Devala",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/teachers",
+    label: "Donations",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/admin",
+    label: "Security Councils",
+    icon: BuildingIcon,
+    color: "from-rose-400 to-pink-600",
+  },
+  {
+    path: "/objections",
+    label: "Objections",
+    icon: EyeIcon,
+    color: "from-emerald-400 to-emerald-600",
+  },
+  {
+    path: "/print-request",
+    label: "Re Print",
+    icon: BookOpenIcon,
+    color: "from-amber-400 to-yellow-500",
+  },
+  {
+    path: "/qr-scan",
+    label: "QR Scan",
+    icon: SearchIcon,
+    color: "from-cyan-400 to-blue-500",
+  },
 ];
+
+
 
 const bannerImages = [
   "/dashboardBanner/bhikku.jpg",
@@ -86,25 +156,14 @@ const bannerImages = [
   "/dashboardBanner/thripitikaya.jpg",
 ];
 
-interface UserData {
-  ua_user_id: string;
-  ua_username: string;
-  ua_email: string;
-  ua_first_name: string;
-  ua_last_name: string;
-  ua_phone: string;
-  ua_status: string;
-  ro_role_id: string;
-  role_ids: string[];
-  role: { ro_role_id: string; ro_role_name: string; ro_description: string };
-}
-
 export default function Dashboard() {
+  const router = useRouter();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [user, setUser] = useState<UserData | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [userData, setUserData] = useState<UserData | null | undefined>(undefined);
 
   // Only rotate through images that actually load
   const [slides, setSlides] = useState<string[]>([]);
@@ -200,19 +259,11 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (!stored) return;
-    try {
-      const parsed = JSON.parse(stored);
-      const normalized: UserData | null =
-        parsed && typeof parsed === "object"
-          ? ("user" in parsed ? (parsed.user as UserData) : (parsed as UserData))
-          : null;
-      if (normalized) setUser(normalized);
-    } catch (err) {
-      console.error("Invalid user data in localStorage", err);
-    }
+    const stored = getStoredUserData();
+    setUserData(stored ?? null);
   }, []);
+
+  
 
   const currentImage = useMemo(() => {
     if (!slides.length) return null;
@@ -224,20 +275,40 @@ export default function Dashboard() {
     if (route && typeof window !== "undefined") window.location.assign(route);
   };
 
+
+  const modules = useMemo(() => {
+    if (userData === undefined) return [];
+    const departmentValues = Array.from(
+      new Set([
+        ...(userData?.departments ?? []),
+        ...(userData?.department ? [userData.department] : []),
+      ].filter(Boolean) as string[])
+    );
+    const effectiveDepartments =
+      departmentValues.length > 0 ? departmentValues : [PUBLIC_MANAGEMENT_DEPARTMENT];
+
+    return MODULE_CARD_DEFINITIONS.filter((m) => {
+      const allowedDepartments = SIDEBAR_ACCESS_MAP[m.path];
+      if (!allowedDepartments) return false;
+      return effectiveDepartments.some((dep) => allowedDepartments.includes(dep));
+    });
+  }, [userData]);
+
+
   return (
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar isOpen={sidebarOpen} />
 
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
-        <main className="p-6">
+        <main className="p-6 pb-32">
           {/* hero */}
           <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
             <div className="relative z-10 max-w-[55%] sm:max-w-[50%] md:max-w-[45%] lg:max-w-[40%] xl:max-w-[35%] pr-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{getGreeting()}</h1>
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Welcome!</h2>
-              <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
-                {user ? `${user.ua_first_name} ${user.ua_last_name}` : "Loading..."}
+                        <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
+                {userData ? `${userData.ua_first_name} ${userData.ua_last_name}` : "Loading..."}
               </p>
               <div className="text-sm sm:text-base md:text-lg opacity-80 leading-tight">
                 <p className="text-white/90">{formatDateTime()}</p>

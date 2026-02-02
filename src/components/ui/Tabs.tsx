@@ -23,6 +23,7 @@ type TabsProps = {
   contentClassName?: string;
   /** Optional classes for the tab label (use to control font size) */
   labelClassName?: string;
+  haveAccess?: boolean;
 };
 
 export const Tabs: React.FC<TabsProps> = ({

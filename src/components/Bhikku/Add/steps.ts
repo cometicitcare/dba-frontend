@@ -10,6 +10,7 @@ export type BhikkhuForm = {
   br_mobile: string;
   br_fathrsaddrs: string;
   br_fathrsmobile: string;
+  br_form_id: string;
 
   br_birthpls: string;
   br_province: string;
@@ -46,6 +47,7 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
     id: 1,
     title: "Personal Information",
     fields: [
+      { name: "br_form_id", label: "Form number", type: "text", rules: { required: true } },
       { name: "br_cat", label: "Category", type: "text", rules: { required: true } },
       { name: "br_reqstdate", label: "Request Date", type: "date", rules: { required: true, maxDateToday: true } },
       { name: "br_dofb", label: "Date of Birth", type: "date", rules: { required: true, maxDateToday: true } },
@@ -97,7 +99,6 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
       { name: "br_parshawaya", label: "Name of Chapter", type: "text", rules: { required: true } },
       { name: "br_mahanayaka_name", label: "Name of Mahanayaka Thera or Nayaka Thero of the Nikaya", type: "text", rules: { required: true } },
       { name: "br_mahanayaka_address", label: "Full postal address of the Mahanayaka Thera or Nayaka Theri of the Nikaya", type: "textarea", rows: 4, rules: { required: true } },
-      { name: "br_robing_after_residence_temple", label: "Temple of residence after robing", type: "text", rules: { required: true } },
     ],
   },
   {
@@ -109,6 +110,7 @@ export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
       { name: "br_mahanaacharyacd", label: "Name of robing tutor", type: "text", rules: { required: true } },
       { name: "br_robing_tutor_residence", label: "Name of robing tutor’s residence", type: "text", rules: { required: true } },
       { name: "br_mahanatemple", label: "Temple where robing took place", type: "text", rules: { required: true } },
+      { name: "br_robing_after_residence_temple", label: "Temple of residence after robing", type: "text", rules: { required: true } },
     ],
   },
   {
@@ -132,6 +134,7 @@ export const bhikkhuInitialValues: Partial<BhikkhuForm> = {
   br_mobile: "",
   br_fathrsaddrs: "",
   br_fathrsmobile: "",
+  br_form_id: "",
 
   br_birthpls: "",
   br_province: "",

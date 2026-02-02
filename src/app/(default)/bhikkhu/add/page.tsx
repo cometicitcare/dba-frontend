@@ -3,18 +3,17 @@
 
 import React, { useMemo, useRef, useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { _manageBhikku } from "@/services/bhikku";
+import { _manageBhikku, _checkBhikkhuDuplicate } from "@/services/bhikku";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-
+import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config";
 import {
   DateField,
   LocationPicker,
   BhikkhuAutocomplete,
   TempleAutocomplete,
-  TempleAutocompleteAddress,
   BhikkhuCategorySelect,
   BhikkhuStatusSelect,
   bhikkhuSteps,
@@ -23,6 +22,7 @@ import {
   validateField,
   Errors,
 } from "@/components/Bhikku/Add";
+import AutocompleteTempleAddress from "@/components/Bhikku/Add/AutocompleteTempleAddress";
 
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
@@ -44,9 +44,10 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 // Import after types to avoid cycle
 import type { BhikkhuForm, StepConfig } from "@/components/Bhikku/Add";
+import { getStoredUserData, UserData } from "@/utils/userData";
 
 const NOVICE_CATEGORY_CODE = "CAT03";
-const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_fathrname", "br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
+const OMITTED_PERSONAL_FIELDS: Array<keyof BhikkhuForm> = ["br_email", "br_mobile", "br_fathrsaddrs", "br_fathrsmobile"];
 const OPTIONAL_LOCATION_FIELDS: Array<keyof BhikkhuForm> = ["br_korale", "br_pattu", "br_division", "br_vilage", "br_gndiv"];
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,10 @@ function AddBhikkhuPageInner() {
   const [submitting, setSubmitting] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+
 
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -177,7 +182,33 @@ function AddBhikkhuPageInner() {
     return { ok: firstInvalidStep == null, firstInvalidStep };
   };
 
-  const handleNext = () => { if (currentStep < effectiveSteps.length && validateStep(currentStep)) setCurrentStep((s) => s + 1); };
+  const handleNext = async () => {
+    if (currentStep >= effectiveSteps.length) return;
+    if (!validateStep(currentStep)) return;
+
+    if (currentStep === 1 && !bhikkhuId) {
+      const gihiname = String(values.br_gihiname ?? "").trim();
+      const dob = toYYYYMMDD(values.br_dofb);
+      if (gihiname && dob) {
+        try {
+          const res = await _checkBhikkhuDuplicate(gihiname, dob);
+          const status = res?.data?.status;
+          if (status === "duplicate_found") {
+            const regn = res?.data?.data?.regn;
+            const message = res?.data?.message ?? "A duplicate record was found.";
+            toast.error(regn ? `${message} (Regn: ${regn})` : message);
+            return;
+          }
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Failed to check duplicates. Please try again.";
+          toast.error(msg);
+          return;
+        }
+      }
+    }
+
+    setCurrentStep((s) => s + 1);
+  };
   const handlePrevious = () => { if (currentStep > 1) setCurrentStep((s) => s - 1); };
 
   const handleSubmit = async () => {
@@ -263,10 +294,54 @@ function AddBhikkhuPageInner() {
     handleInputChange("br_parshawaya", code);
     const nikaya = findNikayaByCode(values.br_nikaya);
     const p = nikaya?.parshawayas.find((x) => x.code === code);
-    setDisplay((d) => ({ ...d, br_parshawaya: p ? `${p.name} - ${p.code}` : code }));
+    const nayakaName = p?.nayaka?.mahananame ?? "";
+    const nayakaAddress = p?.nayaka?.address ?? "";
+
+    handleSetMany({
+      br_mahanayaka_name: nayakaName,
+      br_mahanayaka_address: nayakaAddress,
+    });
+
+    setDisplay((d) => ({
+      ...d,
+      br_parshawaya: p ? `${p.name} - ${p.code}` : code,
+      br_mahanayaka_name: nayakaName,
+      br_mahanayaka_address: nayakaAddress,
+    }));
   };
 
   const gridCols = stepTitle === "Birth Location" ? "md:grid-cols-3" : "md:grid-cols-2";
+
+  useEffect(() => {
+    const stored = getStoredUserData();
+    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+      setAccessDenied(true);
+      router.replace('/');
+      return;
+    }
+
+    setUserData(stored);
+    setAccessChecked(true);
+  }, [router]);
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
+
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -560,14 +635,14 @@ function AddBhikkhuPageInner() {
                         if (id === "br_residence_at_declaration") {
                           return (
                             <div key={id}>
-                              <TempleAutocompleteAddress
+                              <AutocompleteTempleAddress
                                 id={id}
                                 label={f.label}
                                 required={!!f.rules?.required}
                                 placeholder="Type any address or pick a temple address…"
                                 initialDisplay={display.br_residence_at_declaration ?? values.br_residence_at_declaration ?? ""}
-                                onPick={({ address, display: disp }) => {
-                                  handleInputChange("br_residence_at_declaration", address ?? "");
+                                onPick={({ address, trn, display: disp }) => {
+                                  handleInputChange("br_residence_at_declaration", disp ?? address ?? "");
                                   setDisplay((d) => ({ ...d, br_residence_at_declaration: disp }));
                                 }}
                               />

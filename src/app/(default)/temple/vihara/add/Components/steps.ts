@@ -47,9 +47,15 @@ export type ViharaForm = {
 
   // Step D: Leadership Information
   viharadhipathi_name: string; // REGN
+  viharadhipathi_regn: string;
   period_established: string; // Date or period description
 
-  // Step E: Temple Assets & Activities
+  // Step E: Mahanyake Information
+  mahanayake_date: string;
+  mahanayake_letter_nu: string;
+  mahanayake_remarks: string;
+
+  // Step F: Temple Assets & Activities
   buildings_description: string;
   dayaka_families_count: string;
   kulangana_committee: string;
@@ -57,19 +63,19 @@ export type ViharaForm = {
   temple_working_committee: string;
   other_associations: string;
 
-  // Step F: Temple-Owned Land Information (stored as JSON array)
+  // Step G: Temple-Owned Land Information (stored as JSON array)
   temple_owned_land: string; // JSON string of LandInfoRow[]
   land_info_certified: boolean;
 
-  // Step G: Resident Bhikkhus (stored as JSON array)
+  // Step H: Resident Bhikkhus (stored as JSON array)
   resident_bhikkhus: string; // JSON string of ResidentBhikkhuRow[]
   resident_bhikkhus_certified: boolean;
 
-  // Step H: Report and Inspection
+  // Step I: Report and Inspection
   inspection_report: string; // Report text
   inspection_code: string;
 
-  // Step I: Ownership and Recommendation
+  // Step J: Ownership and Recommendation
   grama_niladhari_division_ownership: string;
   sanghika_donation_deed: boolean;
   government_donation_deed: boolean;
@@ -78,7 +84,7 @@ export type ViharaForm = {
   recommend_new_center: boolean;
   recommend_registered_temple: boolean;
 
-  // Step J: Annex II
+  // Step K: Annex II
   annex2_recommend_construction: boolean;
   annex2_land_ownership_docs: boolean;
   annex2_chief_incumbent_letter: boolean;
@@ -99,8 +105,8 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
         name: "telephone_number",
         label: "Telephone Number",
         type: "tel",
-        placeholder: "0XX-XXXXXXX",
-        rules: { required: false, pattern: { regex: /^[\d\s\-]+$/, message: "Invalid telephone number" } },
+        placeholder: "07XXXXXXXX",
+        rules: { required: false, pattern: { regex: /^0\d{9}$/, message: "Must be 10 digits (e.g., 07XXXXXXXX)" } },
       },
       {
         name: "whatsapp_number",
@@ -121,10 +127,10 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     id: 2,
     title: "Administrative Divisions",
     fields: [
-      { name: "district", label: "District", type: "text", rules: { required: true } },
-      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: true } },
+      { name: "district", label: "District", type: "text", rules: { required: false } },
+      { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: false } },
       { name: "pradeshya_sabha", label: "Pradeshīya Shāsanarakshaka Bala Mandalaya", type: "text", rules: { required: false } },
-      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: true } },
+      { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: false } },
     ],
   },
   {
@@ -140,12 +146,29 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Leadership Information",
     fields: [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
+      { name: "viharadhipathi_regn", label: "Chief Monk's Registration Number", type: "text", rules: { required: false } },
       // { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text", rules: { required: true } },
-      { name: "period_established", label: "Period Temple Was Established", type: "text", rules: { required: true } },
+      { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
     ],
   },
   {
     id: 5,
+    title: "Mahanyake thero Information",
+    fields: [
+      { name: "mahanayake_date", label: "Mahanyake Thero Letter Date", type: "date", rules: { required: false } },
+      { name: "mahanayake_letter_nu", label: "Mahanyake Thero Letter Number", type: "text", rules: { required: false } },
+      {
+        name: "mahanayake_remarks",
+        label: "Letter Remarks",
+        type: "textarea",
+        rows: 4,
+        placeholder: "Add detailed remarks about the Mahanyake letter, guidance provided, or any special notes that should be kept with this registration.",
+        rules: { required: false },
+      },
+    ],
+  },
+  {
+    id: 7,
     title: "Temple Assets & Activities",
     fields: [
       { name: "buildings_description", label: "Description of Existing Temple Buildings/Structures", type: "textarea", rows: 2, rules: { required: true } },
@@ -157,7 +180,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     ],
   },
   {
-    id: 6,
+    id: 8,
     title: "Temple-Owned Land Information",
     fields: [
       // This step will be handled specially with an editable table
@@ -166,7 +189,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     ],
   },
   {
-    id: 7,
+    id: 9,
     title: "Resident Bhikkhus Information",
     fields: [
       // This step will be handled specially with an editable table
@@ -175,7 +198,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     ],
   },
   {
-    id: 8,
+    id: 10,
     title: "Inspection Report",
     fields: [
       { name: "inspection_report", label: "Report issued by the Buddhist Religious Affairs Coordinating Officer", type: "textarea", rows: 6, rules: { required: true } },
@@ -183,10 +206,10 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     ],
   },
   {
-    id: 9,
+    id: 11,
     title: "Ownership and Recommendation",
     fields: [
-      { name: "grama_niladhari_division_ownership", label: "Grama Niladhari Division", type: "text", placeholder: "Enter division name", rules: { required: true } },
+      { name: "grama_niladhari_division_ownership", label: "In the Grama Niladhari Division of .........................", type: "text", placeholder: "Enter division name", rules: { required: true } },
       { name: "sanghika_donation_deed", label: "Ownership has been obtained through a Sanghika (Saṅgha) donation deed", type: "text", rules: { required: false } },
       { name: "government_donation_deed", label: "A donation deed issued by the Government has been obtained", type: "text", rules: { required: false } },
       { name: "government_donation_deed_in_progress", label: "Necessary steps are being taken to prepare the donation deed", type: "text", rules: { required: false } },
@@ -196,7 +219,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     ],
   },
   {
-    id: 10,
+    id: 12,
     title: "Annex II",
     fields: [
       { name: "annex2_recommend_construction", label: "I recommend that the temple be constructed and maintained as a new religious center", type: "text", rules: { required: false } },
@@ -224,7 +247,11 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   nikaya: "",
   parshawaya: "",
   viharadhipathi_name: "",
+  viharadhipathi_regn: "",
   period_established: "",
+  mahanayake_date: "",
+  mahanayake_letter_nu: "",
+  mahanayake_remarks: "",
   buildings_description: "",
   dayaka_families_count: "",
   kulangana_committee: "",

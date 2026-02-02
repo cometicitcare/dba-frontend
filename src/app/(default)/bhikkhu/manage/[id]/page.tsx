@@ -14,7 +14,8 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-
+import { getStoredUserData } from "@/utils/userData";
+import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from "@/utils/config";
 import {
   DateField,
   LocationPicker,
@@ -47,12 +48,13 @@ import {
   Button as MuiButton,
   TextField,
 } from "@mui/material";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
+import "@react-pdf-viewer/core/lib/styles/index.css";
 
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const HIDDEN_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
-  "br_fathrname",
   "br_email",
   "br_fathrsaddrs",
   "br_mobile",
@@ -70,6 +72,7 @@ const OPTIONAL_LOCATION_FIELDS: ReadonlySet<keyof BhikkhuForm> = new Set([
 const CERTIFICATE_URL_BASE =
   "https://hrms.dbagovlk.com/bhikkhu/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
+const API_BASE_URL = "https://api.dbagovlk.com";
 
 type CertificateMeta = {
   number: string;
@@ -181,9 +184,15 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [canAdminActions, setCanAdminActions] = useState(false);
+  
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const current = steps[activeTab - 1];
+  const getStepById = (tabId: number) =>
+    steps.find((step) => step.id === tabId);
+  const current = getStepById(activeTab);
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
   const isUploadTab = stepTitle === "Upload Scanned Files";
@@ -241,8 +250,20 @@ function ManageBhikkhuInner({ params }: PageProps) {
     });
   };
 
+  useEffect(() => {
+    const stored = getStoredUserData();
+    if (!stored || stored.department !== BHIKKU_MANAGEMENT_DEPARTMENT) {
+      setAccessDenied(true);
+      router.replace("/");
+      setAccessChecked(true);
+      return;
+    }
+    setCanAdminActions(stored.roleLevel === ADMIN_ROLE_LEVEL);
+    setAccessChecked(true);
+  }, [router]);
+
   const validateTab = (tabIndex: number): boolean => {
-    const step = steps[tabIndex - 1];
+    const step = getStepById(tabIndex);
     if (!step) return true;
     const nextErrors: Errors<BhikkhuForm> = { ...errors };
     let valid = true;
@@ -260,7 +281,8 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const buildPartialPayloadForTab = (
     tabIndex: number
   ): Partial<BhikkhuForm> => {
-    const s = steps[tabIndex - 1];
+    const s = getStepById(tabIndex);
+    if (!s) return {};
     const payload: Partial<BhikkhuForm> = {};
     s.fields.forEach((f) => {
       const v = values[f.name] as unknown as string | undefined;
@@ -473,6 +495,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
     handleInputChange("br_parshawaya", code);
     const nikaya = findNikayaByCode(values.br_nikaya);
     const p = nikaya?.parshawayas.find((x) => x.code === code);
+    const nayaka = p?.nayaka;
+    handleSetMany({
+      br_mahanayaka_name: nayaka?.mahananame ?? "",
+      br_mahanayaka_address: nayaka?.address ?? "",
+    });
     setDisplay((d) => ({
       ...d,
       br_parshawaya: p ? `${p.name} - ${p.code}` : code,
@@ -544,8 +571,8 @@ function ManageBhikkhuInner({ params }: PageProps) {
 
     const province_code = s(
       api?.br_province?.cp_code ||
-        api?.br_province?.code ||
-        (typeof api?.br_province === "string" ? api?.br_province : "")
+      api?.br_province?.code ||
+      (typeof api?.br_province === "string" ? api?.br_province : "")
     );
     const district_code = s(
       api?.br_district?.dd_dcode ||
@@ -560,9 +587,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
     const gn_code = s(
       api?.br_gndiv?.gn_gnc || api?.br_gndiv?.gn_code || api?.br_gndiv
     );
+    const formIdValue = s(api?.br_form_id ?? api?.dbh_form_id);
 
     const formPatch: Partial<BhikkhuForm> = {
       br_cat: (br_cat_code as any) || NOVICE_CATEGORY_CODE,
+      br_form_id: formIdValue,
       br_reqstdate: toYYYYMMDD(s(api?.br_reqstdate)),
       br_dofb: toYYYYMMDD(s(api?.br_dofb)),
       br_gihiname: s(api?.br_gihiname),
@@ -675,9 +704,11 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const MAX_SCAN_BYTES = 5 * 1024 * 1024;
   const resolveScanUrl = (path?: string | null) => {
     if (!path) return null;
-    const trimmed = String(path);
-    if (trimmed.startsWith("http")) return trimmed;
-    return `https://hrms.dbagovlk.com${trimmed}`;
+    const trimmed = String(path).trim();
+    if (!trimmed) return null;
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+    return `${API_BASE_URL}${normalizedPath}`;
   };
   const formatFileSize = (bytes: number) => {
     if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -806,6 +837,7 @@ function ManageBhikkhuInner({ params }: PageProps) {
       lower.endsWith(".jpeg") ||
       lower.endsWith(".gif") ||
       lower.endsWith(".webp");
+    const isPdf = lower.includes(".pdf");
     return (
       <div className="rounded-2xl border border-slate-200 bg-white/60 p-4 shadow-sm">
         <div className="flex items-center justify-between">
@@ -834,10 +866,34 @@ function ManageBhikkhuInner({ params }: PageProps) {
               className="w-full max-h-96 object-contain"
             />
           </div>
+        ) : isPdf ? (
+          <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+              <Viewer fileUrl={existingScanUrl} withCredentials={false} />
+            </Worker>
+          </div>
         ) : null}
       </div>
     );
   };
+
+  if (!accessChecked) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm text-gray-500">Checking access...</p>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="w-full min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-sm font-medium text-red-600">
+          You do not have access to this section.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -859,36 +915,38 @@ function ManageBhikkhuInner({ params }: PageProps) {
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {editId}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleOpenRejectDialog}
-                      disabled={loading || saving || rejecting}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all
-                        ${
-                          loading || saving || rejecting
-                            ? "bg-red-700/60 text-white cursor-not-allowed"
-                            : "bg-red-600 text-white hover:bg-red-700"
-                        }`}
-                      aria-label="Reject registration"
-                      title="Reject registration"
-                    >
+                  {canAdminActions && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleOpenRejectDialog}
+                        disabled={loading || saving || rejecting}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || saving || rejecting
+                              ? "bg-red-700/60 text-white cursor-not-allowed"
+                              : "bg-red-600 text-white hover:bg-red-700"
+                          }`}
+                        aria-label="Reject registration"
+                        title="Reject registration"
+                      >
                       {rejecting ? "Rejecting..." : "Reject"}
-                    </button>
-                    <button
-                      onClick={handleOpenApproveDialog}
-                      disabled={loading || saving || approving}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all
-                        ${
-                          loading || saving || approving
-                            ? "bg-green-700/60 text-white cursor-not-allowed"
-                            : "bg-green-600 text-white hover:bg-green-700"
-                        }`}
-                      aria-label="Approve registration"
-                      title="Approve registration"
-                    >
+                      </button>
+                      <button
+                        onClick={handleOpenApproveDialog}
+                        disabled={loading || saving || approving}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all
+                          ${
+                            loading || saving || approving
+                              ? "bg-green-700/60 text-white cursor-not-allowed"
+                              : "bg-green-600 text-white hover:bg-green-700"
+                          }`}
+                        aria-label="Approve registration"
+                        title="Approve registration"
+                      >
                       {approving ? "Approving…" : "Approve"}
-                    </button>
-                  </div>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -939,26 +997,26 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                     {printingMarking ? "Please wait..." : "Print QR on Certificate"}
                                   </button>
                                 </div>
-                                <p className="text-xs text-slate-500">
-                                  Insert the pre-printed legal-size certificate into the printer.
-                                  Only the QR code positioned at the bottom-right corner of the sheet will be printed.
-                                </p>
-                              </div>
-
-                                <div className="flex justify-center">
-                                  <div
-                                    id="certificate-print-area"
-                                    ref={certificatePaperRef}
-                                    className="relative bg-white"
-                                    style={{ width: "8.5in", height: "14in" }}
-                                  >
-                                  <div className="absolute inset-0 pointer-events-none" />
-                                  <div className="absolute bottom-20 right-16">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-2">
-                                      <QRCode
-                                        value={certificateQrValue}
-                                        size={80}
-                                        className="h-20 w-20"
+                                  <p className="text-xs text-slate-500">
+                                    Insert the pre-printed legal-size certificate into the printer.
+                                    Only the QR code positioned at the upper-left corner of the sheet will be printed.
+                                  </p>
+                                </div>
+  
+                                  <div className="flex justify-center">
+                                    <div
+                                      id="certificate-print-area"
+                                      ref={certificatePaperRef}
+                                      className="relative bg-white"
+                                      style={{ width: "8.5in", height: "14in" }}
+                                    >
+                                    <div className="absolute inset-0 pointer-events-none" />
+                                    <div className="absolute top-16 left-16">
+                                      <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                        <QRCode
+                                          value={certificateQrValue}
+                                          size={80}
+                                          className="h-20 w-20"
                                       />
                                     </div>
                                   </div>
@@ -1000,32 +1058,13 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                   No scanned document uploaded yet.
                                 </div>
                               )}
-                              <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm">
-                                <div className="flex items-center justify-between gap-3">
-                                  <div>
-                                    <p className="text-sm font-semibold text-slate-900">
-                                      Upload a new scan
-                                    </p>
-                                    <p className="text-xs text-slate-600">
-                                      PDF/JPG/PNG, max 5 MB.
-                                    </p>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowUploadModal(true)}
-                                    className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-950"
-                                  >
-                                    Upload
-                                  </button>
-                                </div>
-                              </div>
                             </div>
                           ) : (
                             <>
                               <div
                                 className={`grid grid-cols-1 ${gridCols} gap-5`}
                               >
-                                {current.fields.map((f) => {
+                                {current?.fields?.map((f) => {
                                   const id = String(f.name);
                                   const val =
                                     (values[f.name] as unknown as string) ?? "";
@@ -1463,14 +1502,15 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                             values.br_residence_at_declaration ??
                                             ""
                                           }
-                                          onPick={({
-                                            address,
-                                            display: disp,
-                                          }) => {
-                                            handleInputChange(
-                                              "br_residence_at_declaration",
-                                              address ?? ""
-                                            );
+                                            onPick={({
+                                              address,
+                                              trn,
+                                              display: disp,
+                                            }) => {
+                                              handleInputChange(
+                                                "br_residence_at_declaration",
+                                                disp ?? address ?? ""
+                                              );
                                             setDisplay((d) => ({
                                               ...d,
                                               br_residence_at_declaration: disp,
@@ -1795,4 +1835,3 @@ export default function ManageBhikkhuPage(props: PageProps) {
     </Suspense>
   );
 }
-
