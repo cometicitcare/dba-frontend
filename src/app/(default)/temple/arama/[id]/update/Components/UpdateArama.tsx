@@ -7,6 +7,8 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import QRCode from "react-qr-code";
+import "@react-pdf-viewer/core/lib/styles/index.css";
+import { Worker, Viewer } from "@react-pdf-viewer/core";
 
 import {
   DateField,
@@ -36,7 +38,7 @@ import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, T
 
 const CERTIFICATE_URL_BASE = "https://hrms.dbagovlk.com/arama/certificate";
 const SAMPLE_CERT_URL = `${CERTIFICATE_URL_BASE}/sample`;
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE_URL = "https://api.dbagovlk.com";
 
 type CertificateMeta = {
   number: string;
@@ -373,7 +375,7 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       
       // Step 3: Administrative Details
       chief_nun_name: apiData.ar_viharadhipathi_name ?? "",
-      chief_nun_registration_number: "", // Not in API response
+      chief_nun_registration_number: apiData.ar_viharadhipathi_regn ?? apiData.ar_ownercd?.sil_regn ?? "",
       established_period: apiData.ar_period_established ?? "",
       
       // Step 4: Land & Facilities
@@ -620,10 +622,12 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
     }
 
     const payload: any = {
+      ar_typ: "ARAMA",
+      ar_ownercd: ownerCode,
+      ar_parshawa: "PR005",
       ar_mobile: formData.telephone_number ?? "",
       ar_whtapp: formData.whatsapp_number ?? "",
       ar_email: formData.email_address ?? "",
-      ar_parshawa: "PR005", // Constant as per user request
       ar_vname: formData.arama_name ?? "",
       ar_addrs: formData.arama_address ?? "",
       ar_province: formData.province ?? "",
@@ -631,12 +635,16 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       ar_divisional_secretariat: formData.divisional_secretariat ?? "",
       ar_pradeshya_sabha: formData.provincial_sasanaarakshaka_council ?? "",
       ar_gndiv: formData.grama_niladhari_division ?? "",
+      ar_nikaya: "",
       ar_viharadhipathi_name: formData.chief_nun_name ?? "",
       ar_period_established: formData.established_period ? toYYYYMMDD(formData.established_period) : "",
       ar_buildings_description: formData.existing_buildings_facilities ?? "",
       ar_dayaka_families_count: formData.donor_families_count ?? "",
       ar_fmlycnt: donorCountNum,
       ar_kulangana_committee: formData.committees ?? "",
+      ar_dayaka_sabha: "",
+      ar_temple_working_committee: "",
+      ar_other_associations: "",
       temple_owned_land: mappedLand,
       ar_land_info_certified: formData.land_info_certified ?? false,
       resident_silmathas: mappedSilmathas,
@@ -650,10 +658,13 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       ar_authority_consent_attached: formData.institution_consent_obtained ?? false,
       ar_recommend_new_center: formData.recommend_new_center ?? false,
       ar_recommend_registered_temple: formData.recommend_registered_arama ?? false,
+      ar_annex2_recommend_construction: false,
       ar_annex2_land_ownership_docs: formData.annex2_land_ownership_docs ?? false,
       ar_annex2_chief_incumbent_letter: formData.annex2_chief_nun_registered ?? false,
       ar_annex2_coordinator_recommendation: formData.annex2_district_association_recommendation ?? false,
       ar_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation ?? false,
+      ar_annex2_approval_construction: formData.secretary_approve_construction ?? false,
+      ar_annex2_referral_resubmission: formData.secretary_refer_resubmission ?? false,
     };
 
     if (bgndate) {
@@ -666,106 +677,35 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const buildPartialPayloadForTab = (tabIndex: number): Partial<any> => {
     const s = steps[tabIndex - 1];
     if (!s) return {};
-    
-    const payload: any = {
-      ar_parshawa: "PR005", // Constant as per user request
+
+    let parsedLand: any[] = [];
+    try {
+      parsedLand = values.arama_owned_land
+        ? (typeof values.arama_owned_land === "string" ? JSON.parse(values.arama_owned_land) : values.arama_owned_land)
+        : [];
+    } catch (e) {
+      console.error("Error parsing arama_owned_land:", e);
+    }
+
+    const fullPayload = mapFormToApiFields(values, parsedLand);
+    const fieldsByTab: Record<number, string[]> = {
+      1: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_mobile", "ar_whtapp", "ar_email", "ar_vname", "ar_addrs"],
+      2: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_province", "ar_district", "ar_divisional_secretariat", "ar_pradeshya_sabha", "ar_gndiv"],
+      3: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_nikaya", "ar_viharadhipathi_name", "ar_period_established", "ar_bgndate"],
+      4: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_buildings_description", "ar_dayaka_families_count", "ar_fmlycnt", "ar_kulangana_committee", "ar_dayaka_sabha", "ar_temple_working_committee", "ar_other_associations"],
+      5: ["ar_typ", "ar_ownercd", "ar_parshawa", "temple_owned_land", "ar_land_info_certified"],
+      6: ["ar_typ", "ar_ownercd", "ar_parshawa", "resident_silmathas", "ar_resident_silmathas_certified"],
+      7: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_inspection_report", "ar_inspection_code"],
+      8: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_grama_niladhari_division_ownership", "ar_sanghika_donation_deed", "ar_government_donation_deed", "ar_government_donation_deed_in_progress", "ar_authority_consent_attached", "ar_recommend_new_center", "ar_recommend_registered_temple"],
+      9: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_annex2_recommend_construction", "ar_annex2_land_ownership_docs", "ar_annex2_chief_incumbent_letter", "ar_annex2_coordinator_recommendation", "ar_annex2_divisional_secretary_recommendation"],
+      10: ["ar_typ", "ar_ownercd", "ar_parshawa", "ar_annex2_approval_construction", "ar_annex2_referral_resubmission"],
     };
-    
-    if (tabIndex === 5) {
-      try {
-        const parsedLand = values.arama_owned_land 
-          ? (typeof values.arama_owned_land === 'string' ? JSON.parse(values.arama_owned_land) : values.arama_owned_land)
-          : [];
-        const mappedLand = parsedLand.map((land: any) => ({
-          serialNumber: land.serialNumber ?? land.serial_number ?? 0,
-          landName: land.landName ?? land.land_name ?? "",
-          village: land.village ?? "",
-          district: land.district ?? "",
-          extent: land.extent ?? "",
-          cultivationDescription: land.cultivationDescription ?? land.cultivation_description ?? "",
-          ownershipNature: land.ownershipNature ?? land.ownership_nature ?? "",
-          deedNumber: land.deedNumber ?? land.deed_number ?? "",
-          titleRegistrationNumber: land.titleRegistrationNumber ?? land.title_registration_number ?? "",
-          taxDetails: land.taxDetails ?? land.tax_details ?? "",
-          landOccupants: land.landOccupants ?? land.land_occupants ?? "",
-        }));
-        payload.temple_owned_land = mappedLand;
-        payload.ar_land_info_certified = values.land_info_certified ?? false;
-      } catch (e) {
-        console.error("Error parsing arama_owned_land:", e);
-      }
-      return payload;
-    }
 
-    if (tabIndex === 6) {
-      try {
-        const parsedSilmathas = values.resident_silmathas 
-          ? (typeof values.resident_silmathas === 'string' ? JSON.parse(values.resident_silmathas) : values.resident_silmathas)
-          : [];
-        const mappedSilmathas = parsedSilmathas.map((silmatha: any) => ({
-          name: silmatha.silmathaName ?? silmatha.name ?? "",
-          national_id: silmatha.registrationNumber ?? silmatha.national_id ?? "",
-          date_of_birth: silmatha.date_of_birth ?? "",
-          ordination_date: silmatha.ordination_date ?? "",
-          position: silmatha.occupationEducation?.split(',')[0]?.trim() ?? "",
-          is_head_nun: silmatha.serialNumber === 1,
-          notes: silmatha.occupationEducation?.split(',').slice(1).join(', ').trim() ?? "",
-        }));
-        payload.resident_silmathas = mappedSilmathas;
-        payload.ar_resident_silmathas_certified = values.resident_silmathas_certified ?? false;
-      } catch (e) {
-        console.error("Error parsing resident_silmathas:", e);
-      }
-      return payload;
-    }
-
-    for (const f of s.fields) {
-      if (f.name === "arama_owned_land" || f.name === "resident_silmathas") continue;
-      const v = values[f.name];
-      if (v == null) continue;
-      
-      // Map form field names to API field names
-      const fieldMap: Record<string, string> = {
-        arama_name: "ar_vname",
-        arama_address: "ar_addrs",
-        telephone_number: "ar_mobile",
-        whatsapp_number: "ar_whtapp",
-        email_address: "ar_email",
-        province: "ar_province",
-        district: "ar_district",
-        divisional_secretariat: "ar_divisional_secretariat",
-        provincial_sasanaarakshaka_council: "ar_pradeshya_sabha",
-        grama_niladhari_division: "ar_gndiv",
-        chief_nun_name: "ar_viharadhipathi_name",
-        established_period: "ar_period_established",
-        existing_buildings_facilities: "ar_buildings_description",
-        donor_families_count: "ar_dayaka_families_count",
-        committees: "ar_kulangana_committee",
-        inspection_report: "ar_inspection_report",
-        inspection_code: "ar_inspection_code",
-        ownership_grama_niladhari_division: "ar_grama_niladhari_division_ownership",
-        pooja_deed_obtained: "ar_sanghika_donation_deed",
-        government_pooja_deed_obtained: "ar_government_donation_deed",
-        government_pooja_deed_in_progress: "ar_government_donation_deed_in_progress",
-        institution_consent_obtained: "ar_authority_consent_attached",
-        recommend_new_center: "ar_recommend_new_center",
-        recommend_registered_arama: "ar_recommend_registered_temple",
-        annex2_land_ownership_docs: "ar_annex2_land_ownership_docs",
-        annex2_chief_nun_registered: "ar_annex2_chief_incumbent_letter",
-        annex2_district_association_recommendation: "ar_annex2_coordinator_recommendation",
-        annex2_divisional_secretary_recommendation: "ar_annex2_divisional_secretary_recommendation",
-      };
-
-      const apiFieldName = fieldMap[String(f.name)] || String(f.name);
-      
-      if (f.name === "established_period" && typeof v === "string") {
-        payload[apiFieldName] = toYYYYMMDD(v) || v;
-      } else if (f.name === "donor_families_count" && typeof v === "string") {
-        const count = parseInt(v, 10);
-        payload[apiFieldName] = v;
-        payload.ar_fmlycnt = isNaN(count) ? 0 : count;
-      } else {
-        payload[apiFieldName] = v;
+    const keys = fieldsByTab[tabIndex] ?? [];
+    const payload: any = {};
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(fullPayload, key) && fullPayload[key] !== undefined) {
+        payload[key] = fullPayload[key];
       }
     }
 
@@ -900,13 +840,12 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
             <img src={existingScanUrl} alt="Scanned certificate" className="w-full max-h-96 object-contain" />
           </div>
         ) : isPdf ? (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-            <p>
-              PDF file:{" "}
-              <a href={existingScanUrl} target="_blank" rel="noreferrer" className="underline">
-                {fileName}
-              </a>
-            </p>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <div className="aspect-[8.5/11] w-full">
+              <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
+                <Viewer fileUrl={existingScanUrl} withCredentials={false} />
+              </Worker>
+            </div>
           </div>
         ) : null}
       </div>
@@ -1287,10 +1226,9 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                           </div>
 
                           <div className="aramaya-qr">
-                            <div className="rounded-lg border border-slate-200 bg-white p-2">
-                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                            <div className="rounded-md border border-slate-200 bg-white p-0 inline-block">
+                              <QRCode value={certificateQrValue} size={80} />
                             </div>
-                            <div className="caption">{certificateUrlLabel}</div>
                           </div>
                         </section>
                       </div>

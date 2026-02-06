@@ -56,12 +56,14 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
     onChange(updated);
   };
 
-  const processRowUpdate = (newRow: LandInfoRow, oldRow: LandInfoRow): LandInfoRow => {
-    const updated = rows.map((r) => (r.id === newRow.id ? { ...r, ...newRow } : r));
+  const handleCellChange = <K extends keyof LandInfoRow>(id: string, field: K, value: LandInfoRow[K]) => {
+    const updated = rows.map((r) => (r.id === id ? { ...r, [field]: value } : r));
     setRows(updated);
     onChange(updated);
-    return newRow;
   };
+
+  const inputClassName =
+    "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 
   const columns: GridColDef<LandInfoRow>[] = [
     {
@@ -69,70 +71,161 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
       headerName: "Serial Number",
       width: 100,
       editable: false,
+      renderCell: (params) => <span className="text-sm text-slate-700">{params.value as number}</span>,
     },
     {
       field: "landName",
       headerName: "Name of the Land",
       width: 150,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "landName", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "village",
       headerName: "Village",
       width: 120,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "village", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "district",
       headerName: "District",
       width: 140,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: districtOptions,
+      editable: false,
+      renderCell: (params) => (
+        <select
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "district", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">Select</option>
+          {districtOptions.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ),
     },
     {
       field: "extent",
       headerName: "Extent (Land Area)",
       width: 130,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "extent", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "cultivationDescription",
       headerName: "Nature of Cultivation / Description of Buildings",
       width: 200,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "cultivationDescription", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "ownershipNature",
       headerName: "Nature of Ownership",
       width: 150,
-      editable: true,
-      type: "singleSelect",
-      valueOptions: ["Bandara", "Rajakariya", "Other"],
+      editable: false,
+      renderCell: (params) => (
+        <select
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "ownershipNature", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <option value="">Select</option>
+          {["Bandara", "Rajakariya", "Other"].map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      ),
     },
     {
       field: "deedNumber",
       headerName: "Deed Number",
       width: 120,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "deedNumber", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "titleRegistrationNumber",
       headerName: "Title Registration Number",
       width: 180,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "titleRegistrationNumber", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "taxDetails",
       headerName: "Tax & Other Details",
       width: 150,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "taxDetails", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "landOccupants",
       headerName: "Land Occupants / Users",
       width: 150,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "landOccupants", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "actions",
@@ -166,7 +259,6 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
         <DataGrid<LandInfoRow>
           rows={rows}
           columns={columns}
-          processRowUpdate={processRowUpdate}
           disableRowSelectionOnClick
           hideFooter
           sx={{

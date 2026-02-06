@@ -49,6 +49,7 @@ function AddAramaPageInner() {
 
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const showDemoFill = process.env.NEXT_PUBLIC_SHOW_DEMO_FILL === "true";
 
   const effectiveSteps: Array<StepConfig<AramaForm>> = useMemo(() => {
     if (!reviewEnabled) return steps;
@@ -95,6 +96,115 @@ function AddAramaPageInner() {
       setErrors(nextErrors);
       return next;
     });
+  };
+
+  const randomDigits = (count: number) =>
+    Array.from({ length: count }, () => Math.floor(Math.random() * 10)).join("");
+
+  const randomPhone075 = () => `075${randomDigits(7)}`;
+
+  const randomEmail = () => `user${randomDigits(4)}@example.com`;
+
+  const pickRandom = <T,>(list: T[], fallback: T) => (list.length ? list[Math.floor(Math.random() * list.length)] : fallback);
+
+  const buildRandomFormData = (): Partial<AramaForm> => {
+    const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
+    const province = pickRandom(provinces, undefined);
+    const districts = province?.districts ?? [];
+    const district = pickRandom(districts, undefined);
+    const divisions = district?.divisional_secretariats ?? [];
+    const division = pickRandom(divisions, undefined);
+    const gns = division?.gn_divisions ?? [];
+    const gn = pickRandom(gns, undefined);
+
+    const provinceCode = province?.cp_code ?? "";
+    const districtCode = district?.dd_dcode ?? "";
+    const divisionCode = division?.dv_dvcode ?? "";
+    const gnCode = gn?.gn_gnc ?? gn?.gn_code ?? "";
+
+    const landRow: LandInfoRow = {
+      id: `land-${Date.now()}`,
+      serialNumber: 1,
+      landName: "Land " + randomDigits(2),
+      village: "Village " + randomDigits(2),
+      district: district?.dd_dname ?? "",
+      extent: `${Math.floor(Math.random() * 5) + 1} acres`,
+      cultivationDescription: "Temple buildings",
+      ownershipNature: pickRandom(["Bandara", "Rajakariya", "Other"], "Other"),
+      deedNumber: `DEED${randomDigits(4)}`,
+      titleRegistrationNumber: `TITLE${randomDigits(4)}`,
+      taxDetails: "Paid",
+      landOccupants: "Temple",
+    };
+
+    const residentRow: ResidentSilmathaRow = {
+      id: `silmatha-${Date.now()}`,
+      serialNumber: 1,
+      silmathaName: `Silmatha ${randomDigits(2)}`,
+      registrationNumber: `REG${randomDigits(5)}`,
+      occupationEducation: "Studying",
+    };
+
+    const establishedYear = String(2010 + Math.floor(Math.random() * 15));
+
+    return {
+      arama_name: `Sample Arama ${randomDigits(3)}`,
+      arama_address: `${Math.floor(Math.random() * 200) + 1} Temple Road`,
+      telephone_number: randomPhone075(),
+      whatsapp_number: randomPhone075(),
+      email_address: randomEmail(),
+      province: provinceCode,
+      district: districtCode,
+      divisional_secretariat: divisionCode,
+      provincial_sasanaarakshaka_council: province?.cp_name ?? "Province Council",
+      grama_niladhari_division: gnCode,
+      chief_nun_name: `Chief Nun ${randomDigits(2)}`,
+      chief_nun_registration_number: `REG${randomDigits(6)}`,
+      established_period: establishedYear,
+      land_size: `${Math.floor(Math.random() * 5) + 1} acres`,
+      land_ownership: "Private",
+      legal_ownership_proof: "Grant Deed",
+      existing_buildings_facilities: "Main hall, meditation room",
+      donor_families_count: String(Math.floor(Math.random() * 80) + 10),
+      committees: "Donor Society",
+      arama_owned_land: JSON.stringify([landRow]),
+      land_info_certified: true,
+      resident_silmathas: JSON.stringify([residentRow]),
+      resident_silmathas_certified: true,
+      inspection_report: "Well maintained.",
+      inspection_code: `INSP${randomDigits(4)}`,
+      ownership_district: district?.dd_dname ?? "",
+      ownership_divisional_secretariat: division?.dv_dvname ?? "",
+      ownership_grama_niladhari_division: gn?.gn_gnname ?? "",
+      ownership_arama_name: `Sample Arama ${randomDigits(3)}`,
+      pooja_deed_obtained: true,
+      government_pooja_deed_obtained: false,
+      government_pooja_deed_in_progress: false,
+      institution_name: "Buddhist Affairs Department",
+      institution_consent_obtained: true,
+      recommend_new_center: true,
+      recommend_registered_arama: false,
+      annex2_chief_nun_registered: true,
+      annex2_land_ownership_docs: true,
+      annex2_institution_consent: true,
+      annex2_district_association_recommendation: true,
+      annex2_divisional_secretary_recommendation: true,
+      annex2_recommend_district: district?.dd_dname ?? "",
+      annex2_recommend_divisional_secretariat: division?.dv_dvname ?? "",
+      annex2_recommend_grama_niladhari_division: gn?.gn_gnname ?? "",
+      annex2_recommend_arama_name: `Sample Arama ${randomDigits(3)}`,
+      secretary_approve_construction: true,
+      secretary_not_approve_construction: false,
+      secretary_refer_registration: false,
+      secretary_refer_resubmission: false,
+      secretary_resubmission_notes: "",
+    };
+  };
+
+  const handleFillDemo = () => {
+    const randomData = buildRandomFormData();
+    handleSetMany(randomData);
+    toast.info("Random data filled.", { autoClose: 1200 });
   };
 
   const validateStep = (stepIndex: number): boolean => {
@@ -501,6 +611,15 @@ function AddAramaPageInner() {
                     <h1 className="text-2xl font-bold text-white mb-1">Arama Registration Form</h1>
                     <p className="text-slate-300 text-sm">Please complete all required information</p>
                   </div>
+                  {showDemoFill ? (
+                    <button
+                      type="button"
+                      onClick={handleFillDemo}
+                      className="px-4 py-2 text-sm font-medium bg-white text-slate-800 rounded-lg shadow hover:bg-slate-100 transition-all"
+                    >
+                      Fill Sample Data
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
