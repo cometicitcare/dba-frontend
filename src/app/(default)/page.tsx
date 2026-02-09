@@ -117,12 +117,6 @@ const MODULE_CARD_DEFINITIONS: { path: string; label: string; icon: any; color: 
     color: "from-rose-400 to-pink-600",
   },
   {
-    path: "/admin",
-    label: "Security Councils",
-    icon: BuildingIcon,
-    color: "from-rose-400 to-pink-600",
-  },
-  {
     path: "/objections",
     label: "Objections",
     icon: EyeIcon,
