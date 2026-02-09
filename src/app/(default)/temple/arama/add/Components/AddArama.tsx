@@ -105,7 +105,11 @@ function AddAramaPageInner() {
 
   const randomEmail = () => `user${randomDigits(4)}@example.com`;
 
-  const pickRandom = <T,>(list: T[], fallback?: T) => (list.length ? list[Math.floor(Math.random() * list.length)] : fallback);
+  function pickRandom<T>(list: T[], fallback: T): T;
+  function pickRandom<T>(list: T[], fallback?: T): T | undefined;
+  function pickRandom<T>(list: T[], fallback?: T): T | undefined {
+    return list.length ? list[Math.floor(Math.random() * list.length)] : fallback;
+  }
 
   type GnDivision = {
     gn_gnc?: string;
