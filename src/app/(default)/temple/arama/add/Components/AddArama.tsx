@@ -105,17 +105,46 @@ function AddAramaPageInner() {
 
   const randomEmail = () => `user${randomDigits(4)}@example.com`;
 
-  const pickRandom = <T,>(list: T[], fallback: T) => (list.length ? list[Math.floor(Math.random() * list.length)] : fallback);
+  const pickRandom = <T,>(list: T[], fallback?: T) => (list.length ? list[Math.floor(Math.random() * list.length)] : fallback);
+
+  type GnDivision = {
+    gn_gnc?: string;
+    gn_code?: string;
+    gn_gnname?: string;
+  };
+
+  type DivisionalSecretariat = {
+    dv_dvcode?: string;
+    dv_dvname?: string;
+    gn_divisions?: GnDivision[];
+  };
+
+  type District = {
+    dd_dcode?: string;
+    dd_dname?: string;
+    divisional_secretariats?: DivisionalSecretariat[];
+  };
+
+  type Province = {
+    cp_code?: string;
+    cp_name?: string;
+    districts?: District[];
+  };
+
+  type SelectionsData = {
+    provinces?: Province[];
+  };
 
   const buildRandomFormData = (): Partial<AramaForm> => {
-    const provinces = Array.isArray((selectionsData as any)?.provinces) ? ((selectionsData as any).provinces as any[]) : [];
-    const province = pickRandom(provinces, undefined);
+    const data = selectionsData as SelectionsData;
+    const provinces = Array.isArray(data.provinces) ? data.provinces : [];
+    const province = pickRandom(provinces);
     const districts = province?.districts ?? [];
-    const district = pickRandom(districts, undefined);
+    const district = pickRandom(districts);
     const divisions = district?.divisional_secretariats ?? [];
-    const division = pickRandom(divisions, undefined);
+    const division = pickRandom(divisions);
     const gns = division?.gn_divisions ?? [];
-    const gn = pickRandom(gns, undefined);
+    const gn = pickRandom(gns);
 
     const provinceCode = province?.cp_code ?? "";
     const districtCode = district?.dd_dcode ?? "";
