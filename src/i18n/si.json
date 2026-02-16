@@ -1,0 +1,18 @@
+{
+  "topbar": {
+    "languageLabel": "භාෂාව",
+    "logout": "පිටවීම",
+    "profile": "පැතිකඩ",
+    "settings": "සැකසුම්"
+  },
+  "common": {
+    "save": "සුරකින්න",
+    "cancel": "අවලංගු කරන්න",
+    "search": "සොයන්න"
+  },
+  "auth": {
+    "login": "පිවිසුම",
+    "forgotPassword": "මුරපදය අමතකද?",
+    "welcome": "ආයුබෝවන්, {name}"
+  }
+}

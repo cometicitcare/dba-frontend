@@ -28,6 +28,7 @@ import {
   PUBLIC_MANAGEMENT_DEPARTMENT,
   SIDEBAR_ACCESS_MAP,
 } from "@/utils/config";
+import { useT } from "@/i18n/useT";
 // --- map old services -> each new module path ---
 const SERVICE_MAP: Record<
   string,
@@ -152,6 +153,7 @@ const bannerImages = [
 
 export default function Dashboard() {
   const router = useRouter();
+  const t = useT();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
@@ -288,6 +290,10 @@ export default function Dashboard() {
     });
   }, [userData]);
 
+  const welcomeLine = t("auth.welcome", {
+    name: userData ? `${userData.ua_first_name} ${userData.ua_last_name}` : "Sahan",
+  });
+
 
   return (
     <div className="w-full min-h-screen bg-gray-50">
@@ -300,8 +306,8 @@ export default function Dashboard() {
           <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
             <div className="relative z-10 max-w-[55%] sm:max-w-[50%] md:max-w-[45%] lg:max-w-[40%] xl:max-w-[35%] pr-4">
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2">{getGreeting()}</h1>
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">Welcome!</h2>
-                        <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-3">{welcomeLine}</h2>
+              <p className="text-base sm:text-lg md:text-xl opacity-90 leading-tight mb-2">
                 {userData ? `${userData.ua_first_name} ${userData.ua_last_name}` : "Loading..."}
               </p>
               <div className="text-sm sm:text-base md:text-lg opacity-80 leading-tight">
