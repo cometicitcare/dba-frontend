@@ -66,7 +66,7 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   {
     icon: MonkIcon,
     label: "S.A Balama..",
-    path: "/admin",
+    path: "/sasanarakshaka",
   },
   {
     icon: MonkIcon,
