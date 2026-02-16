@@ -1,0 +1,18 @@
+{
+  "topbar": {
+    "languageLabel": "மொழி",
+    "logout": "வெளியேறு",
+    "profile": "சுயவிவரம்",
+    "settings": "அமைப்புகள்"
+  },
+  "common": {
+    "save": "சேமிக்க",
+    "cancel": "ரத்து செய்ய",
+    "search": "தேடு"
+  },
+  "auth": {
+    "login": "உள்நுழை",
+    "forgotPassword": "கடவுச்சொல் மறந்துவிட்டதா?",
+    "welcome": "வரவேற்கிறோம், {name}"
+  }
+}
