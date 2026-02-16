@@ -375,6 +375,8 @@ function AddAramaPageInner() {
       ar_dayaka_sabha: "", // Not in form
       ar_temple_working_committee: "", // Not in form
       ar_other_associations: "", // Not in form
+      ar_landSize: formData.land_size ?? "",
+      ar_landOwnerShipType: formData.land_ownership ?? "",
       
       // Step 5: Land Information
       temple_owned_land: mappedLand,
@@ -634,7 +636,7 @@ function AddAramaPageInner() {
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
       <Sidebar isOpen={sidebarOpen} />
-      <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+      <div className={`transition-all duration-300 pt-20 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
         <main className="p-2 mb-20">
           <div className="w-full">
             <div className="bg-white shadow-xl overflow-hidden">

@@ -72,7 +72,7 @@ const SERVICE_MAP: Record<
   ],
 
   // -------------------------
-  // 5. Sasanarakshaka Bala Mandala (Security Councils)
+  // 5. Sasanarakshaka Bala Mandala (Sasana Arakshaka Balamandalaya)
   // -------------------------
   "/admin": [
     { icon: UsersIcon, label: "Users", action: "users-sbm", route: "/admin/users" },
@@ -113,7 +113,7 @@ const modules = [
   },
   { 
     icon: SettingsIcon, 
-    label: "Sasanarakshaka Bala Mandala (Security Councils)", 
+    label: "Sasana Arakshaka Balamandalaya", 
     color: "from-red-400 to-red-500", 
     path: "/admin" 
   },
@@ -275,7 +275,7 @@ export default function Dashboard() {
       <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar isOpen={sidebarOpen} />
 
-      <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+      <div className={`transition-all duration-300 pt-20 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
         <main className="p-6">
           {/* hero */}
           <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">

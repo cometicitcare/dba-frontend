@@ -64,7 +64,7 @@ const SERVICE_MAP: Record<
     { icon: BuildingIcon, label: "View Donations", action: "view-Donations", route: "/teachers" },
   ],
   "/admin": [
-    { icon: BuildingIcon, label: "View Security Councils", action: "view-Security-Councils", route: "/admin" },
+    { icon: BuildingIcon, label: "View Sasana Arakshaka Balamandalaya", action: "view-Security-Councils", route: "/admin" },
   ],
   "/ojections": [
     { icon: EyeIcon, label: "View Ojections", action: "view-ojections", route: "/ojections" },
@@ -294,7 +294,7 @@ export default function Dashboard() {
       <TopBar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <Sidebar isOpen={sidebarOpen} />
 
-      <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+      <div className={`transition-all duration-300 pt-20 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
         <main className="p-6 pb-32">
           {/* hero */}
           <div className="bg-gradient-to-r from-blue-400 to-orange-500 rounded-2xl p-4 sm:p-6 md:p-8 mb-8 text-white relative overflow-hidden min-h-[200px] sm:min-h-[250px] md:min-h-[300px]">
