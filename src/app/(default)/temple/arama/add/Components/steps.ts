@@ -132,7 +132,7 @@ export const aramaSteps = (): StepConfig<AramaForm>[] => [
     fields: [
       { name: "district", label: "District", type: "text", rules: { required: false } },
       { name: "divisional_secretariat", label: "Divisional Secretariat Division", type: "text", rules: { required: false } },
-      { name: "provincial_sasanaarakshaka_council", label: "Provincial Sasanaarakshaka Council", type: "text", rules: { required: false } },
+      { name: "provincial_sasanaarakshaka_council", label: "Provincial Sasanaarakshaka balamandalaya", type: "text", rules: { required: false } },
       { name: "grama_niladhari_division", label: "Grama Niladhari Division", type: "text", rules: { required: false } },
     ],
   },

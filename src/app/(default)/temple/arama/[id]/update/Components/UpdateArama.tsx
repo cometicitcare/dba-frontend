@@ -27,6 +27,7 @@ import {
   type ResidentSilmathaRow,
 } from "../../../add/Components";
 import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
+import SasanarakshakaAutocomplete from "@/components/sasanarakshaka/AutoComplete";
 import selectionsData from "@/utils/selectionsData.json";
 
 import { Tabs } from "@/components/ui/Tabs";
@@ -1350,17 +1351,23 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                             </p>
                           )}
                           <div className="mt-4">
-                            <label htmlFor="provincial_sasanaarakshaka_council" className="block text-sm font-medium text-slate-700 mb-2">
-                              Provincial Sasanaarakshaka Council
-                            </label>
-                            <input
+                            <SasanarakshakaAutocomplete
                               id="provincial_sasanaarakshaka_council"
-                              type="text"
-                              value={(values.provincial_sasanaarakshaka_council as string) ?? ""}
-                              onChange={(e) => handleInputChange("provincial_sasanaarakshaka_council", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                              label="Provincial Sasanaarakshaka Council"
+                              placeholder="Type SSB name or code"
+                              initialDisplay={(values.provincial_sasanaarakshaka_council as string) ?? ""}
+                              onPick={(picked) => {
+                                handleSetMany({
+                                  provincial_sasanaarakshaka_council: picked.code ?? "",
+                                });
+                              }}
+                              onInputChange={() => {
+                                handleInputChange("provincial_sasanaarakshaka_council", "");
+                              }}
                             />
-                            {errors.provincial_sasanaarakshaka_council && <p className="mt-1 text-sm text-red-600">{errors.provincial_sasanaarakshaka_council}</p>}
+                            {errors.provincial_sasanaarakshaka_council && (
+                              <p className="mt-1 text-sm text-red-600">{errors.provincial_sasanaarakshaka_council}</p>
+                            )}
                           </div>
                         </div>
                       )}
