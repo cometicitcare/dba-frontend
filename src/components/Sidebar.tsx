@@ -60,13 +60,13 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   },
   {
     icon: MonkIcon,
-    label: "Security Councils",
-    path: "/admin",
+    label: "Arama",
+    path: "/temple/arama",
   },
   {
     icon: MonkIcon,
-    label: "Arama",
-    path: "/temple/arama",
+    label: "S.A Balama..",
+    path: "/admin",
   },
   {
     icon: MonkIcon,
@@ -83,6 +83,7 @@ const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
     label: "QR Scan",
     path: "/qr-scan",
   }
+  
 ];
 
 const PUBLIC_ONLY_PATHS = ["/", "/objections", "/print-request", "/qr-scan"];
@@ -123,7 +124,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 bg-gray-50 border-r border-gray-200 z-40 flex flex-col">
+    <div className="fixed left-0 top-20 h-[calc(100vh-5rem)] w-64 bg-gray-50 border-r border-gray-200 z-40 flex flex-col">
       {/* Profile section */}
       <div className="p-6 border-b border-gray-200 bg-white">
         <div className="flex flex-col items-center">
