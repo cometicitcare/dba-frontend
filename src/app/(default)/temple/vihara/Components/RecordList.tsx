@@ -11,15 +11,13 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
-import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
+import { PlusIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageVihara } from "@/services/vihara";
-import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
-import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
-import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
-import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
+import LocationPickerCompact from "@/components/Bhikku/Filter/LocationPickerCompact";
+import NikayaParshawaCompact from "@/components/Bhikku/Filter/NikayaParshawaCompact";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
-import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
+import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerCompact";
 import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -188,9 +186,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const filterButtonRef = useRef<HTMLButtonElement | null>(null);
-  const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const prevFiltersRef = useRef<FilterState>(DEFAULT_FILTERS);
+  const searchDebounceRef = useRef<number | null>(null);
   const nikayaData = STATIC_NIKAYAS;
   const nikayaLoading = false;
   const nikayaError: string | null = null;
@@ -332,20 +329,6 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     [fetchData, filters]
   );
 
-  const applyFilters = useCallback(async () => {
-    const next = { ...filters, page: 1 };
-    setFilters(next);
-    await fetchData(undefined, next);
-    setFilterPanelOpen(false);
-  }, [fetchData, filters]);
-
-  const clearFilters = useCallback(async () => {
-    const reset = { ...DEFAULT_FILTERS };
-    setFilters(reset);
-    await fetchData(undefined, reset);
-    setFilterPanelOpen(false);
-  }, [fetchData]);
-
   const handlePageChange = useCallback(
     async (nextPage: number) => {
       const safe = Math.max(1, nextPage);
@@ -385,6 +368,56 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     );
   }, []);
 
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const searchChanged = prev.searchKey !== filters.searchKey;
+    const nonSearchChanged =
+      prev.nikaya !== filters.nikaya ||
+      prev.parchawa !== filters.parchawa ||
+      prev.province !== filters.province ||
+      prev.district !== filters.district ||
+      prev.divisionSecretariat !== filters.divisionSecretariat ||
+      prev.gn !== filters.gn;
+
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    // Reset to page 1 when any filter changes
+    if ((searchChanged || nonSearchChanged) && filters.page !== 1) {
+      setFilters((s) => ({ ...s, page: 1 }));
+      return;
+    }
+
+    if (searchChanged) {
+      const key = filters.searchKey.trim();
+      if (key.length > 0 && key.length < 3) {
+        prevFiltersRef.current = filters;
+        return;
+      }
+
+      const delay = key.length >= 3 ? 400 : 0;
+      searchDebounceRef.current = window.setTimeout(() => {
+        fetchData(undefined, filters);
+      }, delay);
+    } else if (nonSearchChanged) {
+      fetchData(undefined, filters);
+    }
+
+    prevFiltersRef.current = filters;
+  }, [
+    fetchData,
+    filters,
+    filters.searchKey,
+    filters.nikaya,
+    filters.parchawa,
+    filters.province,
+    filters.district,
+    filters.divisionSecretariat,
+    filters.gn,
+  ]);
+
   const columns: Column[] = useMemo(
     () => [
       { key: "vh_trn", label: "TRN", sortable: true },
@@ -404,7 +437,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   <button
                     onClick={() => handleFillStageTwo(item)}
                     disabled={!canFill}
-                    className={`text-sm font-semibold rounded-lg px-3 py-1.5 transition-all ${
+                    className={`text-xs font-semibold rounded-md px-2 py-1 transition-all ${
                       canFill
                         ? "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-slate-200 text-slate-500 cursor-not-allowed"
@@ -420,37 +453,10 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     [handleFillStageTwo, isDivisionalSec]
   );
 
-  useEffect(() => {
-    if (!filterPanelOpen) return undefined;
-
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        filterPanelRef.current &&
-        !filterPanelRef.current.contains(target) &&
-        filterButtonRef.current &&
-        !filterButtonRef.current.contains(target)
-      ) {
-        setFilterPanelOpen(false);
-      }
-    };
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFilterPanelOpen(false);
-    };
-
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [filterPanelOpen]);
-
   return (
     <div >
       <main className="p-0">
-          <div className="relative mb-6">
+          <div className="relative mb-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <h1 className="text-xl font-bold text-gray-800">Vihara</h1>
               <div className="flex items-center gap-2 flex-wrap">
@@ -478,266 +484,51 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   <PlusIcon className="w-5 h-5" />
                   Add Upasampada
                 </button> */}
-                <button
-                  ref={filterButtonRef}
-                  type="button"
-                  onClick={() => setFilterPanelOpen((prev) => !prev)}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                    filterPanelOpen
-                      ? "border-blue-500 bg-blue-50 text-blue-600"
-                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                  aria-expanded={filterPanelOpen}
-                  aria-haspopup="dialog"
-                >
-                  Filter
-                </button>
               </div>
             </div>
 
-            {filterPanelOpen && (
-              <div
-                ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl overflow-y-auto"
-                style={{ width: "280px", height: "360px" }}
-                role="dialog"
-                aria-label="Bhikku filters"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-base font-semibold text-slate-800">
-                    Filters
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setFilterPanelOpen(false)}
-                    className="rounded-full border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-                    aria-label="Close filter panel"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-xs text-gray-600">Search</span>
-                      <input
-                        type="text"
-                        value={filters.searchKey}
-                        onChange={(e) =>
-                          setFilters((s) => ({
-                            ...s,
-                            searchKey: e.target.value,
-                          }))
-                        }
-                        placeholder="Search by name, reg. no, etc."
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </label>
-                  </div>
-
-                  {/* Temple Autocomplete (uses TRN) */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-temple"
-                          label="Temples"
-                          initialDisplay={filters.templeDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: trn ?? "",
-                              templeDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search temple"
-                        />
-                      </div>
-                      {filters.templeTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: "",
-                              templeDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Child Temple Autocomplete (uses TRN) */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-child-temple"
-                          label="Child Temple"
-                          initialDisplay={filters.childTempleDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: trn ?? "",
-                              childTempleDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search child temple"
-                        />
-                      </div>
-                      {filters.childTempleTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear child temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: "",
-                              childTempleDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-600">Nikaya</span>
-                    {nikayaLoading ? (
-                      <span className="text-sm text-gray-500">
-                        Loading Nikaya...
-                      </span>
-                    ) : nikayaError ? (
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-red-600">
-                        <span>Error loading Nikaya</span>
-                        <button
-                          type="button"
-                          onClick={() => loadNikayaHierarchy()}
-                          className="text-xs font-medium text-blue-600 underline disabled:text-blue-400"
-                          disabled={nikayaLoading}
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value={filters.nikaya}
-                        onChange={(e) => handleNikayaChange(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                        disabled={!nikayaData.length}
-                      >
-                        <option value="">Select Nikaya</option>
-                        {nikayaData.map((n) => (
-                          <option
-                            key={n.nikaya.code}
-                            value={n.nikaya.code}
-                          >
-                            {n.nikaya.name} - {n.nikaya.code}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-600">Parchawa</span>
-                    <select
-                      value={filters.parchawa}
-                      onChange={(e) => handleParshawaChange(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                      disabled={!filters.nikaya || parshawaOptions.length === 0}
-                    >
-                      <option value="">
-                        {!filters.nikaya
-                          ? "Select Nikaya first"
-                          : parshawaOptions.length
-                          ? "Select Chapter"
-                          : "No chapters available"}
-                      </option>
-                      {parshawaOptions.map((p) => (
-                        <option key={p.code} value={p.code}>
-                          {p.name} - {p.code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <LocationPicker
-                      value={locationSelection}
-                      onChange={(sel) => handleLocationChange(sel)}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuCategorySelect
-                      id="flt-category"
-                      label="Category"
-                      value={filters.category}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, category: code }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuStatusSelect
-                      id="flt-status"
-                      label="Current Status"
-                      value={filters.status}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, status: code }))
-                      }
-                    />
-                  </div>
-
-                  <LabeledDate
-                    label="Date From"
-                    value={filters.dateFrom}
-                    onChange={(v) =>
-                      setFilters((s) => ({ ...s, dateFrom: v }))
-                    }
-                  />
-                  <LabeledDate
-                    label="Date To"
-                    value={filters.dateTo}
-                    onChange={(v) => setFilters((s) => ({ ...s, dateTo: v }))}
-                  />
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    onClick={applyFilters}
-                    disabled={loading}
-                    className="px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    Apply Filters
-                  </button>
-                  <button
-                    onClick={clearFilters}
-                    disabled={loading}
-                    className="px-3 py-1.5 text-sm rounded-lg border text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
-                  >
-                    <RotateCwIcon className="w-4 h-4" />
-                    Clear
-                  </button>
-                </div>
+          </div>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3 lg:grid-cols-4">
+              <div>
+                <input
+                  type="text"
+                  value={filters.searchKey}
+                  onChange={(e) =>
+                    setFilters((s) => ({
+                      ...s,
+                      searchKey: e.target.value,
+                    }))
+                  }
+                  placeholder="Search by name, reg. no, etc."
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-            )}
+              <NikayaParshawaCompact
+                nikayaValue={filters.nikaya}
+                onNikayaChange={handleNikayaChange}
+                parshawaValue={filters.parchawa}
+                onParshawaChange={handleParshawaChange}
+                nikayaOptions={nikayaData.map((n) => n.nikaya)}
+                parshawaOptions={parshawaOptions}
+                nikayaLoading={nikayaLoading}
+                nikayaError={nikayaError}
+                onRetry={loadNikayaHierarchy}
+              />
+
+              <div className="md:col-span-3 lg:col-span-4">
+                <LocationPickerCompact
+                  value={locationSelection}
+                  onChange={(sel) => handleLocationChange(sel)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="mt-2" />
           </div>
 
-<div className="relative overflow-y-auto max-h-[360px]">
+<div className="relative overflow-y-auto max-h-[240px]">
             <DataTable
               columns={columns}
               data={records}
@@ -844,7 +635,7 @@ function LabeledDate({
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-sm text-gray-600">{label}</span>
+      <span className="text-xs text-gray-600">{label}</span>
       <div className="relative flex">
         <input
           type="text"
@@ -854,12 +645,12 @@ function LabeledDate({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={(e) => onChange(toYYYYMMDD(e.target.value))}
-          className="w-full rounded-l-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-l-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="button"
           onClick={openPicker}
-          className="px-3 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 hover:bg-gray-50 text-sm"
+          className="px-2 border border-l-0 border-gray-300 rounded-r-md text-gray-600 hover:bg-gray-50 text-xs"
           aria-label={`Pick ${label}`}
         >
           Pick
@@ -874,7 +665,7 @@ function LabeledDate({
           aria-hidden="true"
         />
       </div>
-      <span className="text-xs text-gray-500">Format: YYYY-MM-DD</span>
+      <span className="text-[11px] text-gray-500">Format: YYYY-MM-DD</span>
     </label>
   );
 }

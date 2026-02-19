@@ -466,6 +466,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       telephone_number: apiData.vh_mobile ?? "",
       whatsapp_number: apiData.vh_whtapp ?? "",
       email_address: apiData.vh_email ?? "",
+      vh_file_number: apiData.vh_file_number ?? "",
+      vh_vihara_code: apiData.vh_vihara_code ?? "",
       
       // Step B: Administrative Divisions
       province: apiData.vh_province ?? "",
@@ -766,6 +768,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         telephone_number: "vh_mobile",
         whatsapp_number: "vh_whtapp",
         email_address: "vh_email",
+        vh_file_number: "vh_file_number",
+        vh_vihara_code: "vh_vihara_code",
         province: "vh_province",
         district: "vh_district",
         divisional_secretariat: "vh_divisional_secretariat",

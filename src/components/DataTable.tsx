@@ -206,7 +206,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               {columns.map((c) => (
                 <th
                   key={String(c.key)}
-                  className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide"
+                  className="px-3 py-1 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide"
                 >
                   {c.sortable ? (
                     <button
@@ -229,7 +229,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               {(onEdit || onDelete) && 
               (activePage !== NILAME && activePage !== DEWALA) && 
               (
-                <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
+                <th className="px-3 py-1 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
                   Action
                 </th>
               )}
@@ -254,7 +254,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                       : String(rawValue);
 
                   return (
-                    <td key={colKey} className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                    <td key={colKey} className="px-3 py-1 whitespace-nowrap text-xs text-gray-900">
                       {content}
                     </td>
                   );
@@ -262,7 +262,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                 {(onEdit || onDelete) && 
                 (activePage !== NILAME && activePage !== DEWALA)
                  && (
-                  <td className="px-3 py-2 whitespace-nowrap text-xs">
+                  <td className="px-3 py-1 whitespace-nowrap text-xs">
                     <div className="flex gap-2">
                       {onEdit && (
                         <button
