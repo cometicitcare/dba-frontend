@@ -27,7 +27,6 @@ import {
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
-  ViharadhipathiAppointmentLetter,
   type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
@@ -233,6 +232,12 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     nk_nname: "",
     br_fathrsaddrs: "",
   });
+  const letterEditorRef = useRef<HTMLDivElement | null>(null);
+  const [letterHtml, setLetterHtml] = useState<string>("");
+  const [letterDirty, setLetterDirty] = useState(false);
+  const letterEditorInitialized = useRef(false);
+  const letterHtmlRef = useRef<string>("");
+  const letterDirtyRef = useRef(false);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const locationNames = useMemo(() => {
@@ -290,6 +295,123 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       values,
     ]
   );
+
+  const escapeHtml = useCallback((value?: string) => {
+    const input = value ?? "";
+    return input
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }, []);
+
+  const buildLetterHtml = useCallback(
+    (data: ViharadhipathiAppointmentLetterData) => {
+      const v = (value?: string) => escapeHtml(value ?? "");
+      return `
+        <div class="letter-header">
+          <div class="reference-number">
+            <span data-field="reference_number">${v(data.reference_number)}</span>
+          </div>
+          <div class="date">
+            දිනය: <span data-field="letter_date">${v(data.letter_date)}</span>
+          </div>
+        </div>
+
+        <div class="letter-recipient">
+          <div class="recipient-title">
+            විහාරාධිපති <span data-field="appointed_monk_name">${v(data.appointed_monk_name)}</span> ස්වාමීන් වහන්සේ,
+          </div>
+          <div><span data-field="viharasthana_full_name">${v(data.viharasthana_full_name)}</span>,</div>
+          <div><span data-field="viharasthana_location">${v(data.viharasthana_location)}</span>,</div>
+          <div><span data-field="district">${v(data.district)}</span>.</div>
+        </div>
+
+        <div class="letter-section">
+          ගරු වහන්සේ,
+        </div>
+
+        <div class="letter-section">
+          <strong><u>විහාරාධිපති තනතුර පත් කිරීම පිළිබඳ දැනුම්දීම</u></strong>
+        </div>
+
+        <div class="letter-body">
+          <strong>${v(data.district)}</strong> දිස්ත්‍රික්කයේ,
+          <strong>${v(data.divisional_secretariat)}</strong> ප්‍රාදේශීය ලේකම් කොට්ඨාසයේ,
+          <strong>${v(data.grama_niladari)}</strong> ග්‍රාම නිලධාරී වසමේ,
+          <strong>${v(data.viharasthana_location)}</strong>, <strong>${v(data.viharasthana_area)}</strong>
+          <strong>${v(data.viharasthana_full_name)}</strong> විහාරස්ථානයේ විහාරාධිපති තනතුරට,
+          අතිපුජ්‍ය මහ නායක හිමියන් විසින් යොමු කර ඇති,
+          අංක <strong>${v(data.mahanayaka_lt_no)}</strong>,
+          <strong>${v(data.mahanayaka_lt_date)}</strong> දිනැති ලිපිය පිළිගැන,
+          <strong>${v(data.appointed_monk_title)}</strong>
+          <strong>${v(data.appointed_monk_name)}</strong> ස්වාමීන් වහන්සේ පත් කළ බව දැනුම් දෙමි.
+        </div>
+
+        <div class="letter-section">
+          මෙයට - සසුනට වැඩී,
+          <br /><br />
+          ................................. 
+          <div class="signature-title">ආර්.ඒම්.ජේ.සෙනෙවිරත්න</div>
+          <div class="signature-title">බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,</div>
+          <div class="letter-section">
+            දුරකථනය : 0113159682<br />
+            ෆැක්ස් : 0112337335<br />
+            විද්‍යුත් තැපෑල : dbavihara@gmail.com
+          </div>
+        </div>
+
+        <div class="letter-section">
+          විශේෂ කරුණු: <strong>${v(data.remarks)}</strong>
+        </div>
+
+        <div class="letter-copyto">
+          <div class="copy-to-header">පිටපත් :</div>
+          <ul class="copy-to-list">
+            <li>
+              1. <span data-field="appointed_monk_title">${v(data.appointed_monk_title)}</span>
+              <span data-field="br_mahananame">${v(data.br_mahananame)}</span> මහනායක ස්වාමීන් වහන්සේගේ - ගරු වරනීය දැන ගැනීම සඳහා
+              <span data-field="nk_nname">${v(data.nk_nname)}</span>
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;<span data-field="br_fathrsaddrs">${v(data.br_fathrsaddrs)}</span>
+            </li>
+            <li>
+              2. ප්‍රාදේශීය ලේකම්, - කාරුණික දැන ගැනීමට හා අවශ්‍ය කටයුතු සඳහා
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;ලේකම් කාර්යාලය, <span data-field="divisional_secretariat_office">${v(data.divisional_secretariat_office)}</span>
+            </li>
+          </ul>
+        </div>
+      `;
+    },
+    [escapeHtml]
+  );
+
+  const defaultLetterHtml = useMemo(() => buildLetterHtml(letterData), [buildLetterHtml, letterData]);
+
+  useEffect(() => {
+    if (!letterDirtyRef.current) {
+      setLetterHtml(defaultLetterHtml);
+      letterHtmlRef.current = defaultLetterHtml;
+    }
+  }, [defaultLetterHtml, letterDirty]);
+
+  useEffect(() => {
+    if (!letterEditorRef.current) return;
+    const nextHtml = letterHtml || defaultLetterHtml;
+    const isFocused = document.activeElement === letterEditorRef.current;
+    if (!letterEditorInitialized.current) {
+      letterEditorRef.current.innerHTML = nextHtml;
+      letterHtmlRef.current = nextHtml;
+      letterEditorInitialized.current = true;
+      return;
+    }
+    if (isFocused) return;
+    if (letterEditorRef.current.innerHTML !== nextHtml) {
+      letterEditorRef.current.innerHTML = nextHtml;
+    }
+  }, [letterHtml, defaultLetterHtml]);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
@@ -1021,6 +1143,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       text-align: center;
       word-break: break-all;
     }
+    .letter-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .letter-editor {
+      min-height: 9in;
+      outline: none;
+      font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
+      line-height: 1.6;
+      color: #0f172a;
+    }
+    .letter-editor[contenteditable="true"]:focus {
+      outline: 2px solid #94a3b8;
+      outline-offset: 4px;
+    }
     @media print {
       body {
         margin: 0 !important;
@@ -1041,6 +1179,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         right: 0;
         margin: 0 auto;
         box-shadow: none !important;
+      }
+      .letter-toolbar {
+        display: none !important;
       }
     }
     .simple-certificate {
@@ -1078,6 +1219,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [certificateNumberLabel, display.nikaya, display.parshawaya, locationNames.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
 
   const handlePrintCertificate = () => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      setLetterDirty(true);
+      letterDirtyRef.current = true;
+    }
     const targetId = ensureActivePrintTarget();
     setActivePrintAreaId(targetId);
     window.print();
@@ -1130,6 +1278,86 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       setPrintDialogOpen(false);
       handlePrintCertificate();
       setPrintingMarking(false);
+    }
+  };
+
+  const applyLetterCommand = (command: string, value?: string) => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand(command, false, value);
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const normalizeFontSizes = () => {
+    if (!letterEditorRef.current) return;
+    const sizeMap: Record<string, string> = {
+      "1": "10px",
+      "2": "12px",
+      "3": "14px",
+      "4": "16px",
+      "5": "18px",
+      "6": "24px",
+      "7": "32px",
+    };
+    const nodes = letterEditorRef.current.querySelectorAll("font[size]");
+    nodes.forEach((node) => {
+      const sizeAttr = node.getAttribute("size") || "3";
+      const span = document.createElement("span");
+      span.style.fontSize = sizeMap[sizeAttr] || "14px";
+      span.innerHTML = node.innerHTML;
+      node.replaceWith(span);
+    });
+  };
+
+  const applyLetterFontSize = (size: "3" | "4" | "5") => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand("fontSize", false, size);
+      normalizeFontSizes();
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const handleLetterInput = () => {
+    if (!letterEditorRef.current) return;
+    letterHtmlRef.current = letterEditorRef.current.innerHTML || "";
+    if (!letterDirtyRef.current) {
+      letterDirtyRef.current = true;
+      setLetterDirty(true);
+    }
+  };
+
+  const handleLetterBlur = () => {
+    if (!letterEditorRef.current) return;
+    const html = letterEditorRef.current.innerHTML || "";
+    letterHtmlRef.current = html;
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterDirtyRef.current = true;
+  };
+
+  const handleResetLetter = () => {
+    setLetterHtml(defaultLetterHtml);
+    setLetterDirty(false);
+    letterHtmlRef.current = defaultLetterHtml;
+    letterDirtyRef.current = false;
+    if (letterEditorRef.current) {
+      letterEditorRef.current.innerHTML = defaultLetterHtml;
     }
   };
 
@@ -1310,6 +1538,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     setApproveDialogOpen(false);
   };
   const handleOpenPrintDialog = (targetId: CertificateTypeId) => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      if (!letterDirtyRef.current) {
+        setLetterDirty(true);
+        letterDirtyRef.current = true;
+      }
+    }
     setActivePrintAreaId(targetId);
     setPrintDialogOpen(true);
   };
@@ -1606,15 +1843,124 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </section>
                                       </div>
                                     ) : (
-                                      <div className="flex justify-center">
-                                        <section
-                                          id={printAreaId}
-                                          data-printing={isActivePrint ? "true" : undefined}
-                                          ref={certificatePaperRef}
-                                          className="certificate-page relative"
-                                        >
-                                          <ViharadhipathiAppointmentLetter data={letterData} />
-                                        </section>
+                                      <div className="space-y-4">
+                                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow">
+                                          <div className="letter-toolbar">
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("3")}
+                                            >
+                                              A-
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("4")}
+                                            >
+                                              A
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("5")}
+                                            >
+                                              A+
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("bold")}
+                                            >
+                                              Bold
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("italic")}
+                                            >
+                                              Italic
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("underline")}
+                                            >
+                                              Underline
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("insertHTML", "<br />")}
+                                            >
+                                              New Line
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyLeft")}
+                                            >
+                                              Align Left
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyCenter")}
+                                            >
+                                              Center
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyRight")}
+                                            >
+                                              Align Right
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("removeFormat")}
+                                            >
+                                              Clear Format
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={handleResetLetter}
+                                            >
+                                              Reset Template
+                                            </button>
+                                          </div>
+                                          <p className="mt-2 text-xs text-slate-500">
+                                            Click inside the letter and edit text. Formatting will be printed with the QR code.
+                                          </p>
+                                        </div>
+
+                                        <div className="flex justify-center">
+                                          <section
+                                            id={printAreaId}
+                                            data-printing={isActivePrint ? "true" : undefined}
+                                            ref={certificatePaperRef}
+                                            className="certificate-page relative"
+                                          >
+                                            <div className="letter-page">
+                                              <div
+                                                ref={letterEditorRef}
+                                                className="letter-editor"
+                                                contentEditable
+                                                suppressContentEditableWarning
+                                                onInput={handleLetterInput}
+                                                onBlur={handleLetterInput}
+                                                dangerouslySetInnerHTML={{ __html: letterHtml || defaultLetterHtml }}
+                                              />
+                                            </div>
+                                            <div className="letter-qr">
+                                              <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                                <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                              </div>
+                                            </div>
+                                          </section>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1624,10 +1970,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
+                              <style>{certificateTemplateStyles}</style>
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
                                   {activeMajorStep === 1 ? (
                                     existingScanUrlStageOne ? (
-                                      <ViharadhipathiAppointmentLetter data={letterData} />
+                                      <div className="flex justify-center">
+                                        <section className="certificate-page relative">
+                                          <div className="letter-page">
+                                            <div
+                                              className="letter-editor"
+                                              dangerouslySetInnerHTML={{ __html: letterHtml }}
+                                            />
+                                          </div>
+                                          <div className="letter-qr">
+                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                            </div>
+                                          </div>
+                                        </section>
+                                      </div>
                                     ) : null
                                   ) : (
                                     renderExistingScan(existingScanUrlStageTwo)
