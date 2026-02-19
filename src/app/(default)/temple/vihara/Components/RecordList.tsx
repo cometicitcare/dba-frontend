@@ -449,15 +449,15 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
 
   return (
     <div >
-      <main className="p-6">
+      <main className="p-0">
           <div className="relative mb-6">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Vihara</h1>
+              <h1 className="text-xl font-bold text-gray-800">Vihara</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
                   disabled={loading}
-                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-3 py-1.5 text-sm rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
                   Add Vihara
@@ -482,7 +482,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   ref={filterButtonRef}
                   type="button"
                   onClick={() => setFilterPanelOpen((prev) => !prev)}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors ${
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                     filterPanelOpen
                       ? "border-blue-500 bg-blue-50 text-blue-600"
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
@@ -498,13 +498,13 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             {filterPanelOpen && (
               <div
                 ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
-                style={{ width: "300px", height: "400px" }}
+                className="absolute right-0 top-full z-30 mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl overflow-y-auto"
+                style={{ width: "280px", height: "360px" }}
                 role="dialog"
                 aria-label="Bhikku filters"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-lg font-semibold text-slate-800">
+                  <p className="text-base font-semibold text-slate-800">
                     Filters
                   </p>
                   <button
@@ -516,10 +516,10 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                     <XIcon className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <label className="flex flex-col gap-1">
-                      <span className="text-sm text-gray-600">Search</span>
+                      <span className="text-xs text-gray-600">Search</span>
                       <input
                         type="text"
                         value={filters.searchKey}
@@ -530,7 +530,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                           }))
                         }
                         placeholder="Search by name, reg. no, etc."
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </label>
                   </div>
@@ -612,7 +612,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-sm text-gray-600">Nikaya</span>
+                    <span className="text-xs text-gray-600">Nikaya</span>
                     {nikayaLoading ? (
                       <span className="text-sm text-gray-500">
                         Loading Nikaya...
@@ -633,7 +633,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                       <select
                         value={filters.nikaya}
                         onChange={(e) => handleNikayaChange(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                         disabled={!nikayaData.length}
                       >
                         <option value="">Select Nikaya</option>
@@ -650,11 +650,11 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-sm text-gray-600">Parchawa</span>
+                    <span className="text-xs text-gray-600">Parchawa</span>
                     <select
                       value={filters.parchawa}
                       onChange={(e) => handleParshawaChange(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                       disabled={!filters.nikaya || parshawaOptions.length === 0}
                     >
                       <option value="">
@@ -716,18 +716,18 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   />
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
                   <button
                     onClick={applyFilters}
                     disabled={loading}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                    className="px-3 py-1.5 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
                   >
                     Apply Filters
                   </button>
                   <button
                     onClick={clearFilters}
                     disabled={loading}
-                    className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
+                    className="px-3 py-1.5 text-sm rounded-lg border text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
                   >
                     <RotateCwIcon className="w-4 h-4" />
                     Clear
@@ -737,7 +737,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             )}
           </div>
 
-<div className="relative overflow-y-auto max-h-[400px]">
+<div className="relative overflow-y-auto max-h-[360px]">
             <DataTable
               columns={columns}
               data={records}
@@ -756,8 +756,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             )}
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-slate-600">
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-xs text-slate-600">
               {totalRecords > 0
                 ? `Showing ${
                     (filters.page - 1) * filters.limit + 1
@@ -767,14 +767,14 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                 : "No records to display"}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-xs text-slate-600">
                 Rows per page
                 <select
                   value={filters.limit}
                   onChange={(e) =>
                     handlePageSizeChange(Number(e.target.value))
                   }
-                  className="border border-slate-300 rounded px-2 py-1 text-sm"
+                  className="border border-slate-300 rounded px-2 py-1 text-xs"
                   disabled={loading}
                 >
                   {[5, 10, 25, 50].map((n) => (
@@ -789,7 +789,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   type="button"
                   onClick={() => handlePageChange(filters.page - 1)}
                   disabled={loading || filters.page <= 1}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${
                     filters.page <= 1 || loading
                       ? "text-slate-400 border-slate-200"
                       : "text-slate-700 hover:bg-slate-50"
@@ -797,14 +797,14 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                 >
                   Previous
                 </button>
-                <span className="text-sm font-semibold text-slate-700">
+                <span className="text-xs font-semibold text-slate-700">
                   Page {filters.page}
                 </span>
                 <button
                   type="button"
                   onClick={() => handlePageChange(filters.page + 1)}
                   disabled={loading || !hasMoreResults}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${
                     !hasMoreResults || loading
                       ? "text-slate-400 border-slate-200"
                       : "text-slate-700 hover:bg-slate-50"

@@ -16,7 +16,7 @@ export default function ViharaList({ canDelete }: { canDelete: boolean }) {
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
       <Sidebar isOpen={sidebarOpen} />
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
-        <main className="p-6">
+        <main className="p-4">
           <RecordList canDelete={canDelete} />
         </main>
       </div>

@@ -112,11 +112,11 @@ export default function LocationPicker({
 
   return (
     <div className={className}>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.province}</label>
+          <label className="block mb-1 text-xs font-medium">{labels.province}</label>
           <select
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
             value={selection.provinceCode ?? ""}
             onChange={(e) => setSelection({ provinceCode: e.target.value || undefined, districtCode: undefined, divisionCode: undefined, gnCode: undefined })}
             disabled={disabled}
@@ -132,9 +132,9 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.district}</label>
+          <label className="block mb-1 text-xs font-medium">{labels.district}</label>
           <select
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
             value={selection.districtCode ?? ""}
             onChange={(e) => setSelection({ districtCode: e.target.value || undefined, divisionCode: undefined, gnCode: undefined })}
             disabled={disabled || !currentProvince}
@@ -150,9 +150,9 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.division}</label>
+          <label className="block mb-1 text-xs font-medium">{labels.division}</label>
           <select
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
             value={selection.divisionCode ?? ""}
             onChange={(e) => setSelection({ divisionCode: e.target.value || undefined, gnCode: undefined })}
             disabled={disabled || !currentDistrict}
@@ -168,9 +168,9 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">{labels.gn}</label>
+          <label className="block mb-1 text-xs font-medium">{labels.gn}</label>
           <select
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border rounded-md px-3 py-2 text-sm"
             value={selection.gnCode ?? ""}
             onChange={(e) => setSelection({ gnCode: e.target.value || undefined })}
             disabled={disabled || !currentDivision || !gnDivisions.length}

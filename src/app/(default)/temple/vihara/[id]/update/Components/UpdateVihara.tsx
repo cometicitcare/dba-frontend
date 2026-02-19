@@ -1653,7 +1653,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
               <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">
+                    <h1 className="text-xl font-bold text-white mb-1">
                       Update Registration
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
@@ -1753,7 +1753,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                         </div>
                       ) : (
                         <div className="min-h-[360px]">
-                          <h2 className="text-xl font-bold text-slate-800 mb-5">
+                          <h2 className="text-lg font-bold text-slate-800 mb-3">
                             {stepTitle}
                           </h2>
 
@@ -1783,7 +1783,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                           <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
                                             Certificate number
                                           </p>
-                                          <p className="text-2xl font-semibold text-slate-900">
+                                          <p className="text-xl font-semibold text-slate-900">
                                             {certificateNumberLabel}
                                           </p>
                                           <p className="break-all text-slate-500">
@@ -2049,7 +2049,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                             </div>
                           ) : (
-                            <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
+                            <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
                               {current?.id === 8 && (
                                 <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
@@ -2061,9 +2061,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("land_info_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.land_info_certified && <p className="mt-1 text-sm text-red-600">{errors.land_info_certified}</p>}
+                            {errors.land_info_certified && <p className="mt-1 text-xs text-red-600">{errors.land_info_certified}</p>}
                           </div>
                           <ImportantNotes className="mt-4">
                             <strong>Important Notes:</strong>
@@ -2086,9 +2086,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("resident_bhikkhus_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-sm text-red-600">{errors.resident_bhikkhus_certified}</p>}
+                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-xs text-red-600">{errors.resident_bhikkhus_certified}</p>}
                           </div>
                               </div>
                             )}
@@ -2115,9 +2115,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -2147,9 +2147,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -2177,9 +2177,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -2225,7 +2225,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       }}
                                     />
                                     {(errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division) && (
-                                      <p className="mt-1 text-sm text-red-600">
+                                      <p className="mt-1 text-xs text-red-600">
                                         {errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division}
                                       </p>
                                     )}
@@ -2253,7 +2253,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         handleInputChange(f.name, "");
                                       }}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2262,11 +2262,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "nikaya") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     {nikayaLoading ? (
                                       <div className="text-sm text-slate-600">Loading Nikaya…</div>
                                     ) : nikayaError ? (
-                                      <div role="alert" className="text-sm text-red-600">Error: {nikayaError}</div>
+                                      <div role="alert" className="text-xs text-red-600">Error: {nikayaError}</div>
                                     ) : (
                                       <select
                                         key={`nikaya-select-${values.nikaya}`}
@@ -2274,7 +2274,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         value={values.nikaya ?? ""}
                                         onChange={(e) => onPickNikaya(e.target.value)}
                                         required={!!f.rules?.required}
-                                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                       >
                                         <option value="">Select Nikaya</option>
                                         {nikayaData.map((n) => (
@@ -2284,7 +2284,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         ))}
                                       </select>
                                     )}
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2293,7 +2293,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 const options = parshawaOptions(values.nikaya);
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <select
                                       key={`parshawaya-select-${values.nikaya}-${values.parshawaya}`}
                                       id={id}
@@ -2301,7 +2301,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       onChange={(e) => onPickParshawa(e.target.value)}
                                       required={!!f.rules?.required}
                                       disabled={!values.nikaya || options.length === 0}
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
                                     >
                                       <option value="">{values.nikaya ? "Select Parshawaya" : "Select Nikaya first"}</option>
                                       {options.map((p) => (
@@ -2310,7 +2310,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </option>
                                       ))}
                                     </select>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2336,7 +2336,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         });
                                       }}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2352,9 +2352,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2363,7 +2363,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "inspection_code") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       This temple has been personally inspected by me. Accordingly, the following code has been issued:
                                     </label>
                                     <input
@@ -2372,9 +2372,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter code"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2383,7 +2383,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "grama_niladhari_division_ownership") {
                                 return (
                                   <div key={id} className="md:col-span-2">
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       In the Grama Niladhari Division of .........................
                                     </label>
                                     <input
@@ -2392,9 +2392,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter division name"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2426,7 +2426,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                   : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                                 return (
                                   <div key={idStr} className={spanClass}>
-                                    <label htmlFor={idStr} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                    <label htmlFor={idStr} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <textarea
                                       id={idStr}
                                       value={val}
@@ -2435,7 +2435,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
                                       placeholder={f.placeholder}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2443,7 +2443,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               // Regular text/email/tel inputs
                               return (
                                 <div key={id} className={current?.id === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
-                                  <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                  <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                   <input
                                     id={id}
                                     type={f.type}
@@ -2452,7 +2452,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     placeholder={f.placeholder}
                                   />
-                                  {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                  {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                 </div>
                               );
                             })}
@@ -2479,7 +2479,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               <button
                                 onClick={handleSaveTab}
                                 disabled={saving || loading}
-                                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
+                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
                               >
                                 {saving ? "Saving…" : "Save this section"}
                               </button>
@@ -2665,3 +2665,4 @@ export default function UpdateVihara({ role, department }: { role: string | unde
     </Suspense>
   );
 }
+
