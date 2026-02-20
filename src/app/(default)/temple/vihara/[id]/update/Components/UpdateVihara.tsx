@@ -297,7 +297,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   );
 
   const escapeHtml = useCallback((value?: string) => {
-    const input = value ?? "";
+    const input = String(value ?? "");
     return input
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -434,6 +434,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
+    console.log("🔍 DEBUG: Raw API Data received:", apiData);
+    console.log("🔍 DEBUG: Administrative Division Fields:");
+    console.log("   - vh_province:", apiData.vh_province, "(type:", typeof apiData.vh_province, ")");
+    console.log("   - vh_district:", apiData.vh_district, "(type:", typeof apiData.vh_district, ")");
+    console.log("   - vh_divisional_secretariat:", apiData.vh_divisional_secretariat, "(type:", typeof apiData.vh_divisional_secretariat, ")");
+    console.log("   - vh_gndiv:", apiData.vh_gndiv, "(type:", typeof apiData.vh_gndiv, ")");
+    
     // Map temple_owned_land array fields - handle both camelCase and snake_case from API
     const mappedLand = (apiData.temple_lands || []).map((land: any) => ({
       id: String(land.id || land.serial_number || land.serialNumber || Math.random()),
@@ -459,7 +466,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       occupationEducation: bhikkhu.occupationEducation ?? bhikkhu.occupation_education ?? "",
     }));
 
-    return {
+    const formFields = {
       // Step A: Basic Information
       temple_name: apiData.vh_vname ?? "",
       temple_address: apiData.vh_addrs ?? "",
@@ -528,6 +535,35 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       annex2_approval_construction: apiData.vh_annex2_approval_construction ?? false,
       annex2_referral_resubmission: apiData.vh_annex2_referral_resubmission ?? false,
     };
+    
+    // AUTO-DETECT PROVINCE FROM DISTRICT if province is missing
+    // This fixes the issue where district is saved but province is not
+    if ((!formFields.province || formFields.province === "") && formFields.district) {
+      // Find which province this district belongs to
+      const districtCode = formFields.district;
+      const provinces = (selectionsData as any)?.provinces || [];
+      if (Array.isArray(provinces)) {
+        for (const province of provinces) {
+          const districtMatch = province.districts?.find(
+            (d: any) => d.code === districtCode || d.dd_dcode === districtCode
+          );
+          if (districtMatch) {
+            formFields.province = province.cp_code || province.code;
+            console.log(`🔍 DEBUG: Auto-detected province "${formFields.province}" from district code "${districtCode}"`);
+            break;
+          }
+        }
+      }
+    }
+    
+    console.log("🔍 DEBUG: Mapped form fields for admin divisions:", {
+      province: formFields.province,
+      district: formFields.district,
+      divisional_secretariat: formFields.divisional_secretariat,
+      grama_niladhari_division: formFields.grama_niladhari_division,
+    });
+    
+    return formFields;
   };
 
   // Load data for update
@@ -811,6 +847,28 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toYYYYMMDD(String(v)) : v);
     });
     
+    // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
+    // If user provided district but forgot province, auto-detect it from district code
+    if (tabId === 2 && (payload.vh_district || payload.vh_divisional_secretariat || payload.vh_gndiv)) {
+      if (!payload.vh_province && payload.vh_district) {
+        // Auto-detect province from district code
+        const districtCode = payload.vh_district;
+        const provinces = (selectionsData as any)?.provinces || [];
+        if (Array.isArray(provinces)) {
+          for (const province of provinces) {
+            const districtMatch = province.districts?.find(
+              (d: any) => d.code === districtCode || d.dd_dcode === districtCode
+            );
+            if (districtMatch) {
+              payload.vh_province = province.cp_code || province.code;
+              console.log(`🔍 DEBUG: Auto-added province "${payload.vh_province}" to update payload for district "${districtCode}"`);
+              break;
+            }
+          }
+        }
+      }
+    }
+    
     return payload;
   };
 
@@ -824,7 +882,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
       console.log("Saving partial payload for tab:", partial);
       
-      await _manageVihara({
+      const updateResponse = await _manageVihara({
         action: "UPDATE",
         payload: {
           ...(vhId ? { vh_id: vhId } : {}),
@@ -832,6 +890,20 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           data: partial,
         },
       } as any);
+      
+      // After successful UPDATE, reload the vihara data to confirm the save
+      // This ensures the form always displays what's actually in the database
+      const updatedData = (updateResponse as any)?.data?.data || (updateResponse as any)?.data;
+      if (updatedData) {
+        const formData = mapApiToFormFields(updatedData);
+        const filledValues = {
+          ...viharaInitialValues,
+          ...formData,
+        };
+        setValues(filledValues);
+        console.log("Form values refreshed from API response after update:", filledValues);
+      }
+      
       toast.success(`Saved "${stepTitle}"`, { autoClose: 1200 });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save. Please try again.";
@@ -2206,10 +2278,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     <LocationPicker
                                       key={`location-${values.province}-${values.district}-${values.divisional_secretariat}-${values.grama_niladhari_division}`}
                                       value={{
-                                        provinceCode: (values.province as string) || undefined,
-                                        districtCode: (values.district as string) || undefined,
-                                        divisionCode: (values.divisional_secretariat as string) || undefined,
-                                        gnCode: (values.grama_niladhari_division as string) || undefined,
+                                        provinceCode: values.province ? (values.province as string) : undefined,
+                                        districtCode: values.district ? (values.district as string) : undefined,
+                                        divisionCode: values.divisional_secretariat ? (values.divisional_secretariat as string) : undefined,
+                                        gnCode: values.grama_niladhari_division ? (values.grama_niladhari_division as string) : undefined,
                                       }}
                                       onChange={(sel) => {
                                         handleSetMany({
