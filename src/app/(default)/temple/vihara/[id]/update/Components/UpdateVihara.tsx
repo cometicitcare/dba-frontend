@@ -232,6 +232,16 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     nk_nname: "",
     br_fathrsaddrs: "",
   });
+  
+  // Religious Affiliation state (Nikaya & Parshawa)
+  const [nikayaData, setNikayaData] = useState<NikayaAPIItem[]>(STATIC_NIKAYA_DATA);
+  const [nikayaLoading, setNikayaLoading] = useState(false);
+  const [nikayaError, setNikayaError] = useState<string | null>(null);
+  const [display, setDisplay] = useState<Record<string, string>>({
+    nikaya: "",
+    parshawaya: "",
+  });
+  
   const letterEditorRef = useRef<HTMLDivElement | null>(null);
   const [letterHtml, setLetterHtml] = useState<string>("");
   const [letterDirty, setLetterDirty] = useState(false);
@@ -739,6 +749,56 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return valid;
   };
 
+  // Helper function to find nikaya by code
+  const findNikayaByCode = useCallback((code?: string | null) => {
+    if (!code) return undefined;
+    return nikayaData.find((n) => n.nikaya.code === code);
+  }, [nikayaData]);
+
+  // Helper function to get parshawa options based on selected nikaya
+  const parshawaOptions = useCallback((nikayaCode?: string) => {
+    if (!nikayaCode) return [];
+    const nikayaItem = findNikayaByCode(nikayaCode);
+    return nikayaItem?.parshawayas || [];
+  }, [findNikayaByCode]);
+
+  // Handler for picking nikaya
+  const onPickNikaya = useCallback((nikayaCode: string) => {
+    handleInputChange("nikaya", nikayaCode);
+    const item = findNikayaByCode(nikayaCode);
+    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : nikayaCode }));
+  }, [findNikayaByCode]);
+
+  // Handler for picking parshawaya
+  const onPickParshawa = useCallback((parshawaCode: string) => {
+    handleInputChange("parshawaya", parshawaCode);
+    const nikaya = findNikayaByCode(values.nikaya);
+    const p = nikaya?.parshawayas.find((x) => x.code === parshawaCode);
+    setDisplay((d) => ({ ...d, parshawaya: p ? `${p.name} - ${p.code}` : parshawaCode }));
+  }, [findNikayaByCode, values.nikaya]);
+
+  // Update display text when form values change (e.g., on load)
+  useEffect(() => {
+    const nikayaItem = findNikayaByCode(values.nikaya);
+    if (nikayaItem) {
+      setDisplay((d) => ({
+        ...d,
+        nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}`,
+      }));
+    }
+
+    const nikaya = findNikayaByCode(values.nikaya);
+    if (nikaya && values.parshawaya) {
+      const p = nikaya.parshawayas.find((x) => x.code === values.parshawaya);
+      if (p) {
+        setDisplay((d) => ({
+          ...d,
+          parshawaya: `${p.name} - ${p.code}`,
+        }));
+      }
+    }
+  }, [values.nikaya, values.parshawaya, findNikayaByCode]);
+
   const buildPartialPayloadForTab = (tabId: number): Partial<any> => {
     const s = steps.find((step) => step.id === tabId);
     if (!s) return {};
@@ -1003,52 +1063,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_annex2_approval_construction: formData.annex2_approval_construction,
       vh_annex2_referral_resubmission: formData.annex2_referral_resubmission,
     };
-  };
-
-
-  // Display/labels for review
-  const [display, setDisplay] = useState<{
-    viharadhipathi_name?: string;
-    nikaya?: string;
-    parshawaya?: string;
-  }>({});
-
-  // Nikaya & Parshawa
-  const nikayaData = STATIC_NIKAYA_DATA;
-  const nikayaLoading = false;
-  const nikayaError: string | null = null;
-
-  const findNikayaByCode = useCallback((code?: string | null) => nikayaData.find((n) => n.nikaya.code === (code ?? "")), [nikayaData]);
-  const parshawaOptions = useCallback((nikayaCode?: string | null) => findNikayaByCode(nikayaCode)?.parshawayas ?? [], [findNikayaByCode]);
-
-  // Update display state when values change (for auto-fill)
-  useEffect(() => {
-    if (values.nikaya) {
-      const nikayaItem = findNikayaByCode(values.nikaya);
-      if (nikayaItem) {
-        setDisplay((d) => ({ ...d, nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}` }));
-      }
-    }
-    if (values.parshawaya && values.nikaya) {
-      const nikayaItem = findNikayaByCode(values.nikaya);
-      const parshawaItem = nikayaItem?.parshawayas.find((p) => p.code === values.parshawaya);
-      if (parshawaItem) {
-        setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
-      }
-    }
-  }, [values.nikaya, values.parshawaya, findNikayaByCode]);
-
-  const onPickNikaya = (code: string) => {
-    const item = findNikayaByCode(code);
-    handleInputChange("nikaya", code);
-    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : code }));
-  };
-
-  const onPickParshawa = (code: string) => {
-    handleInputChange("parshawaya", code);
-    const nikaya = findNikayaByCode(values.nikaya);
-    const p = nikaya?.parshawayas.find((x) => x.code === code);
-    setDisplay((d) => ({ ...d, parshawaya: p ? `${p.name} - ${p.code}` : code }));
   };
 
   // Parse JSON arrays for tables
