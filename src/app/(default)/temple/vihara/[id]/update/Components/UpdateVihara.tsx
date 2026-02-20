@@ -27,7 +27,6 @@ import {
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
-  ViharadhipathiAppointmentLetter,
   type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
@@ -233,6 +232,12 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     nk_nname: "",
     br_fathrsaddrs: "",
   });
+  const letterEditorRef = useRef<HTMLDivElement | null>(null);
+  const [letterHtml, setLetterHtml] = useState<string>("");
+  const [letterDirty, setLetterDirty] = useState(false);
+  const letterEditorInitialized = useRef(false);
+  const letterHtmlRef = useRef<string>("");
+  const letterDirtyRef = useRef(false);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const locationNames = useMemo(() => {
@@ -290,6 +295,123 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       values,
     ]
   );
+
+  const escapeHtml = useCallback((value?: string) => {
+    const input = value ?? "";
+    return input
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }, []);
+
+  const buildLetterHtml = useCallback(
+    (data: ViharadhipathiAppointmentLetterData) => {
+      const v = (value?: string) => escapeHtml(value ?? "");
+      return `
+        <div class="letter-header">
+          <div class="reference-number">
+            <span data-field="reference_number">${v(data.reference_number)}</span>
+          </div>
+          <div class="date">
+            දිනය: <span data-field="letter_date">${v(data.letter_date)}</span>
+          </div>
+        </div>
+
+        <div class="letter-recipient">
+          <div class="recipient-title">
+            විහාරාධිපති <span data-field="appointed_monk_name">${v(data.appointed_monk_name)}</span> ස්වාමීන් වහන්සේ,
+          </div>
+          <div><span data-field="viharasthana_full_name">${v(data.viharasthana_full_name)}</span>,</div>
+          <div><span data-field="viharasthana_location">${v(data.viharasthana_location)}</span>,</div>
+          <div><span data-field="district">${v(data.district)}</span>.</div>
+        </div>
+
+        <div class="letter-section">
+          ගරු වහන්සේ,
+        </div>
+
+        <div class="letter-section">
+          <strong><u>විහාරාධිපති තනතුර පත් කිරීම පිළිබඳ දැනුම්දීම</u></strong>
+        </div>
+
+        <div class="letter-body">
+          <strong>${v(data.district)}</strong> දිස්ත්‍රික්කයේ,
+          <strong>${v(data.divisional_secretariat)}</strong> ප්‍රාදේශීය ලේකම් කොට්ඨාසයේ,
+          <strong>${v(data.grama_niladari)}</strong> ග්‍රාම නිලධාරී වසමේ,
+          <strong>${v(data.viharasthana_location)}</strong>, <strong>${v(data.viharasthana_area)}</strong>
+          <strong>${v(data.viharasthana_full_name)}</strong> විහාරස්ථානයේ විහාරාධිපති තනතුරට,
+          අතිපුජ්‍ය මහ නායක හිමියන් විසින් යොමු කර ඇති,
+          අංක <strong>${v(data.mahanayaka_lt_no)}</strong>,
+          <strong>${v(data.mahanayaka_lt_date)}</strong> දිනැති ලිපිය පිළිගැන,
+          <strong>${v(data.appointed_monk_title)}</strong>
+          <strong>${v(data.appointed_monk_name)}</strong> ස්වාමීන් වහන්සේ පත් කළ බව දැනුම් දෙමි.
+        </div>
+
+        <div class="letter-section">
+          මෙයට - සසුනට වැඩී,
+          <br /><br />
+          ................................. 
+          <div class="signature-title">ආර්.ඒම්.ජේ.සෙනෙවිරත්න</div>
+          <div class="signature-title">බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,</div>
+          <div class="letter-section">
+            දුරකථනය : 0113159682<br />
+            ෆැක්ස් : 0112337335<br />
+            විද්‍යුත් තැපෑල : dbavihara@gmail.com
+          </div>
+        </div>
+
+        <div class="letter-section">
+          විශේෂ කරුණු: <strong>${v(data.remarks)}</strong>
+        </div>
+
+        <div class="letter-copyto">
+          <div class="copy-to-header">පිටපත් :</div>
+          <ul class="copy-to-list">
+            <li>
+              1. <span data-field="appointed_monk_title">${v(data.appointed_monk_title)}</span>
+              <span data-field="br_mahananame">${v(data.br_mahananame)}</span> මහනායක ස්වාමීන් වහන්සේගේ - ගරු වරනීය දැන ගැනීම සඳහා
+              <span data-field="nk_nname">${v(data.nk_nname)}</span>
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;<span data-field="br_fathrsaddrs">${v(data.br_fathrsaddrs)}</span>
+            </li>
+            <li>
+              2. ප්‍රාදේශීය ලේකම්, - කාරුණික දැන ගැනීමට හා අවශ්‍ය කටයුතු සඳහා
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;ලේකම් කාර්යාලය, <span data-field="divisional_secretariat_office">${v(data.divisional_secretariat_office)}</span>
+            </li>
+          </ul>
+        </div>
+      `;
+    },
+    [escapeHtml]
+  );
+
+  const defaultLetterHtml = useMemo(() => buildLetterHtml(letterData), [buildLetterHtml, letterData]);
+
+  useEffect(() => {
+    if (!letterDirtyRef.current) {
+      setLetterHtml(defaultLetterHtml);
+      letterHtmlRef.current = defaultLetterHtml;
+    }
+  }, [defaultLetterHtml, letterDirty]);
+
+  useEffect(() => {
+    if (!letterEditorRef.current) return;
+    const nextHtml = letterHtml || defaultLetterHtml;
+    const isFocused = document.activeElement === letterEditorRef.current;
+    if (!letterEditorInitialized.current) {
+      letterEditorRef.current.innerHTML = nextHtml;
+      letterHtmlRef.current = nextHtml;
+      letterEditorInitialized.current = true;
+      return;
+    }
+    if (isFocused) return;
+    if (letterEditorRef.current.innerHTML !== nextHtml) {
+      letterEditorRef.current.innerHTML = nextHtml;
+    }
+  }, [letterHtml, defaultLetterHtml]);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
   const isCertificatesTab = stepTitle === "Certificates";
@@ -344,6 +466,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       telephone_number: apiData.vh_mobile ?? "",
       whatsapp_number: apiData.vh_whtapp ?? "",
       email_address: apiData.vh_email ?? "",
+      vh_file_number: apiData.vh_file_number ?? "",
+      vh_vihara_code: apiData.vh_vihara_code ?? "",
       
       // Step B: Administrative Divisions
       province: apiData.vh_province ?? "",
@@ -644,6 +768,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         telephone_number: "vh_mobile",
         whatsapp_number: "vh_whtapp",
         email_address: "vh_email",
+        vh_file_number: "vh_file_number",
+        vh_vihara_code: "vh_vihara_code",
         province: "vh_province",
         district: "vh_district",
         divisional_secretariat: "vh_divisional_secretariat",
@@ -1021,6 +1147,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       text-align: center;
       word-break: break-all;
     }
+    .letter-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .letter-editor {
+      min-height: 9in;
+      outline: none;
+      font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
+      line-height: 1.6;
+      color: #0f172a;
+    }
+    .letter-editor[contenteditable="true"]:focus {
+      outline: 2px solid #94a3b8;
+      outline-offset: 4px;
+    }
     @media print {
       body {
         margin: 0 !important;
@@ -1041,6 +1183,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         right: 0;
         margin: 0 auto;
         box-shadow: none !important;
+      }
+      .letter-toolbar {
+        display: none !important;
       }
     }
     .simple-certificate {
@@ -1078,6 +1223,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [certificateNumberLabel, display.nikaya, display.parshawaya, locationNames.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
 
   const handlePrintCertificate = () => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      setLetterDirty(true);
+      letterDirtyRef.current = true;
+    }
     const targetId = ensureActivePrintTarget();
     setActivePrintAreaId(targetId);
     window.print();
@@ -1130,6 +1282,86 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       setPrintDialogOpen(false);
       handlePrintCertificate();
       setPrintingMarking(false);
+    }
+  };
+
+  const applyLetterCommand = (command: string, value?: string) => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand(command, false, value);
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const normalizeFontSizes = () => {
+    if (!letterEditorRef.current) return;
+    const sizeMap: Record<string, string> = {
+      "1": "10px",
+      "2": "12px",
+      "3": "14px",
+      "4": "16px",
+      "5": "18px",
+      "6": "24px",
+      "7": "32px",
+    };
+    const nodes = letterEditorRef.current.querySelectorAll("font[size]");
+    nodes.forEach((node) => {
+      const sizeAttr = node.getAttribute("size") || "3";
+      const span = document.createElement("span");
+      span.style.fontSize = sizeMap[sizeAttr] || "14px";
+      span.innerHTML = node.innerHTML;
+      node.replaceWith(span);
+    });
+  };
+
+  const applyLetterFontSize = (size: "3" | "4" | "5") => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand("fontSize", false, size);
+      normalizeFontSizes();
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const handleLetterInput = () => {
+    if (!letterEditorRef.current) return;
+    letterHtmlRef.current = letterEditorRef.current.innerHTML || "";
+    if (!letterDirtyRef.current) {
+      letterDirtyRef.current = true;
+      setLetterDirty(true);
+    }
+  };
+
+  const handleLetterBlur = () => {
+    if (!letterEditorRef.current) return;
+    const html = letterEditorRef.current.innerHTML || "";
+    letterHtmlRef.current = html;
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterDirtyRef.current = true;
+  };
+
+  const handleResetLetter = () => {
+    setLetterHtml(defaultLetterHtml);
+    setLetterDirty(false);
+    letterHtmlRef.current = defaultLetterHtml;
+    letterDirtyRef.current = false;
+    if (letterEditorRef.current) {
+      letterEditorRef.current.innerHTML = defaultLetterHtml;
     }
   };
 
@@ -1310,6 +1542,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     setApproveDialogOpen(false);
   };
   const handleOpenPrintDialog = (targetId: CertificateTypeId) => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      if (!letterDirtyRef.current) {
+        setLetterDirty(true);
+        letterDirtyRef.current = true;
+      }
+    }
     setActivePrintAreaId(targetId);
     setPrintDialogOpen(true);
   };
@@ -1416,7 +1657,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
               <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">
+                    <h1 className="text-xl font-bold text-white mb-1">
                       Update Registration
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
@@ -1516,7 +1757,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                         </div>
                       ) : (
                         <div className="min-h-[360px]">
-                          <h2 className="text-xl font-bold text-slate-800 mb-5">
+                          <h2 className="text-lg font-bold text-slate-800 mb-3">
                             {stepTitle}
                           </h2>
 
@@ -1546,7 +1787,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                           <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
                                             Certificate number
                                           </p>
-                                          <p className="text-2xl font-semibold text-slate-900">
+                                          <p className="text-xl font-semibold text-slate-900">
                                             {certificateNumberLabel}
                                           </p>
                                           <p className="break-all text-slate-500">
@@ -1606,15 +1847,124 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </section>
                                       </div>
                                     ) : (
-                                      <div className="flex justify-center">
-                                        <section
-                                          id={printAreaId}
-                                          data-printing={isActivePrint ? "true" : undefined}
-                                          ref={certificatePaperRef}
-                                          className="certificate-page relative"
-                                        >
-                                          <ViharadhipathiAppointmentLetter data={letterData} />
-                                        </section>
+                                      <div className="space-y-4">
+                                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow">
+                                          <div className="letter-toolbar">
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("3")}
+                                            >
+                                              A-
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("4")}
+                                            >
+                                              A
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("5")}
+                                            >
+                                              A+
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("bold")}
+                                            >
+                                              Bold
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("italic")}
+                                            >
+                                              Italic
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("underline")}
+                                            >
+                                              Underline
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("insertHTML", "<br />")}
+                                            >
+                                              New Line
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyLeft")}
+                                            >
+                                              Align Left
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyCenter")}
+                                            >
+                                              Center
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyRight")}
+                                            >
+                                              Align Right
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("removeFormat")}
+                                            >
+                                              Clear Format
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={handleResetLetter}
+                                            >
+                                              Reset Template
+                                            </button>
+                                          </div>
+                                          <p className="mt-2 text-xs text-slate-500">
+                                            Click inside the letter and edit text. Formatting will be printed with the QR code.
+                                          </p>
+                                        </div>
+
+                                        <div className="flex justify-center">
+                                          <section
+                                            id={printAreaId}
+                                            data-printing={isActivePrint ? "true" : undefined}
+                                            ref={certificatePaperRef}
+                                            className="certificate-page relative"
+                                          >
+                                            <div className="letter-page">
+                                              <div
+                                                ref={letterEditorRef}
+                                                className="letter-editor"
+                                                contentEditable
+                                                suppressContentEditableWarning
+                                                onInput={handleLetterInput}
+                                                onBlur={handleLetterInput}
+                                                dangerouslySetInnerHTML={{ __html: letterHtml || defaultLetterHtml }}
+                                              />
+                                            </div>
+                                            <div className="letter-qr">
+                                              <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                                <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                              </div>
+                                            </div>
+                                          </section>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1624,10 +1974,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
+                              <style>{certificateTemplateStyles}</style>
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
                                   {activeMajorStep === 1 ? (
                                     existingScanUrlStageOne ? (
-                                      <ViharadhipathiAppointmentLetter data={letterData} />
+                                      <div className="flex justify-center">
+                                        <section className="certificate-page relative">
+                                          <div className="letter-page">
+                                            <div
+                                              className="letter-editor"
+                                              dangerouslySetInnerHTML={{ __html: letterHtml }}
+                                            />
+                                          </div>
+                                          <div className="letter-qr">
+                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                            </div>
+                                          </div>
+                                        </section>
+                                      </div>
                                     ) : null
                                   ) : (
                                     renderExistingScan(existingScanUrlStageTwo)
@@ -1688,7 +2053,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                             </div>
                           ) : (
-                            <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
+                            <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
                               {current?.id === 8 && (
                                 <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
@@ -1700,9 +2065,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("land_info_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.land_info_certified && <p className="mt-1 text-sm text-red-600">{errors.land_info_certified}</p>}
+                            {errors.land_info_certified && <p className="mt-1 text-xs text-red-600">{errors.land_info_certified}</p>}
                           </div>
                           <ImportantNotes className="mt-4">
                             <strong>Important Notes:</strong>
@@ -1725,9 +2090,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("resident_bhikkhus_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-sm text-red-600">{errors.resident_bhikkhus_certified}</p>}
+                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-xs text-red-600">{errors.resident_bhikkhus_certified}</p>}
                           </div>
                               </div>
                             )}
@@ -1754,9 +2119,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1786,9 +2151,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1816,9 +2181,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1864,7 +2229,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       }}
                                     />
                                     {(errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division) && (
-                                      <p className="mt-1 text-sm text-red-600">
+                                      <p className="mt-1 text-xs text-red-600">
                                         {errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division}
                                       </p>
                                     )}
@@ -1892,7 +2257,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         handleInputChange(f.name, "");
                                       }}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1901,11 +2266,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "nikaya") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     {nikayaLoading ? (
                                       <div className="text-sm text-slate-600">Loading Nikaya…</div>
                                     ) : nikayaError ? (
-                                      <div role="alert" className="text-sm text-red-600">Error: {nikayaError}</div>
+                                      <div role="alert" className="text-xs text-red-600">Error: {nikayaError}</div>
                                     ) : (
                                       <select
                                         key={`nikaya-select-${values.nikaya}`}
@@ -1913,7 +2278,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         value={values.nikaya ?? ""}
                                         onChange={(e) => onPickNikaya(e.target.value)}
                                         required={!!f.rules?.required}
-                                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                       >
                                         <option value="">Select Nikaya</option>
                                         {nikayaData.map((n) => (
@@ -1923,7 +2288,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         ))}
                                       </select>
                                     )}
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1932,7 +2297,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 const options = parshawaOptions(values.nikaya);
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <select
                                       key={`parshawaya-select-${values.nikaya}-${values.parshawaya}`}
                                       id={id}
@@ -1940,7 +2305,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       onChange={(e) => onPickParshawa(e.target.value)}
                                       required={!!f.rules?.required}
                                       disabled={!values.nikaya || options.length === 0}
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
                                     >
                                       <option value="">{values.nikaya ? "Select Parshawaya" : "Select Nikaya first"}</option>
                                       {options.map((p) => (
@@ -1949,7 +2314,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </option>
                                       ))}
                                     </select>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1975,7 +2340,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         });
                                       }}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1991,9 +2356,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2002,7 +2367,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "inspection_code") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       This temple has been personally inspected by me. Accordingly, the following code has been issued:
                                     </label>
                                     <input
@@ -2011,9 +2376,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter code"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2022,7 +2387,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "grama_niladhari_division_ownership") {
                                 return (
                                   <div key={id} className="md:col-span-2">
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       In the Grama Niladhari Division of .........................
                                     </label>
                                     <input
@@ -2031,9 +2396,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter division name"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2065,7 +2430,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                   : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                                 return (
                                   <div key={idStr} className={spanClass}>
-                                    <label htmlFor={idStr} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                    <label htmlFor={idStr} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <textarea
                                       id={idStr}
                                       value={val}
@@ -2074,7 +2439,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
                                       placeholder={f.placeholder}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2082,7 +2447,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               // Regular text/email/tel inputs
                               return (
                                 <div key={id} className={current?.id === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
-                                  <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                  <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                   <input
                                     id={id}
                                     type={f.type}
@@ -2091,7 +2456,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     placeholder={f.placeholder}
                                   />
-                                  {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                  {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                 </div>
                               );
                             })}
@@ -2118,7 +2483,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               <button
                                 onClick={handleSaveTab}
                                 disabled={saving || loading}
-                                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
+                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
                               >
                                 {saving ? "Saving…" : "Save this section"}
                               </button>
@@ -2304,3 +2669,4 @@ export default function UpdateVihara({ role, department }: { role: string | unde
     </Suspense>
   );
 }
+

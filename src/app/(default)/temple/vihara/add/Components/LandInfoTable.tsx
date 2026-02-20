@@ -152,30 +152,34 @@ export default function LandInfoTable({ value, onChange, error }: Props) {
 
   return (
     <div className="w-full">
-      <div className="mb-4 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-slate-800">Temple-Owned Land Information</h3>
+      <div className="mb-3 flex justify-between items-center">
+        <h3 className="text-base font-semibold text-slate-800">Temple-Owned Land Information</h3>
         <button
           type="button"
           onClick={handleAddRow}
-          className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-all"
+          className="px-3 py-1.5 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-all"
         >
           + Add Row
         </button>
       </div>
-      <div style={{ height: 400, width: "100%" }} className="bg-white">
+      <div style={{ height: 360, width: "100%" }} className="bg-white">
         <DataGrid<LandInfoRow>
           rows={rows}
           columns={columns}
           processRowUpdate={processRowUpdate}
           disableRowSelectionOnClick
           hideFooter
+          rowHeight={34}
+          columnHeaderHeight={34}
+          density="compact"
           sx={{
             "& .MuiDataGrid-cell": {
-              fontSize: "0.875rem",
+              fontSize: "0.75rem",
             },
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: "#f1f5f9",
               fontWeight: 600,
+              fontSize: "0.75rem",
             },
             "& .MuiDataGrid-cell:focus": {
               outline: "none",

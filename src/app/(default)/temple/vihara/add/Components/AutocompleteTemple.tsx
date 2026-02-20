@@ -60,7 +60,7 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
 
   return (
     <div className="relative">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{label}</label>
       <input
         id={id}
         type="text"
@@ -71,13 +71,13 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         placeholder={placeholder ?? "Search temple — saves TRN"}
         required={required}
-        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
         autoComplete="off"
       />
       {open && focused && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
-          {loading && <div className="px-3 py-2 text-sm text-slate-500">Searching…</div>}
-          {!loading && options.length === 0 && <div className="px-3 py-2 text-sm text-slate-500">No matches</div>}
+          {loading && <div className="px-3 py-2 text-xs text-slate-500">Searching…</div>}
+          {!loading && options.length === 0 && <div className="px-3 py-2 text-xs text-slate-500">No matches</div>}
           {options.map((o) => (
             <button
               key={o.trn}
@@ -86,7 +86,7 @@ export default function TempleAutocomplete({ id, label, placeholder, required, i
               className="w-full text-left px-3 py-2 hover:bg-slate-50"
             >
               <div className="text-sm font-medium text-slate-800">{o.name}</div>
-              <div className="text-xs text-slate-500">{o.trn}</div>
+              <div className="text-[11px] text-slate-500">{o.trn}</div>
             </button>
           ))}
         </div>

@@ -24,7 +24,7 @@ export default function DateField({ id, label, value, onChange, required, placeh
 
   return (
     <div className="grid grid-cols-1">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{label}</label>
       <div className="relative flex">
         <input
           id={id}
@@ -36,12 +36,12 @@ export default function DateField({ id, label, value, onChange, required, placeh
           onChange={(e) => onChange(e.target.value)}
           onBlur={(e) => onChange(toYYYYMMDD(e.target.value))}
           required={required}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+          className="w-full px-3 py-2 text-sm border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
         />
         <button
           type="button"
           onClick={openPicker}
-          className="px-3 border border-l-0 border-slate-300 rounded-r-lg text-slate-600 hover:bg-slate-50"
+          className="px-3 border border-l-0 border-slate-300 rounded-r-lg text-slate-600 hover:bg-slate-50 text-sm"
           aria-label="Open date picker"
           title="Open date picker"
         >
@@ -57,8 +57,8 @@ export default function DateField({ id, label, value, onChange, required, placeh
           aria-hidden="true"
         />
       </div>
-      <p className="mt-1 text-xs text-slate-500">Format: YYYY-MM-DD</p>
-      {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
+      <p className="mt-1 text-[11px] text-slate-500">Format: YYYY-MM-DD</p>
+      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
     </div>
   );
 }

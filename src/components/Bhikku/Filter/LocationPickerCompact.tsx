@@ -33,25 +33,17 @@ export type Province = {
   districts: District[];
 };
 
+type DistrictOption = District & { provinceCode: string };
+type DivisionOption = Division & { districtCode: string; provinceCode: string };
+
 const STATIC_PROVINCES: Province[] = Array.isArray((selectionsData as any)?.provinces)
   ? ((selectionsData as any).provinces as Province[])
   : [];
 
-export type LocationSelection = {
-  provinceCode?: string;
-  districtCode?: string;
-  divisionCode?: string;
-  gnCode?: string;
-};
+const gnCodeOf = (g?: GnDivision): string | undefined => g?.gn_gnc ?? g?.gn_code ?? undefined;
 
-export type LocationPayload = {
-  province?: Province;
-  district?: District;
-  division?: Division;
-  gn?: GnDivision;
-};
-
-export const gnCodeOf = (g?: GnDivision): string | undefined => g?.gn_gnc ?? g?.gn_code ?? undefined;
+export type LocationSelection = { provinceCode?: string; districtCode?: string; divisionCode?: string; gnCode?: string };
+export type LocationPayload = { province?: Province; district?: District; division?: Division; gn?: GnDivision };
 
 type Props = {
   value?: LocationSelection;
@@ -59,36 +51,75 @@ type Props = {
   className?: string;
   disabled?: boolean;
   required?: boolean;
-  requiredFields?: Partial<{ province: boolean; district: boolean; division: boolean; gn: boolean }>;
   labels?: Partial<{ province: string; district: string; division: string; gn: string }>;
 };
 
-export default function LocationPicker({
+export default function LocationPickerCompact({
   value,
   onChange,
   className,
   disabled = false,
   required = false,
-  requiredFields,
   labels: labelsOverride,
 }: Props) {
   const labels = { province: "Province", district: "District", division: "Divisional Secretariat", gn: "GN Division", ...labelsOverride };
-  const requiredMap = {
-    province: requiredFields?.province ?? required,
-    district: requiredFields?.district ?? required,
-    division: requiredFields?.division ?? required,
-    gn: requiredFields?.gn ?? required,
-  };
 
   const provinces = STATIC_PROVINCES;
+  const districtOptionsAll = useMemo<DistrictOption[]>(
+    () => provinces.flatMap((p) => p.districts.map((d) => ({ ...d, provinceCode: p.cp_code }))),
+    [provinces]
+  );
+  const divisionOptionsAll = useMemo<DivisionOption[]>(
+    () =>
+      provinces.flatMap((p) =>
+        p.districts.flatMap((d) =>
+          d.divisional_secretariats.map((dv) => ({ ...dv, districtCode: d.dd_dcode, provinceCode: p.cp_code }))
+        )
+      ),
+    [provinces]
+  );
+
   const [internal, setInternal] = useState<LocationSelection>({});
   const selection: LocationSelection = value ?? internal;
 
   const currentProvince = useMemo(() => provinces.find((p) => p.cp_code === selection.provinceCode), [provinces, selection.provinceCode]);
-  const districts = currentProvince?.districts ?? [];
-  const currentDistrict = useMemo(() => districts.find((d) => d.dd_dcode === selection.districtCode), [districts, selection.districtCode]);
-  const divisions = currentDistrict?.divisional_secretariats ?? [];
-  const currentDivision = useMemo(() => divisions.find((dv) => dv.dv_dvcode === selection.divisionCode), [divisions, selection.divisionCode]);
+
+  const currentDistrict = useMemo(() => {
+    if (!selection.districtCode) return undefined;
+    if (currentProvince) {
+      const match = currentProvince.districts.find((d) => d.dd_dcode === selection.districtCode);
+      if (match) return match;
+    }
+    return districtOptionsAll.find((d) => d.dd_dcode === selection.districtCode);
+  }, [currentProvince, districtOptionsAll, selection.districtCode]);
+
+  const districtOptions = useMemo<DistrictOption[]>(() => {
+    if (currentProvince) {
+      return currentProvince.districts.map((d) => ({ ...d, provinceCode: currentProvince.cp_code }));
+    }
+    return districtOptionsAll;
+  }, [currentProvince, districtOptionsAll]);
+
+  const divisionsSource = currentDistrict?.divisional_secretariats ?? [];
+
+  const currentDivision = useMemo(() => {
+    if (!selection.divisionCode) return undefined;
+    const direct = divisionsSource.find((dv) => dv.dv_dvcode === selection.divisionCode);
+    if (direct) return direct;
+    return divisionOptionsAll.find((dv) => dv.dv_dvcode === selection.divisionCode);
+  }, [divisionsSource, divisionOptionsAll, selection.divisionCode]);
+
+  const divisionOptions = useMemo<DivisionOption[]>(() => {
+    if (currentDistrict) {
+      return currentDistrict.divisional_secretariats.map((dv) => ({
+        ...dv,
+        districtCode: currentDistrict.dd_dcode,
+        provinceCode: currentDistrict.dd_prcode,
+      }));
+    }
+    return divisionOptionsAll;
+  }, [currentDistrict, divisionOptionsAll]);
+
   const gnDivisions = currentDivision?.gn_divisions ?? [];
   const currentGn = useMemo(() => gnDivisions.find((g) => gnCodeOf(g) === selection.gnCode), [gnDivisions, selection.gnCode]);
 
@@ -114,13 +145,14 @@ export default function LocationPicker({
     <div className={className}>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
         <div>
-          <label className="block mb-1 text-xs font-medium">{labels.province}</label>
           <select
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className="w-full border rounded-md px-2 py-1 text-xs"
             value={selection.provinceCode ?? ""}
-            onChange={(e) => setSelection({ provinceCode: e.target.value || undefined, districtCode: undefined, divisionCode: undefined, gnCode: undefined })}
+            onChange={(e) =>
+              setSelection({ provinceCode: e.target.value || undefined, districtCode: undefined, divisionCode: undefined, gnCode: undefined })
+            }
             disabled={disabled}
-            required={requiredMap.province}
+            required={required}
           >
             <option value="">Select Province</option>
             {provinces.map((p) => (
@@ -132,16 +164,21 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-xs font-medium">{labels.district}</label>
           <select
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className="w-full border rounded-md px-2 py-1 text-xs"
             value={selection.districtCode ?? ""}
-            onChange={(e) => setSelection({ districtCode: e.target.value || undefined, divisionCode: undefined, gnCode: undefined })}
-            disabled={disabled || !currentProvince}
-            required={requiredMap.district}
+            onChange={(e) => {
+              const code = e.target.value || undefined;
+              const info = districtOptionsAll.find((d) => d.dd_dcode === code);
+              const patch: LocationSelection = { districtCode: code, divisionCode: undefined, gnCode: undefined };
+              if (info?.provinceCode) patch.provinceCode = info.provinceCode;
+              setSelection(patch);
+            }}
+            disabled={disabled}
+            required={required}
           >
             <option value="">Select District</option>
-            {districts.map((d) => (
+            {districtOptions.map((d) => (
               <option key={d.dd_dcode} value={d.dd_dcode}>
                 {d.dd_dname}
               </option>
@@ -150,16 +187,22 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-xs font-medium">{labels.division}</label>
           <select
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className="w-full border rounded-md px-2 py-1 text-xs"
             value={selection.divisionCode ?? ""}
-            onChange={(e) => setSelection({ divisionCode: e.target.value || undefined, gnCode: undefined })}
-            disabled={disabled || !currentDistrict}
-            required={requiredMap.division}
+            onChange={(e) => {
+              const code = e.target.value || undefined;
+              const info = divisionOptionsAll.find((dv) => dv.dv_dvcode === code);
+              const patch: LocationSelection = { divisionCode: code, gnCode: undefined };
+              if (info?.districtCode) patch.districtCode = info.districtCode;
+              if (info?.provinceCode) patch.provinceCode = info.provinceCode;
+              setSelection(patch);
+            }}
+            disabled={disabled}
+            required={required}
           >
             <option value="">Select Divisional Secretariat</option>
-            {divisions.map((dv) => (
+            {divisionOptions.map((dv) => (
               <option key={dv.dv_dvcode} value={dv.dv_dvcode}>
                 {dv.dv_dvname}
               </option>
@@ -168,13 +211,12 @@ export default function LocationPicker({
         </div>
 
         <div>
-          <label className="block mb-1 text-xs font-medium">{labels.gn}</label>
           <select
-            className="w-full border rounded-md px-3 py-2 text-sm"
+            className="w-full border rounded-md px-2 py-1 text-xs"
             value={selection.gnCode ?? ""}
             onChange={(e) => setSelection({ gnCode: e.target.value || undefined })}
             disabled={disabled || !currentDivision || !gnDivisions.length}
-            required={requiredMap.gn}
+            required={required}
           >
             <option value="">Select GN Division</option>
             {gnDivisions.map((g) => {

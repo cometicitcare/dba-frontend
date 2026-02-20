@@ -33,6 +33,8 @@ export type ViharaForm = {
   telephone_number: string;
   whatsapp_number: string;
   email_address: string;
+  vh_file_number: string;
+  vh_vihara_code: string;
 
   // Step B: Administrative Divisions
   province: string;
@@ -101,6 +103,8 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     fields: [
       { name: "temple_name", label: "Name of the Temple", type: "text", rules: { required: true } },
       { name: "temple_address", label: "Temple Address", type: "textarea", rows: 3, rules: { required: true } },
+      { name: "vh_file_number", label: "File Number", type: "text", rules: { required: false } },
+      { name: "vh_vihara_code", label: "Vihara Code", type: "text", rules: { required: false } },
       {
         name: "telephone_number",
         label: "Telephone Number",
@@ -239,6 +243,8 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   telephone_number: "",
   whatsapp_number: "",
   email_address: "",
+  vh_file_number: "",
+  vh_vihara_code: "",
   province: "",
   district: "",
   divisional_secretariat: "",
