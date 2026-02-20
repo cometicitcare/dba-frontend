@@ -423,7 +423,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       { key: "vh_trn", label: "TRN", sortable: true },
       { key: "name", label: "Name", sortable: true },
       { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
+      { key: "address", label: "Address" },
       { key: "workflow_status", label: "Status", sortable: true },
       ...(isDivisionalSec
         ? []
