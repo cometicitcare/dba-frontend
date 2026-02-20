@@ -1783,25 +1783,30 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
               </div>
 
               <div className="px-4 md:px-10 py-6" ref={sectionRef}>
-                {visibleMajorStepGroups.length > 1 && (
+                {majorStepGroups.length > 1 && (
                   <div className="flex flex-wrap gap-3 mb-4">
-                    {visibleMajorStepGroups.map((group, idx) => {
+                    {majorStepGroups.map((group, idx) => {
                       const isActive = group.id === activeMajorStep;
+                      const isVisible = visibleMajorStepGroups.some((g) => g.id === group.id);
                       const firstTabId = group.tabs[0]?.id;
                       return (
                         <button
                           key={group.id}
                           onClick={() => {
+                            if (!isVisible) return;
                             setActiveMajorStep(group.id);
                             if (firstTabId) {
                               setActiveTabId(firstTabId);
                             }
                             scrollTop();
                           }}
+                          disabled={!isVisible}
                           className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
                             isActive
                               ? "bg-slate-800 text-white border-slate-800 shadow-sm"
-                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                              : isVisible
+                              ? "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                           }`}
                         >
                           Vihara flow {idx + 1}
