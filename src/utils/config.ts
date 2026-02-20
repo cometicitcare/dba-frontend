@@ -1,6 +1,6 @@
 type Environment = "LOCAL" | "DEVELOP" | "PRODUCTION";
 
-const environment = "DEVELOP" as Environment;
+const environment = "LOCAL" as Environment;
 
 export const baseURL: string | undefined =
   environment === "LOCAL"
