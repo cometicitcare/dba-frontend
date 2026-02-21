@@ -9,6 +9,7 @@ import {
   _approveStage,
   _rejectStage,
 } from "@/services/vihara";
+import { _manageBhikku } from "@/services/bhikku";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -22,6 +23,8 @@ import {
   viharaSteps,
   viharaInitialValues,
   toYYYYMMDD,
+  toISOFormat,
+  toDisplayFormat,
   validateField,
   Errors,
   LandInfoTable,
@@ -444,13 +447,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
-    console.log("🔍 DEBUG: Raw API Data received:", apiData);
-    console.log("🔍 DEBUG: Administrative Division Fields:");
-    console.log("   - vh_province:", apiData.vh_province, "(type:", typeof apiData.vh_province, ")");
-    console.log("   - vh_district:", apiData.vh_district, "(type:", typeof apiData.vh_district, ")");
-    console.log("   - vh_divisional_secretariat:", apiData.vh_divisional_secretariat, "(type:", typeof apiData.vh_divisional_secretariat, ")");
-    console.log("   - vh_gndiv:", apiData.vh_gndiv, "(type:", typeof apiData.vh_gndiv, ")");
-    
     // Map temple_owned_land array fields - handle both camelCase and snake_case from API
     const mappedLand = (apiData.temple_lands || []).map((land: any) => ({
       id: String(land.id || land.serial_number || land.serialNumber || Math.random()),
@@ -500,10 +496,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         // Step D: Leadership
         viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
         viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
-        period_established: apiData.vh_period_established ?? "",
+        period_established: toDisplayFormat(apiData.vh_period_established) ?? "",
 
         // Step E: Mahanyake Information
-        mahanayake_date: apiData.vh_mahanayake_date ?? "",
+        mahanayake_date: toDisplayFormat(apiData.vh_mahanayake_date) ?? "",
         mahanayake_letter_nu: apiData.vh_mahanayake_letter_nu ?? "",
         mahanayake_remarks: apiData.vh_mahanayake_remarks ?? "",
         
@@ -596,7 +592,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         });
 
         const apiData = (response.data as any)?.data || response.data;
-        console.log("Loading vihara data from API:", apiData);
         
         // Map API fields to form fields
         const formData = mapApiToFormFields(apiData);
@@ -605,7 +600,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           ...formData,
         };
         setValues(filledValues);
-        console.log("Form values auto-filled:", filledValues);
 
         const mainBhikkuInfo = apiData?.nikaya_info?.main_bhikku_info;
         setNikayaLetterInfo({
@@ -680,6 +674,36 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
     loadViharaData();
   }, [viharaId]);
+
+  // Auto-lookup bhikkhu name from registration number if name is missing
+  useEffect(() => {
+    const lookupBhikkhuName = async () => {
+      // If we have regn but no name, lookup the bhikkhu
+      if (values.viharadhipathi_regn && !values.viharadhipathi_name) {
+        try {
+          const response = await _manageBhikku({
+            action: "READ_ALL",
+            payload: { skip: 0, limit: 1, search: values.viharadhipathi_regn },
+          });
+          const bhikkhus = (response as any)?.data?.data ?? [];
+          if (bhikkhus.length > 0) {
+            const bhikkhu = bhikkhus[0];
+            const bhikkhuName = bhikkhu.br_mahananame || bhikkhu.br_gihiname || "";
+            if (bhikkhuName) {
+              handleSetMany({
+                viharadhipathi_name: bhikkhuName,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Could not lookup bhikkhu name:", e);
+        }
+      }
+    };
+
+    lookupBhikkhuName();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.viharadhipathi_regn, values.viharadhipathi_name]);
 
   const fieldLabels: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
@@ -799,6 +823,38 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
   }, [values.nikaya, values.parshawaya, findNikayaByCode]);
 
+  // Helper function to ensure viharadhipathi is added to resident bhikkhus before submission
+  const ensureViharadhipathiInResidentBhikkhus = (bhikkhus: any[]): any[] => {
+    if (!values.viharadhipathi_name || !values.viharadhipathi_regn) {
+      return bhikkhus;
+    }
+
+    // Check if viharadhipathi already exists
+    const existingIndex = bhikkhus.findIndex(
+      (b: any) => (b.registrationNumber || b.registration_number) === values.viharadhipathi_regn
+    );
+
+    // If exists, remove it first
+    if (existingIndex >= 0) {
+      bhikkhus.splice(existingIndex, 1);
+    }
+
+    // Add viharadhipathi as first entry
+    const viharadhipathiEntry = {
+      id: `bhikkhu-viharadhipathi-${Date.now()}`,
+      serialNumber: 1,
+      bhikkhuName: values.viharadhipathi_name,
+      registrationNumber: values.viharadhipathi_regn,
+      occupationEducation: "Chief Incumbent (Viharadhipathi)",
+    };
+
+    // Insert at beginning and update serial numbers
+    return [viharadhipathiEntry, ...bhikkhus].map((b, idx) => ({
+      ...b,
+      serialNumber: idx + 1,
+    }));
+  };
+
   const buildPartialPayloadForTab = (tabId: number): Partial<any> => {
     const s = steps.find((step) => step.id === tabId);
     if (!s) return {};
@@ -834,9 +890,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     
     if (tabId === 7) { // Resident Bhikkhus tab
       try {
-        const parsedBhikkhus = values.resident_bhikkhus 
+        let parsedBhikkhus = values.resident_bhikkhus 
           ? (typeof values.resident_bhikkhus === 'string' ? JSON.parse(values.resident_bhikkhus) : values.resident_bhikkhus)
           : [];
+        
+        // Ensure viharadhipathi is in resident bhikkhus as first entry
+        parsedBhikkhus = ensureViharadhipathiInResidentBhikkhus(parsedBhikkhus);
+        
         const mappedBhikkhus = parsedBhikkhus.map((bhikkhu: any) => ({
           serial_number: bhikkhu.serialNumber ?? bhikkhu.serial_number,
           bhikkhu_name: bhikkhu.bhikkhuName ?? bhikkhu.bhikkhu_name,
@@ -904,7 +964,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       };
       
       const apiFieldName = fieldMapping[f.name] || f.name;
-      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toYYYYMMDD(String(v)) : v);
+      // Convert dates to ISO format (YYYY-MM-DD) for API
+      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v)) : v);
     });
     
     // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
@@ -921,7 +982,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
             );
             if (districtMatch) {
               payload.vh_province = province.cp_code || province.code;
-              console.log(`🔍 DEBUG: Auto-added province "${payload.vh_province}" to update payload for district "${districtCode}"`);
               break;
             }
           }
@@ -961,7 +1021,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           ...formData,
         };
         setValues(filledValues);
-        console.log("Form values refreshed from API response after update:", filledValues);
       }
       
       toast.success(`Saved "${stepTitle}"`, { autoClose: 1200 });
@@ -1017,11 +1076,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_nikaya: formData.nikaya,
       vh_parshawa: formData.parshawaya,
       
-      // Step D: Leadership
+      // Step D: Leadership - Convert dates to ISO format
       vh_viharadhipathi_name: formData.viharadhipathi_name,
       vh_viharadhipathi_regn: formData.viharadhipathi_regn,
-      vh_period_established: formData.period_established,
-      vh_mahanayake_date: formData.mahanayake_date,
+      vh_period_established: toISOFormat(formData.period_established) || null,
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date) || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu,
       vh_mahanayake_remarks: formData.mahanayake_remarks,
       
@@ -2424,11 +2483,47 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       required={!!f.rules?.required}
                                       initialDisplay={displayValue}
                                       placeholder="Type a Bhikkhu name or registration number"
+                                      showAddButton={true}
                                       onPick={(picked) => {
+                                        const regnValue = picked.regn || String(picked.data?.br_regn ?? "");
                                         handleSetMany({
                                           viharadhipathi_name: picked.name ?? "",
-                                          viharadhipathi_regn: picked.regn ?? "",
+                                          viharadhipathi_regn: regnValue,
                                         });
+                                        
+                                        // Auto-add viharadhipathi to resident bhikkhus as first entry
+                                        try {
+                                          const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
+                                          
+                                          // Check if this bhikkhu already exists in the table
+                                          const existingIndex = currentBhikkhus.findIndex(
+                                            (b: any) => (b.registrationNumber || b.registration_number) === regnValue
+                                          );
+                                          
+                                          // Remove existing entry if found
+                                          if (existingIndex >= 0) {
+                                            currentBhikkhus.splice(existingIndex, 1);
+                                          }
+                                          
+                                          // Add as first entry
+                                          const newEntry = {
+                                            id: `bhikkhu-viharadhipathi-${Date.now()}`,
+                                            serialNumber: 1,
+                                            bhikkhuName: picked.name ?? "",
+                                            registrationNumber: regnValue,
+                                            occupationEducation: "Chief Incumbent (Viharadhipathi)",
+                                          };
+                                          
+                                          // Insert at beginning and update serial numbers
+                                          const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
+                                            ...b,
+                                            serialNumber: idx + 1,
+                                          }));
+                                          
+                                          handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
+                                        } catch (e) {
+                                          console.error("Error auto-adding viharadhipathi to resident bhikkhus:", e);
+                                        }
                                       }}
                                     />
                                     {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
@@ -2507,6 +2602,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       required={!!f.rules?.required}
                                       error={err}
                                       placeholder="Select existing temple buildings/structures"
+                                    />
+                                  </div>
+                                );
+                              }
+
+                              // Date fields - Use DateField component from vihara/add
+                              if (f.type === "date") {
+                                return (
+                                  <div key={id}>
+                                    <DateField
+                                      id={id}
+                                      label={f.label}
+                                      value={val}
+                                      onChange={(displayValue) => handleInputChange(f.name, displayValue)}
+                                      required={!!f.rules?.required}
+                                      placeholder="YYYY/MM/DD"
+                                      error={err}
                                     />
                                   </div>
                                 );

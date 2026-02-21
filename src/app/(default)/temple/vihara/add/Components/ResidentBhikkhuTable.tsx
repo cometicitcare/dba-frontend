@@ -101,6 +101,8 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
           id="resident-bhikkhu-search"
           label="Search Bhikkhu to add"
           placeholder="Type a name or registration number"
+          showAddButton={true}
+          clearAfterPick={true}
           onPick={(picked) => {
             const regn = picked.regn || "";
             const name = picked.name || picked.display || "";

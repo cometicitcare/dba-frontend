@@ -199,7 +199,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
       setBhikkuError(null);
       const token = getAuthToken();
       const response = await request.post<{
-        data?: { tb_id?: number | string; tb_name?: string };
+        data?: any; // Backend now returns standard bhikku object with br_regn
       }>(
         "https://api.dbagovlk.com/api/v1/temporary-bhikku/manage",
         {
@@ -209,11 +209,46 @@ function AddViharaPageInner({ department }: { department?: string }) {
         { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
       );
       const created = response?.data?.data;
-      if (created?.tb_name) {
+      if (created?.br_regn) {
+        // Backend now returns normal bhikku with BH registration number
+        const bhikkuRegn = created.br_regn;
+        const bhikkhuName = created.br_mahananame || created.br_gihiname || "";
+        
         handleSetMany({
-          viharadhipathi_name: String(created.tb_name),
-          viharadhipathi_regn: created.tb_id != null ? String(created.tb_id) : "",
+          viharadhipathi_name: bhikkhuName,
+          viharadhipathi_regn: bhikkuRegn,
         });
+        
+        // Auto-add to resident bhikkhus as first entry
+        try {
+          const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
+          
+          // Check if already exists
+          const existingIndex = currentBhikkhus.findIndex(
+            (b: any) => b.registrationNumber === bhikkuRegn
+          );
+          
+          if (existingIndex >= 0) {
+            currentBhikkhus.splice(existingIndex, 1);
+          }
+          
+          const newEntry = {
+            id: `bhikkhu-viharadhipathi-${bhikkuRegn}`,
+            serialNumber: 1,
+            bhikkhuName: bhikkhuName,
+            registrationNumber: bhikkuRegn,
+            occupationEducation: "Chief Incumbent (Viharadhipathi)",
+          };
+          
+          const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
+            ...b,
+            serialNumber: idx + 1,
+          }));
+          
+          handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
+        } catch (e) {
+          console.error("Error auto-adding temp viharadhipathi to resident bhikkhus:", e);
+        }
       }
       toast.success("Bhikku created.", { autoClose: 1200 });
       setBhikkuForm({
@@ -618,6 +653,38 @@ function AddViharaPageInner({ department }: { department?: string }) {
     };
   };
 
+  // Helper function to ensure viharadhipathi is added to resident bhikkhus before submission
+  const ensureViharadhipathiInResidentBhikkhus = (bhikkhus: any[]): any[] => {
+    if (!values.viharadhipathi_name || !values.viharadhipathi_regn) {
+      return bhikkhus;
+    }
+
+    // Check if viharadhipathi already exists
+    const existingIndex = bhikkhus.findIndex(
+      (b: any) => b.registrationNumber === values.viharadhipathi_regn
+    );
+
+    // If exists, remove it first
+    if (existingIndex >= 0) {
+      bhikkhus.splice(existingIndex, 1);
+    }
+
+    // Add viharadhipathi as first entry
+    const viharadhipathiEntry = {
+      id: `bhikkhu-viharadhipathi-${Date.now()}`,
+      serialNumber: 1,
+      bhikkhuName: values.viharadhipathi_name,
+      registrationNumber: values.viharadhipathi_regn,
+      occupationEducation: "Chief Incumbent (Viharadhipathi)",
+    };
+
+    // Insert at beginning and update serial numbers
+    return [viharadhipathiEntry, ...bhikkhus].map((b, idx) => ({
+      ...b,
+      serialNumber: idx + 1,
+    }));
+  };
+
   const handleSubmit = async () => {
     console.log("Submitting Vihara form", {
       stageQuery,
@@ -656,6 +723,9 @@ function AddViharaPageInner({ department }: { department?: string }) {
         console.error("Error parsing temple_owned_land:", e);
         parsedTempleOwnedLand = [];
       }
+      
+      // Ensure viharadhipathi is in resident bhikkhus as first entry
+      parsedResidentBhikkhus = ensureViharadhipathiInResidentBhikkhus(parsedResidentBhikkhus);
       
       const apiPayload = mapFormToApiFields(values, parsedResidentBhikkhus, parsedTempleOwnedLand);
       console.log("Vihara Form Payload:", apiPayload);
@@ -1157,17 +1227,52 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                 required={!!f.rules?.required}
                                 initialDisplay={displayValue}
                                 placeholder="Type a Bhikkhu name or registration number"
-                                storeRegn={false}
+                                showAddButton={true}
                                 onPick={(picked) => {
+                                  const regnValue = picked.regn || String(picked.data?.br_regn ?? "");
                                   handleSetMany({
                                     viharadhipathi_name: picked.name ?? "",
-                                    viharadhipathi_regn: String(picked.data?.br_regn ?? ""),
+                                    viharadhipathi_regn: regnValue,
                                   });
+                                  
+                                  // Auto-add viharadhipathi to resident bhikkhus as first entry
+                                  try {
+                                    const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
+                                    
+                                    // Check if this bhikkhu already exists in the table
+                                    const existingIndex = currentBhikkhus.findIndex(
+                                      (b: any) => b.registrationNumber === regnValue
+                                    );
+                                    
+                                    // Remove existing entry if found
+                                    if (existingIndex >= 0) {
+                                      currentBhikkhus.splice(existingIndex, 1);
+                                    }
+                                    
+                                    // Add as first entry
+                                    const newEntry = {
+                                      id: `bhikkhu-viharadhipathi-${Date.now()}`,
+                                      serialNumber: 1,
+                                      bhikkhuName: picked.name ?? "",
+                                      registrationNumber: regnValue,
+                                      occupationEducation: "Chief Incumbent (Viharadhipathi)",
+                                    };
+                                    
+                                    // Insert at beginning and update serial numbers
+                                    const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
+                                      ...b,
+                                      serialNumber: idx + 1,
+                                    }));
+                                    
+                                    handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
+                                  } catch (e) {
+                                    console.error("Error auto-adding viharadhipathi to resident bhikkhus:", e);
+                                  }
                                 }}
                                 onInputChange={(value) => {
+                                  // Update name while typing - keep the regn if already set
                                   handleSetMany({
                                     viharadhipathi_name: value,
-                                    viharadhipathi_regn: "",
                                   });
                                 }}
                               />
@@ -1276,17 +1381,18 @@ function AddViharaPageInner({ department }: { department?: string }) {
                         }
 
                         // Regular text/email/tel inputs
-                        const isDisabled = id === "viharadhipathi_regn";
                         return (
                           <div key={id} className={currentStep === 6 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
-                            <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
+                            <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
+                              {f.label}
+                              {id === "viharadhipathi_regn" && <span className="text-xs text-slate-500 ml-1">(Auto-populated or enter manually)</span>}
+                            </label>
                             <input
                               id={id}
                               type={f.type}
                               value={val}
                               onChange={(e) => handleInputChange(f.name, e.target.value)}
-                              disabled={isDisabled}
-                              className={`w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all ${isDisabled ? "bg-slate-100 text-slate-500 cursor-not-allowed" : ""}`}
+                              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                               placeholder={f.placeholder}
                             />
                             {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
