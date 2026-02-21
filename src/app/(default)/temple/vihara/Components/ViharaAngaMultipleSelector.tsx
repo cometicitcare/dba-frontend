@@ -12,6 +12,7 @@ import {
   Button,
 } from "@mui/material";
 import request from "@/services/backendClient";
+import { baseURL } from "@/utils/config";
 
 type ViharaAngaOption = {
   vg_id: number;
@@ -31,7 +32,7 @@ type Props = {
   disabled?: boolean;
 };
 
-const API_URL = "https://api.dbagovlk.com/api/v1/viharanga/manage";
+const API_URL = `${baseURL}/viharanga/manage`;
 
 const getAuthToken = () => {
   if (typeof window === "undefined") return null;
