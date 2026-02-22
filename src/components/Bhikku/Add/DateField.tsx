@@ -1,6 +1,6 @@
 "use client";
-import React, { useRef } from "react";
-import { toDisplayFormat, toISOFormat } from "./helpers";
+import React from "react";
+import { toISOFormat } from "./helpers";
 
 type Props = {
   id: string;
@@ -12,15 +12,29 @@ type Props = {
   error?: string;
 };
 
-export default function DateField({ id, label, value, onChange, required, placeholder, error }: Props) {
-  const hiddenRef = useRef<HTMLInputElement | null>(null);
-  const displayValue = toDisplayFormat(value);
-  const isoValue = toISOFormat(value);
+function formatAsIsoInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
 
-  const openPicker = () => {
-    const el = hiddenRef.current;
-    if (el?.showPicker) el.showPicker();
-    else el?.click();
+export default function DateField({ id, label, value, onChange, required, placeholder, error }: Props) {
+  const displayValue = toISOFormat(value) || value;
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatAsIsoInput(e.target.value);
+    onChange(formatted);
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const trimmed = e.target.value.trim();
+    if (!trimmed) {
+      onChange("");
+      return;
+    }
+    const iso = toISOFormat(trimmed);
+    onChange(iso);
   };
 
   return (
@@ -34,34 +48,16 @@ export default function DateField({ id, label, value, onChange, required, placeh
           id={id}
           type="text"
           inputMode="numeric"
-          pattern="(\d{4}-\d{2}-\d{2}|\d{4}/\d{2}/\d{2})"
-          placeholder={placeholder ?? "YYYY/MM/DD"}
+          pattern="\d{4}-\d{2}-\d{2}"
+          placeholder={placeholder ?? "YYYY-MM-DD"}
           value={displayValue}
-          onChange={(e) => onChange(toDisplayFormat(e.target.value))}
-          onBlur={(e) => onChange(toDisplayFormat(e.target.value))}
+          onChange={handleChange}
+          onBlur={handleBlur}
           required={required}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-l-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-        />
-        <button
-          type="button"
-          onClick={openPicker}
-          className="px-3 border border-l-0 border-slate-300 rounded-r-lg text-slate-600 hover:bg-slate-50"
-          aria-label="Open date picker"
-          title="Open date picker"
-        >
-          📅
-        </button>
-        <input
-          ref={hiddenRef}
-          type="date"
-          value={isoValue}
-          onChange={(e) => onChange(toDisplayFormat(e.target.value))}
-          className="absolute opacity-0 pointer-events-none w-0 h-0"
-          tabIndex={-1}
-          aria-hidden="true"
+          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
         />
       </div>
-      <p className="mt-1 text-xs text-slate-500">Format: YYYY/MM/DD</p>
+      <p className="mt-1 text-xs text-slate-500">Format: YYYY-MM-DD</p>
       {error ? <p className="mt-1 text-sm text-red-600">{error}</p> : null}
     </div>
   );
