@@ -153,9 +153,9 @@ export default function AddUpasampadaPage() {
 
       toast.success("Upasampada record saved.", {
         autoClose: 1200,
-        onClose: () => router.push("/bhikkhu"),
+        onClose: () => router.push("/bhikkhu?tab=upasampada"),
       });
-      setTimeout(() => router.push("/bhikkhu"), 1400);
+      setTimeout(() => router.push("/bhikkhu?tab=upasampada"), 1400);
     } catch (error: any) {
       const message = error?.message ?? "Failed to save record.";
       toast.error(message);
