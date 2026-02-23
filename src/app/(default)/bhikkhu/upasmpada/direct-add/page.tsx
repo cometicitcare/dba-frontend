@@ -567,9 +567,9 @@ export default function DirectAddPage() {
       await _manageDirectHighBhikku(payload);
       toast.success("Direct high Bhikkhu record created.", {
         autoClose: 1200,
-        onClose: () => router.push("/bhikkhu"),
+        onClose: () => router.push("/bhikkhu?tab=upasampada"),
       });
-      setTimeout(() => router.push("/bhikkhu"), 1400);
+      setTimeout(() => router.push("/bhikkhu?tab=upasampada"), 1400);
     } catch (error: any) {
       const message = error?.message ?? "Failed to create direct high Bhikkhu.";
       toast.error(message);

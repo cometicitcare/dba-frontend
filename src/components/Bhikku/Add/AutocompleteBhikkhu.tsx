@@ -186,7 +186,7 @@ export default function BhikkhuAutocomplete({
                 if (!name) return;
                 setAddSubmitting(true);
                 try {
-                  await _manageTempBhikku({
+                  const response = await _manageTempBhikku({
                     action: "CREATE",
                     payload: {
                       data: {
@@ -199,11 +199,24 @@ export default function BhikkhuAutocomplete({
                       },
                     },
                   });
+                  const created = (response as any)?.data?.data;
                   toast.success("Temporary bhikkhu created");
+                  
+                  const bhikkuRegn = created?.br_regn || "";
+                  const bhikkhuName = created?.br_mahananame || created?.br_gihiname || name;
+                  const display = `${bhikkhuName} - ${bhikkuRegn}`;
+                  
+                  onPick(
+                    storeRegn
+                      ? { regn: bhikkuRegn, name: bhikkhuName, display, data: created }
+                      : { name: bhikkhuName, display, data: created }
+                  );
+                  setInput(display);
                   await onAddBhikkhu?.({
                     name,
                   });
                   setAddDialogOpen(false);
+                  resetDialogFields();
                 } finally {
                   setAddSubmitting(false);
                 }

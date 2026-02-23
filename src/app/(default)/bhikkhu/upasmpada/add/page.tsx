@@ -12,6 +12,7 @@ import { _manageHighBhikku } from "@/services/bhikku";
 import { getStoredUserData, UserData } from "@/utils/userData";
 import { BHIKKU_MANAGEMENT_DEPARTMENT } from "@/utils/config"
 type UpasampadaForm = {
+  requestDate: string;
   candidateRegNo: string;
   candidateDisplay: string;
   currentStatus: string;
@@ -35,6 +36,7 @@ type UpasampadaForm = {
 };
 
 const INITIAL_FORM: UpasampadaForm = {
+  requestDate: "",
   candidateRegNo: "",
   candidateDisplay: "",
   currentStatus: "",
@@ -76,7 +78,7 @@ const FORM_STEPS = [
 ];
 
 const REQUIRED_BY_STEP: Record<number, Array<keyof UpasampadaForm>> = {
-  1: ["candidateRegNo", "higherOrdinationPlace", "higherOrdinationDate", "karmacharyaName", "upaddhyayaName", "assumedName"],
+  1: ["requestDate", "candidateRegNo", "higherOrdinationPlace", "higherOrdinationDate", "karmacharyaName", "upaddhyayaName", "assumedName"],
   2: ["higherOrdinationResidenceTrn", "permanentResidenceTrn", "declarationResidenceAddress", "tutorsTutorRegNo", "presidingBhikshuRegNo"],
   3: ["currentStatus", "declarationDate"],
 };
@@ -87,7 +89,8 @@ export default function AddUpasampadaPage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
-  const [form, setForm] = useState<UpasampadaForm>(INITIAL_FORM);
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [form, setForm] = useState<UpasampadaForm>({ ...INITIAL_FORM, requestDate: todayIso });
   const [submitting, setSubmitting] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -118,13 +121,11 @@ export default function AddUpasampadaPage() {
     if (!isLastStep || !stepIsValid || submitting) return;
     setSubmitting(true);
 
-    const today = toYYYYMMDD(new Date().toISOString());
-
     const requestBody = {
       action: "CREATE",
       payload: {
         data: {
-          bhr_reqstdate: today,
+          bhr_reqstdate: toYYYYMMDD(form.requestDate || todayIso),
           bhr_currstat: form.currentStatus,
           bhr_parshawaya: "",
           bhr_livtemple: form.permanentResidenceTrn || form.higherOrdinationResidenceTrn || "",
@@ -152,9 +153,9 @@ export default function AddUpasampadaPage() {
 
       toast.success("Upasampada record saved.", {
         autoClose: 1200,
-        onClose: () => router.push("/bhikkhu"),
+        onClose: () => router.push("/bhikkhu?tab=upasampada"),
       });
-      setTimeout(() => router.push("/bhikkhu"), 1400);
+      setTimeout(() => router.push("/bhikkhu?tab=upasampada"), 1400);
     } catch (error: any) {
       const message = error?.message ?? "Failed to save record.";
       toast.error(message);
@@ -198,6 +199,13 @@ export default function AddUpasampadaPage() {
       case 1:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <DateField
+              id="bhr_reqstdate"
+              label="Request Date"
+              value={form.requestDate}
+              onChange={(v) => updateField("requestDate", v)}
+              required
+            />
             <div className="md:col-span-2">
               <BhikkhuAutocomplete
                 id="bhikkhu-search"
