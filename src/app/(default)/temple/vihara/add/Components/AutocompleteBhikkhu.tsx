@@ -11,7 +11,7 @@ async function searchBhikkhus(q: string, page = 1, limit = 10): Promise<BhikkhuO
   // Backend now saves temp bhikkhus to bhikku_regist table with normal BH numbers
   const res = await _manageBhikku({
     action: "READ_ALL",
-    payload: { skip: 0, limit, search: q ?? "" },
+    payload: { skip: 0, limit, search_key: q ?? "" },
   } as any);
   const rows: any[] = (res as any)?.data?.data ?? [];
   return rows.map((r) => ({
