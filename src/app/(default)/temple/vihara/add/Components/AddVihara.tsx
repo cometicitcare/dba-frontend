@@ -454,6 +454,51 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     return null;
   };
 
+  // Maps raw API/schema field names to human-readable labels shown in the form
+  const API_FIELD_LABELS: Record<string, string> = {
+    // Basic Temple Info
+    temple_name: "Temple Name",
+    temple_address: "Temple Address",
+    telephone_number: "Telephone Number",
+    whatsapp_number: "WhatsApp Number",
+    email_address: "Email Address",
+    temple_type: "Temple Type",
+    province: "Province",
+    district: "District",
+    divisional_secretariat: "Divisional Secretariat",
+    pradeshya_sabha: "Pradeshya Sabha",
+    grama_niladhari_division: "Grama Niladhari Division",
+    // Religious Affiliation
+    nikaya: "Nikaya (Monastic Order)",
+    parshawaya: "Parshawaya (Sub-division / Sect)",
+    // Leadership
+    viharadhipathi_name: "Name of Current Chief Incumbent",
+    viharadhipathi_regn: "Chief Monk's Registration Number",
+    viharadhipathi_date: "Date of Appointment",
+    vihara_dhipathi_date: "Date of Appointment",
+    period_established: "Period Temple Was Established",
+    vh_period_era: "Era (AD / BC / Buddhist Era)",
+    vh_period_year: "Year",
+    vh_period_month: "Month",
+    vh_period_day: "Day",
+    vh_period_notes: "Notes About Period",
+    // Assets
+    buildings_description: "Description of Temple Buildings",
+    dayaka_families_count: "Number of Dayaka Families",
+    // Other common fields
+    owner_code: "Owner Code",
+    inspection_report: "Inspection Report",
+    inspection_code: "Inspection Code",
+  };
+
+  const formatApiFieldMessage = (field: string | null | undefined, msg: string): string => {
+    if (!field) return msg;
+    // e.g. "data.viharadhipathi_date" → "viharadhipathi_date"
+    const key = field.split(".").pop() ?? field;
+    const label = API_FIELD_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return `${label}: ${msg}`;
+  };
+
   const collectApiErrors = (source: any) => {
     const container = source?.data ?? source;
     const rawErrors =
@@ -467,9 +512,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
             if (!err) return "";
             const msg = err.message ?? err.msg ?? "";
             const field = err.field ?? err.name ?? "";
-            if (field && msg) return `${field}: ${msg}`;
-            if (msg) return msg;
-            return field ? `${field}: Validation failed.` : "";
+            if (!msg && !field) return "";
+            return formatApiFieldMessage(field || null, msg || "Validation failed.");
           })
           .filter(Boolean)
       : [];
@@ -478,6 +522,15 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       container?.data?.message ??
       "Failed to save Stage 1. Please try again.";
     return { messages, fallback };
+  };
+
+  /** Show each validation error as a separate toast so users can read and act on each one individually. */
+  const showApiErrors = (messages: string[], fallback: string) => {
+    if (messages.length === 0) {
+      toast.error(fallback);
+      return;
+    }
+    messages.forEach((msg) => toast.error(msg, { autoClose: 6000 }));
   };
 
   const handleSaveFlowOne = async (overrideValues?: Partial<ViharaForm>, bypassField?: keyof ViharaForm) => {
@@ -495,7 +548,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       const success = (payload as any)?.success ?? true;
       if (!success) {
         const { messages, fallback } = collectApiErrors(payload);
-        toast.error(messages.join("\n") || fallback);
+        showApiErrors(messages, fallback);
         return;
       }
 
@@ -525,11 +578,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     } catch (e: unknown) {
       const data = (e as any)?.response?.data ?? (e as any)?.data;
       const { messages, fallback } = collectApiErrors(data);
-      const msg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.");
-      toast.error(msg);
+      const fallbackMsg = fallback || (e instanceof Error ? e.message : "Failed to save Stage 1. Please try again.");
+      showApiErrors(messages, fallbackMsg);
     } finally {
       setSubmitting(false);
     }
@@ -671,6 +721,11 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       payload.vh_bgndate = bgndate;
     }
 
+    // Normalize all string values: trim leading/trailing whitespace and collapse internal spaces
+    Object.keys(payload).forEach((k) => {
+      if (typeof payload[k] === "string") payload[k] = (payload[k] as string).replace(/\s+/g, " ").trim();
+    });
+
     return payload;
   };
 
@@ -679,7 +734,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     const establishmentDate = toISOFormat(formData.period_established ?? "");
     const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
 
-    return {
+    const _stageOnePayload: Record<string, any> = {
       vh_vname: formData.temple_name ?? "",
       vh_addrs: formData.temple_address ?? "",
       vh_mobile: formData.telephone_number ?? "",
@@ -712,6 +767,11 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
       ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
     };
+    // Normalize all string values: trim leading/trailing whitespace and collapse internal spaces
+    Object.keys(_stageOnePayload).forEach((k) => {
+      if (typeof (_stageOnePayload as any)[k] === "string") (_stageOnePayload as any)[k] = (_stageOnePayload as any)[k].replace(/\s+/g, " ").trim();
+    });
+    return _stageOnePayload;
   };
 
   // Helper function to ensure viharadhipathi is added to resident bhikkhus before submission
@@ -1434,47 +1494,6 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                                 initialDisplay={displayValue}
                                 placeholder="Search by name, REGN, temple, or address"
                                 showAddButton={true}
-                                onAddBhikkhu={async (payload) => {
-                                  // When a new TEMP bhikkhu is created, auto-populate the fields
-                                  const { name, phone } = payload; // phone field carries br_regn
-                                  const brRegn = phone || "";
-                                  
-                                  handleSetMany({
-                                    viharadhipathi_name: name || "",
-                                    viharadhipathi_regn: brRegn,
-                                  });
-                                  
-                                  // Auto-add to resident bhikkhus as first entry
-                                  try {
-                                    const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
-                                    
-                                    // Check if already exists
-                                    const existingIndex = currentBhikkhus.findIndex(
-                                      (b: any) => b.registrationNumber === brRegn
-                                    );
-                                    
-                                    if (existingIndex >= 0) {
-                                      currentBhikkhus.splice(existingIndex, 1);
-                                    }
-                                    
-                                    const newEntry = {
-                                      id: `bhikkhu-viharadhipathi-${brRegn}`,
-                                      serialNumber: 1,
-                                      bhikkhuName: name || "",
-                                      registrationNumber: brRegn,
-                                      occupationEducation: "Chief Incumbent (Viharadhipathi)",
-                                    };
-                                    
-                                    const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
-                                      ...b,
-                                      serialNumber: idx + 1,
-                                    }));
-                                    
-                                    handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
-                                  } catch (e) {
-                                    console.error("Error auto-adding temp viharadhipathi to resident bhikkhus:", e);
-                                  }
-                                }}
                                 onPick={(picked) => {
                                   const regnValue = picked.regn || String(picked.data?.br_regn ?? "");
                                   handleSetMany({

@@ -166,7 +166,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
       { name: "viharadhipathi_regn", label: "Chief Monk's Registration Number (Auto-populated or enter manually)", type: "text", rules: { required: false } },
       { name: "viharadhipathi_date", label: "Date of Appointment", type: "date", rules: { required: false } },
-      { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
+      { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: false } },
       { name: "vh_period_era", label: "Era (If different from AD)", type: "text", placeholder: "AD / BC / Buddhist Era", rules: { required: false } },
       { name: "vh_period_year", label: "Year", type: "text", placeholder: "YYYY", rules: { required: false } },
       { name: "vh_period_month", label: "Month (Optional)", type: "text", placeholder: "MM", rules: { required: false } },
