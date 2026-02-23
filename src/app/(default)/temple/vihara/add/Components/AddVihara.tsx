@@ -8,7 +8,7 @@ import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import selectionsData from "@/utils/selectionsData.json";
-import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from "@/utils/config";
 
 import {
   DateField,
@@ -18,6 +18,7 @@ import {
   viharaSteps,
   viharaInitialValues,
   toYYYYMMDD,
+  toISOFormat,
   validateField,
   Errors,
   LandInfoTable,
@@ -53,12 +54,26 @@ const STATIC_NIKAYA_DATA: NikayaAPIItem[] = Array.isArray((selectionsData as any
 
 export const dynamic = "force-dynamic";
 
-function AddViharaPageInner({ department }: { department?: string }) {
+/** Stage F bypass field config — drives mutual exclusivity and step locking */
+const BYPASS_FIELDS_CONFIG: Array<{ field: keyof ViharaForm; stepId: number }> = [
+  { field: "vh_bypass_no_detail", stepId: 3 },
+  { field: "vh_bypass_no_chief", stepId: 4 },
+  { field: "vh_bypass_ltr_cert", stepId: 5 },
+];
+/** Maps bypass boolean field → dedicated CRUDAction that triggers status transition */
+const BYPASS_ACTION_MAP: Record<string, string> = {
+  vh_bypass_no_detail: "BYPASS_NO_DETAIL",
+  vh_bypass_no_chief:  "BYPASS_NO_CHIEF",
+  vh_bypass_ltr_cert:  "BYPASS_LTR_CERT",
+};
+
+function AddViharaPageInner({ department, role }: { department?: string; role?: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const viharaId = search.get("id") || undefined;
   const stageQuery = search.get("stage") || undefined;
   const isDivisionalSec = department === DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT;
+  const canModerate = role === ADMIN_ROLE_LEVEL && !isDivisionalSec;
   const parseId = useCallback((v?: string | null) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
@@ -114,7 +129,13 @@ function AddViharaPageInner({ department }: { department?: string }) {
     ...viharaInitialValues,
   });
   const [errors, setErrors] = useState<Errors<ViharaForm>>({});
+  /** Whichever bypass toggle is currently ON — null if none */
+  const activeBypassEntry = BYPASS_FIELDS_CONFIG.find((b) => (values[b.field] as boolean) === true) ?? null;
   const [submitting, setSubmitting] = useState(false);
+  const [bypassConfirm, setBypassConfirm] = useState<{
+    field: keyof ViharaForm;
+    label: string;
+  } | null>(null);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [bhikkuModalOpen, setBhikkuModalOpen] = useState(false);
@@ -459,12 +480,12 @@ function AddViharaPageInner({ department }: { department?: string }) {
     return { messages, fallback };
   };
 
-  const handleSaveFlowOne = async () => {
+  const handleSaveFlowOne = async (overrideValues?: Partial<ViharaForm>, bypassField?: keyof ViharaForm) => {
     if (!validateStep(currentStep)) return;
 
     try {
       setSubmitting(true);
-      const stageOnePayload = mapFormToStageOneFields(values);
+      const stageOnePayload = mapFormToStageOneFields(overrideValues ? { ...values, ...overrideValues } : values);
       const response = await _manageVihara({
         action: "SAVE_STAGE_ONE",
         payload: { data: stageOnePayload },
@@ -480,6 +501,21 @@ function AddViharaPageInner({ department }: { department?: string }) {
 
       const newId = extractViharaId(response);
       if (newId) setCreatedViharaId(newId);
+
+      // Stage F: if a bypass toggle was set, fire the dedicated BYPASS_ action now that we have a vh_id
+      if (bypassField && newId) {
+        const bypassAction = BYPASS_ACTION_MAP[bypassField as string];
+        if (bypassAction) {
+          try {
+            await _manageVihara({
+              action: bypassAction,
+              payload: { vh_id: newId },
+            } as any);
+          } catch {
+            // bypass action failure is non-fatal — record was still saved
+          }
+        }
+      }
 
       toast.success("Stage 1 data saved.", {
         autoClose: 1200,
@@ -507,7 +543,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
   // Array fields use camelCase (serialNumber, bhikkhuName, etc.)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
     const periodRaw = formData.period_established ?? "";
-    const normalizedPeriodDate = toYYYYMMDD(periodRaw);
+    // Convert display format YYYY/MM/DD → ISO YYYY-MM-DD for the backend
+    const normalizedPeriodDate = toISOFormat(periodRaw);
 
     // Map temple_owned_land array fields - use camelCase as per API
     const mappedLand = parsedTempleOwnedLand.map((land: any) => ({
@@ -569,13 +606,27 @@ function AddViharaPageInner({ department }: { department?: string }) {
       
       // Step C: Religious Affiliation
       vh_nikaya: formData.nikaya ?? "",
+      vh_bypass_no_detail: formData.vh_bypass_no_detail ?? false,
       
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      vh_period_established: periodRaw,
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
+      vh_period_established: toISOFormat(periodRaw),
+      vh_period_era: formData.vh_period_era ?? "",
+      vh_period_year: formData.vh_period_year ?? "",
+      vh_period_month: formData.vh_period_month ?? "",
+      vh_period_day: formData.vh_period_day ?? "",
+      vh_period_notes: formData.vh_period_notes ?? "",
+      vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
       
-      // Step E: Assets & Activities
+      // Step E: Mahanyake (with bypass)
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
+      vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
+      vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
+      vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
+      
+      // Step F: Temple Assets & Activities
       vh_buildings_description: formData.buildings_description ?? "",
       vh_dayaka_families_count: formData.dayaka_families_count ?? "",
       vh_fmlycnt: dayakaCountNum,
@@ -624,7 +675,8 @@ function AddViharaPageInner({ department }: { department?: string }) {
   };
 
   const mapFormToStageOneFields = (formData: Partial<ViharaForm>) => {
-    const establishmentDate = toYYYYMMDD(formData.period_established);
+    // Convert display format YYYY/MM/DD → ISO YYYY-MM-DD for the backend
+    const establishmentDate = toISOFormat(formData.period_established ?? "");
     const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
 
     return {
@@ -645,10 +697,19 @@ function AddViharaPageInner({ department }: { department?: string }) {
       vh_ownercd: ownerCode,
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      vh_period_established: formData.period_established ?? "",
-      vh_mahanayake_date: formData.mahanayake_date ?? "",
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
+      vh_period_established: toISOFormat(formData.period_established ?? ""),
+      vh_period_era: formData.vh_period_era ?? "",
+      vh_period_year: formData.vh_period_year ?? "",
+      vh_period_month: formData.vh_period_month ?? "",
+      vh_period_day: formData.vh_period_day ?? "",
+      vh_period_notes: formData.vh_period_notes ?? "",
+      vh_bypass_no_detail: formData.vh_bypass_no_detail ?? false,
+      vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
       vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
+      vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
       ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
     };
   };
@@ -905,13 +966,14 @@ function AddViharaPageInner({ department }: { department?: string }) {
                     const stepIndex = effectiveSteps.findIndex((s) => s.id === step.id) + 1;
                     const isCompleted = currentStep > stepIndex;
                     const isCurrent = currentStep === stepIndex;
+                    const isStepLocked = !!(activeBypassEntry && step.id > activeBypassEntry.stepId);
                     return (
                       <div key={step.id} className="flex items-center flex-1 min-w-[80px]">
                         <div className="flex flex-col items-center flex-1">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${isCompleted ? "bg-green-500 text-white" : isCurrent ? "bg-slate-700 text-white ring-4 ring-slate-200" : "bg-slate-200 text-slate-400"}`}>
-                            {isCompleted ? "✓" : idx + 1}
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${isStepLocked ? "bg-slate-100 text-slate-300 ring-1 ring-slate-200" : isCompleted ? "bg-green-500 text-white" : isCurrent ? "bg-slate-700 text-white ring-4 ring-slate-200" : "bg-slate-200 text-slate-400"}`}>
+                            {isStepLocked ? "—" : isCompleted ? "✓" : idx + 1}
                           </div>
-                          <span className={`text-[10px] mt-2 font-medium text-center ${isCurrent || isCompleted ? "text-slate-700" : "text-slate-400"}`}>{step.title}</span>
+                          <span className={`text-[10px] mt-2 font-medium text-center ${isStepLocked ? "text-slate-300" : isCurrent || isCompleted ? "text-slate-700" : "text-slate-400"}`}>{step.title}</span>
                         </div>
                         {idx < visibleSteps.length - 1 && <div className={`h-1 flex-1 mx-2 rounded transition-all duration-300 ${isCompleted ? "bg-green-500" : "bg-slate-200"}`} />}
                       </div>
@@ -1085,6 +1147,64 @@ function AddViharaPageInner({ department }: { department?: string }) {
                           );
                         }
 
+                        // Handle checkboxes
+                        if (f.type === "checkbox") {
+                          const BYPASS_FIELDS = ["vh_bypass_no_detail", "vh_bypass_no_chief", "vh_bypass_ltr_cert"];
+                          if (BYPASS_FIELDS.includes(id)) {
+                            const checked = (values[f.name] as boolean) || false;
+                            const parts = f.label.split(" — ");
+                            const otherBypassIsOn = !!activeBypassEntry && activeBypassEntry.field !== id;
+                            const isLockedOn = checked && !canModerate;
+                            const toggleDisabled = otherBypassIsOn || isLockedOn;
+                            return (
+                              <div key={id} className="md:col-span-2">
+                                <div className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-colors ${checked ? "bg-amber-50 border-amber-300" : toggleDisabled ? "bg-slate-100 border-slate-200 opacity-60" : "bg-slate-50 border-slate-200"}`}>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-slate-800">{parts[1] ?? parts[0]}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">{parts[0]}</p>
+                                    {isLockedOn && <p className="text-[10px] text-amber-600 mt-1 font-medium">Admin access required to disable</p>}
+                                    {otherBypassIsOn && <p className="text-[10px] text-slate-400 mt-1">Another bypass is already active</p>}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={checked}
+                                    disabled={toggleDisabled}
+                                    title={otherBypassIsOn ? "Another bypass is active for this record" : isLockedOn ? "Only administrators can disable this" : undefined}
+                                    onClick={() => {
+                                      if (toggleDisabled) return;
+                                      if (!checked) {
+                                        setBypassConfirm({ field: f.name as keyof ViharaForm, label: f.label });
+                                      } else {
+                                        handleInputChange(f.name, false);
+                                      }
+                                    }}
+                                    className={`relative shrink-0 inline-flex h-6 w-11 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${toggleDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${checked ? "bg-indigo-600" : "bg-slate-300"}`}
+                                  >
+                                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? "translate-x-5" : "translate-x-0"}`} />
+                                  </button>
+                                </div>
+                                {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                              </div>
+                            );
+                          }
+                          // Regular non-bypass checkbox
+                          return (
+                            <div key={id} className="md:col-span-2">
+                              <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                                <input
+                                  type="checkbox"
+                                  checked={(values[f.name] as boolean) || false}
+                                  onChange={(e) => handleInputChange(f.name, e.target.checked)}
+                                  className="w-4 h-4 cursor-pointer"
+                                />
+                                <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                              </label>
+                              {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                            </div>
+                          );
+                        }
+
                         // Step B: Administrative Divisions - use LocationPicker
                         if (currentStep === 2 && id === "district") {
                           const selection = {
@@ -1213,6 +1333,92 @@ function AddViharaPageInner({ department }: { department?: string }) {
                           );
                         }
 
+                        // Historical Period Fields (vh_period_*) - rendered as a grouped section
+                        if (["vh_period_era", "vh_period_year", "vh_period_month", "vh_period_day", "vh_period_notes"].includes(id)) {
+                          // Only render once for the era field, then skip others
+                          if (id === "vh_period_era") {
+                            return (
+                              <div key="period-section" className="md:col-span-2 border border-slate-200 rounded-lg p-4 bg-slate-50">
+                                <h3 className="text-sm font-semibold text-slate-800 mb-3">Historical Period (Alternative Dating System)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {/* Era dropdown */}
+                                  <div>
+                                    <label htmlFor="vh_period_era" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      Era (If different from AD)
+                                    </label>
+                                    <input
+                                      id="vh_period_era"
+                                      type="text"
+                                      value={(values.vh_period_era as string) ?? ""}
+                                      onChange={(e) => handleInputChange("vh_period_era", e.target.value)}
+                                      placeholder="AD / BC / Buddhist Era"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                  {/* Year input */}
+                                  <div>
+                                    <label htmlFor="vh_period_year" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      Year
+                                    </label>
+                                    <input
+                                      id="vh_period_year"
+                                      type="text"
+                                      value={(values.vh_period_year as string) ?? ""}
+                                      onChange={(e) => handleInputChange("vh_period_year", e.target.value)}
+                                      placeholder="YYYY"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                  {/* Month input */}
+                                  <div>
+                                    <label htmlFor="vh_period_month" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      Month (Optional)
+                                    </label>
+                                    <input
+                                      id="vh_period_month"
+                                      type="text"
+                                      value={(values.vh_period_month as string) ?? ""}
+                                      onChange={(e) => handleInputChange("vh_period_month", e.target.value)}
+                                      placeholder="MM"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                  {/* Day input */}
+                                  <div>
+                                    <label htmlFor="vh_period_day" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      Day (Optional)
+                                    </label>
+                                    <input
+                                      id="vh_period_day"
+                                      type="text"
+                                      value={(values.vh_period_day as string) ?? ""}
+                                      onChange={(e) => handleInputChange("vh_period_day", e.target.value)}
+                                      placeholder="DD"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                  {/* Notes textarea */}
+                                  <div className="md:col-span-2">
+                                    <label htmlFor="vh_period_notes" className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      Notes About Period
+                                    </label>
+                                    <textarea
+                                      id="vh_period_notes"
+                                      value={(values.vh_period_notes as string) ?? ""}
+                                      onChange={(e) => handleInputChange("vh_period_notes", e.target.value)}
+                                      placeholder="Enter approximate or historical notes if exact date unavailable"
+                                      rows={2}
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          // Skip rendering of individual period fields (they're rendered together above)
+                          return null;
+                        }
+
                         // Step D: Viharadhipathi
                         if (id === "viharadhipathi_name") {
                           const displayValue =
@@ -1228,6 +1434,47 @@ function AddViharaPageInner({ department }: { department?: string }) {
                                 initialDisplay={displayValue}
                                 placeholder="Type a Bhikkhu name or registration number"
                                 showAddButton={true}
+                                onAddBhikkhu={async (payload) => {
+                                  // When a new TEMP bhikkhu is created, auto-populate the fields
+                                  const { name, phone } = payload; // phone field carries br_regn
+                                  const brRegn = phone || "";
+                                  
+                                  handleSetMany({
+                                    viharadhipathi_name: name || "",
+                                    viharadhipathi_regn: brRegn,
+                                  });
+                                  
+                                  // Auto-add to resident bhikkhus as first entry
+                                  try {
+                                    const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
+                                    
+                                    // Check if already exists
+                                    const existingIndex = currentBhikkhus.findIndex(
+                                      (b: any) => b.registrationNumber === brRegn
+                                    );
+                                    
+                                    if (existingIndex >= 0) {
+                                      currentBhikkhus.splice(existingIndex, 1);
+                                    }
+                                    
+                                    const newEntry = {
+                                      id: `bhikkhu-viharadhipathi-${brRegn}`,
+                                      serialNumber: 1,
+                                      bhikkhuName: name || "",
+                                      registrationNumber: brRegn,
+                                      occupationEducation: "Chief Incumbent (Viharadhipathi)",
+                                    };
+                                    
+                                    const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
+                                      ...b,
+                                      serialNumber: idx + 1,
+                                    }));
+                                    
+                                    handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
+                                  } catch (e) {
+                                    console.error("Error auto-adding temp viharadhipathi to resident bhikkhus:", e);
+                                  }
+                                }}
                                 onPick={(picked) => {
                                   const regnValue = picked.regn || String(picked.data?.br_regn ?? "");
                                   handleSetMany({
@@ -1475,7 +1722,7 @@ function AddViharaPageInner({ department }: { department?: string }) {
                   {currentStep < effectiveSteps.length ? (
                     isFlowOneExitStep ? (
                       <button
-                        onClick={handleSaveFlowOne}
+                        onClick={() => handleSaveFlowOne()}
                         disabled={submitting}
                         className="flex items-center justify-center gap-2 px-4 py-2 text-sm bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all"
                       >
@@ -1505,6 +1752,63 @@ function AddViharaPageInner({ department }: { department?: string }) {
       </div>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
+
+      {/* ─── Bypass Toggle Confirm Modal ─────────────────────────────────── */}
+      {bypassConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Mark as Complete?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{bypassConfirm.label.split(" — ")[0]}</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                Enabling{" "}
+                <strong className="text-slate-800">
+                  {bypassConfirm.label.split(" — ")[1] ?? bypassConfirm.label}
+                </strong>{" "}
+                will mark this section as complete.
+              </p>
+              <p className="text-sm text-slate-500 mt-2">
+                Your record will be <strong>saved</strong> and you will return to the vihara list. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setBypassConfirm(null)}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const field = bypassConfirm.field;
+                  setBypassConfirm(null);
+                  await handleSaveFlowOne({ [field]: true } as Partial<ViharaForm>, field);
+                }}
+                disabled={submitting}
+                className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {submitting ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
+                ) : "Save & Return"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Dialog open={bhikkuModalOpen} onClose={handleCloseBhikkuModal} fullWidth maxWidth="sm">
         <DialogTitle>Add New Bhikku</DialogTitle>
         <DialogContent dividers>
@@ -1563,10 +1867,10 @@ function AddViharaPageInner({ department }: { department?: string }) {
   );
 }
 
-export default function AddVihara({ department }: { department?: string }) {
+export default function AddVihara({ department, role }: { department?: string; role?: string }) {
   return (
     <Suspense fallback={<div className="p-8 text-slate-600">Loading…</div>}>
-      <AddViharaPageInner department={department} />
+      <AddViharaPageInner department={department} role={role} />
     </Suspense>
   );
 }

@@ -201,11 +201,11 @@ export default function BhikkhuAutocomplete({
                   });
                   const created = (response as any)?.data?.data;
                   toast.success("Temporary bhikkhu created");
-                  
+
                   const bhikkuRegn = created?.br_regn || "";
                   const bhikkhuName = created?.br_mahananame || created?.br_gihiname || name;
                   const display = `${bhikkhuName} - ${bhikkuRegn}`;
-                  
+
                   onPick(
                     storeRegn
                       ? { regn: bhikkuRegn, name: bhikkhuName, display, data: created }
@@ -225,7 +225,7 @@ export default function BhikkhuAutocomplete({
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Name
+                  Name <span className="text-xs text-red-500">*</span>
                   <input
                     type="text"
                     value={newBhikkhuName}
@@ -245,7 +245,7 @@ export default function BhikkhuAutocomplete({
                 </label>
               </div>
               <label className="block text-sm font-medium text-slate-700">
-                Address
+                Address <span className="text-xs text-slate-500">(Optional)</span>
                 <textarea
                   value={tbAddress}
                   onChange={(e) => setTbAddress(e.target.value)}

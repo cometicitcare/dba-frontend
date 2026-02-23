@@ -8,7 +8,7 @@ export type FieldRule<T> = {
 export type FieldConfig<T> = {
   name: keyof T;
   label: string;
-  type: "text" | "email" | "tel" | "date" | "textarea";
+  type: "text" | "email" | "tel" | "date" | "textarea" | "checkbox";
   placeholder?: string;
   rows?: number;
   rules?: FieldRule<T>;
@@ -27,23 +27,20 @@ export const isPhoneLK = (v: string) => /^0\d{9}$/.test(v.trim());
 export function toISOFormat(input: string | undefined | null): string {
   const s = (input ?? "").trim();
   if (!s) return "";
-  
-  // Already in ISO format
+
+  // Already in ISO format YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  
-  // Convert from display format (YYYY/MM/DD)
-  if (/^\d{4}\/\d{2}\/\d{2}$/.test(s)) {
-    return s.replace(/\//g, "-");
+
+  // Display format YYYY/MM/DD
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(s)) return s.replace(/\//g, "-");
+
+  // Raw 8-digit string YYYYMMDD (user typed without separators)
+  if (/^\d{8}$/.test(s)) {
+    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
   }
-  
-  // Try parsing as date
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return "";
-  
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+
+  // Partial inputs or anything else — do NOT attempt Date parsing (causes blank on partial input)
+  return "";
 }
 
 /** 
