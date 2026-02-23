@@ -1004,8 +1004,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       };
       
       const apiFieldName = fieldMapping[f.name] || f.name;
-      // Convert dates to ISO format (YYYY-MM-DD) for API
-      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v)) : v);
+      // Convert dates to ISO format (YYYY-MM-DD) for API; trim & collapse whitespace for strings
+      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v).trim()) : (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v));
     });
     
     // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
@@ -1065,8 +1065,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       
       toast.success(`Saved "${stepTitle}"`, { autoClose: 1200 });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to save. Please try again.";
-      toast.error(msg);
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const fallbackMsg = fallback || (e instanceof Error ? e.message : "Failed to save. Please try again.");
+      showApiErrors(messages, fallbackMsg);
     } finally {
       setSaving(false);
     }
@@ -1500,7 +1502,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         const success = (payload as any)?.success ?? true;
         if (!success) {
           const { messages, fallback } = collectApprovalErrors(payload);
-          toast.error(messages.join("\n") || fallback);
+          showApiErrors(messages, fallback);
           return;
         }
       } else {
@@ -1512,20 +1514,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         const success = (payload as any)?.success ?? true;
         if (!success) {
           const { messages, fallback } = collectApprovalErrors(payload);
-          toast.error(messages.join("\n") || fallback);
+          showApiErrors(messages, fallback);
           return;
         }
       }
     } catch (e: unknown) {
       const data = (e as any)?.response?.data ?? (e as any)?.data;
       const { messages, fallback } = collectApprovalErrors(data);
-      const errMsg =
-        messages.join("\n") ||
-        fallback ||
-        (e instanceof Error
-          ? e.message
-          : "Failed to mark as printed. Please try again.");
-      toast.error(errMsg);
+      const fallbackMsg = fallback || (e instanceof Error ? e.message : "Failed to mark as printed. Please try again.");
+      showApiErrors(messages, fallbackMsg);
     } finally {
       setPrintDialogOpen(false);
       handlePrintCertificate();
@@ -1860,6 +1857,45 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
   };
 
+  // Maps raw API/schema field names to human-readable labels shown in the form
+  const API_FIELD_LABELS: Record<string, string> = {
+    temple_name: "Temple Name",
+    temple_address: "Temple Address",
+    telephone_number: "Telephone Number",
+    whatsapp_number: "WhatsApp Number",
+    email_address: "Email Address",
+    temple_type: "Temple Type",
+    province: "Province",
+    district: "District",
+    divisional_secretariat: "Divisional Secretariat",
+    pradeshya_sabha: "Pradeshya Sabha",
+    grama_niladhari_division: "Grama Niladhari Division",
+    nikaya: "Nikaya (Monastic Order)",
+    parshawaya: "Parshawaya (Sub-division / Sect)",
+    viharadhipathi_name: "Name of Current Chief Incumbent",
+    viharadhipathi_regn: "Chief Monk's Registration Number",
+    viharadhipathi_date: "Date of Appointment",
+    vihara_dhipathi_date: "Date of Appointment",
+    period_established: "Period Temple Was Established",
+    vh_period_era: "Era (AD / BC / Buddhist Era)",
+    vh_period_year: "Year",
+    vh_period_month: "Month",
+    vh_period_day: "Day",
+    vh_period_notes: "Notes About Period",
+    buildings_description: "Description of Temple Buildings",
+    dayaka_families_count: "Number of Dayaka Families",
+    owner_code: "Owner Code",
+    inspection_report: "Inspection Report",
+    inspection_code: "Inspection Code",
+  };
+
+  const formatApiFieldMessage = (field: string | null | undefined, msg: string): string => {
+    if (!field) return msg;
+    const key = field.split(".").pop() ?? field;
+    const label = API_FIELD_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    return `${label}: ${msg}`;
+  };
+
   const collectApprovalErrors = (source: any) => {
     const container = source?.data ?? source;
     const rawErrors =
@@ -1873,9 +1909,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
             if (!err) return "";
             const msg = err.message ?? err.msg ?? "";
             const field = err.field ?? err.name ?? "";
-            if (field && msg) return `${field}: ${msg}`;
-            if (msg) return msg;
-            return field ? `${field}: Validation failed.` : "";
+            if (!msg && !field) return "";
+            return formatApiFieldMessage(field || null, msg || "Validation failed.");
           })
           .filter(Boolean)
       : [];
@@ -1886,12 +1921,21 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return { messages, fallback };
   };
 
+  /** Show each validation error as a separate toast so users can read and act on each one individually. */
+  const showApiErrors = (messages: string[], fallback: string) => {
+    if (messages.length === 0) {
+      toast.error(fallback);
+      return;
+    }
+    messages.forEach((msg) => toast.error(msg, { autoClose: 6000 }));
+  };
+
   const extractApiMessage = (err: any, fallback: string) => {
     const data = err?.response?.data ?? err?.data ?? err;
     const msg = data?.message || data?.error || data?.msg;
     if (msg) return msg;
     const { messages, fallback: fb } = collectApprovalErrors(data);
-    return messages.join("\n") || fb || (err instanceof Error ? err.message : fallback);
+    return messages[0] || fb || (err instanceof Error ? err.message : fallback);
   };
 
   return (
