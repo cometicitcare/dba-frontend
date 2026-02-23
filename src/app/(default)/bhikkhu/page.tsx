@@ -7,7 +7,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Tabs } from '@/components/ui/Tabs'
 import { useRouter, useSearchParams } from 'next/navigation'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { getStoredUserData, type UserData } from '@/utils/userData'
 import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from '@/utils/config'
 
@@ -18,7 +18,7 @@ const tabItems = [
   ];
 
 
-export default function Page() {
+function BhikkhuPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -95,5 +95,13 @@ export default function Page() {
         <FooterBar />
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <BhikkhuPageContent />
+    </Suspense>
   )
 }
