@@ -130,7 +130,7 @@ export default function BhikkhuAutocomplete({
           onFocus={() => { setFocused(true); setOpen(true); }}
           onBlur={() => { setFocused(false); setOpen(false); }}
           onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
-          placeholder={placeholder ?? "Type a name / REGN…"}
+          placeholder={placeholder ?? "Search by name, REGN, temple, or address"}
           required={required}
           className="w-full pr-12 pl-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
           autoComplete="off"
@@ -149,20 +149,70 @@ export default function BhikkhuAutocomplete({
           </button>
         )}
         {open && focused && (
-          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-80 overflow-auto">
             {loading && <div className="px-3 py-2 text-xs text-slate-500">Searching…</div>}
             {!loading && options.length === 0 && <div className="px-3 py-2 text-xs text-slate-500">No matches</div>}
-            {options.map((o) => (
-              <button
-                key={o.regn}
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); handleSelect(o); }}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50"
-              >
-                <div className="text-sm font-medium text-slate-800">{o.name}</div>
-                <div className="text-[11px] text-slate-500">{o.regn}</div>
-              </button>
-            ))}
+            {options.map((o) => {
+              // Determine if this is a temporary bhikku
+              const isTemporary = o.regn?.startsWith('TEMP-');
+              
+              // Get living temple info
+              const livTemple = o.data?.br_livtemple;
+              const livTempleInfo = typeof livTemple === 'object' ? livTemple : null;
+              const livTempleName = livTempleInfo?.vh_vname || '';
+              const livTempleAddr = livTempleInfo?.vh_addrs || '';
+              
+              // Get mahana temple info
+              const mahanaTemple = o.data?.br_mahanatemple;
+              const mahanaTempleInfo = typeof mahanaTemple === 'object' ? mahanaTemple : null;
+              const mahanaTempleName = mahanaTempleInfo?.vh_vname || '';
+              const mahanaTempleAddr = mahanaTempleInfo?.vh_addrs || '';
+              
+              // Use living temple if available, otherwise use mahana temple
+              const displayTemplate = livTempleInfo || mahanaTempleInfo;
+              const displayName = livTempleName || mahanaTempleName;
+              const displayAddr = livTempleAddr || mahanaTempleAddr;
+              const isSecondary = !livTempleInfo && mahanaTempleInfo;
+              
+              return (
+                <button
+                  key={o.regn}
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); handleSelect(o); }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">{o.name}</div>
+                      <div className="text-[11px] text-slate-500">{o.regn}</div>
+                    </div>
+                    {isTemporary && (
+                      <span className="inline-block ml-2 px-2 py-1 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded">
+                        TEMPORARY
+                      </span>
+                    )}
+                  </div>
+                  {displayName ? (
+                    <div className="text-[11px] text-slate-600 mt-1">
+                      <span className="font-semibold">{isSecondary ? 'Mahana Temple:' : 'Living Temple:'}</span> {displayName}
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-amber-600 mt-1">
+                      <span className="font-semibold">Temple:</span> <span className="italic">(Not assigned)</span>
+                    </div>
+                  )}
+                  {displayAddr ? (
+                    <div className="text-[11px] text-slate-600">
+                      <span className="font-semibold">Address:</span> {displayAddr}
+                    </div>
+                  ) : displayName ? (
+                    <div className="text-[11px] text-amber-600">
+                      <span className="font-semibold">Address:</span> <span className="italic">(Not recorded)</span>
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
