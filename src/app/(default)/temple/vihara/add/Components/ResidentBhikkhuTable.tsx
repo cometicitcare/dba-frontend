@@ -86,21 +86,23 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
 
   return (
     <div className="w-full">
-      <div className="mb-4 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-slate-800">Information About Resident Bhikkhus in the Temple</h3>
+      <div className="mb-3 flex justify-between items-center">
+        <h3 className="text-base font-semibold text-slate-800">Information About Resident Bhikkhus in the Temple</h3>
         <button
           type="button"
           onClick={handleAddRow}
-          className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-all"
+          className="px-3 py-1.5 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-all"
         >
           + Add Row
         </button>
       </div>
-      <div className="mb-4">
+      <div className="mb-3">
         <BhikkhuAutocomplete
           id="resident-bhikkhu-search"
           label="Search Bhikkhu to add"
-          placeholder="Type a name or registration number"
+          placeholder="Search by name, REGN, temple, or address"
+          showAddButton={true}
+          clearAfterPick={true}
           onPick={(picked) => {
             const regn = picked.regn || "";
             const name = picked.name || picked.display || "";
@@ -121,20 +123,24 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
           }}
         />
       </div>
-      <div style={{ height: 400, width: "100%" }} className="bg-white">
+      <div style={{ height: 360, width: "100%" }} className="bg-white">
         <DataGrid<ResidentBhikkhuRow>
           rows={rows}
           columns={columns}
           processRowUpdate={processRowUpdate}
           disableRowSelectionOnClick
           hideFooter
+          rowHeight={34}
+          columnHeaderHeight={34}
+          density="compact"
           sx={{
             "& .MuiDataGrid-cell": {
-              fontSize: "0.875rem",
+              fontSize: "0.75rem",
             },
             "& .MuiDataGrid-columnHeaders": {
               backgroundColor: "#f1f5f9",
               fontWeight: 600,
+              fontSize: "0.75rem",
             },
             "& .MuiDataGrid-cell:focus": {
               outline: "none",

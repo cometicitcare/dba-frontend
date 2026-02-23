@@ -3,11 +3,20 @@
 import React from "react";
 import { LogOutIcon, MenuIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Button, Menu, MenuItem } from "@mui/material";
+import LanguageIcon from "@mui/icons-material/Language";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { selectLanguage, setLanguage, type Lang } from "@/store/slices/i18nSlice";
+import { useT } from "@/i18n/useT";
 
 interface TopBarProps { onMenuClick: () => void; }
 
 export function TopBar({ onMenuClick }: TopBarProps) {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const language = useAppSelector(selectLanguage);
+  const t = useT();
 
   const clearClientState = () => {
     if (typeof window === "undefined") return;
@@ -24,6 +33,22 @@ export function TopBar({ onMenuClick }: TopBarProps) {
   const handleLogout = () => {
     clearClientState();
     router.push("/login");
+  };
+
+  const [languageAnchor, setLanguageAnchor] = React.useState<null | HTMLElement>(null);
+  const languageMenuOpen = Boolean(languageAnchor);
+
+  const handleLanguageClick = (event: React.MouseEvent<HTMLElement>) => {
+    setLanguageAnchor(event.currentTarget);
+  };
+
+  const handleLanguageClose = () => {
+    setLanguageAnchor(null);
+  };
+
+  const handleLanguageSelect = (lang: Lang) => {
+    dispatch(setLanguage(lang));
+    handleLanguageClose();
   };
 
   return (
@@ -61,12 +86,49 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         </span>
       </h1>
 
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-2 bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors font-semibold"
-      >
-        <LogOutIcon className="w-5 h-5" /> Logout
-      </button>
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={handleLanguageClick}
+          variant="contained"
+          startIcon={<LanguageIcon />}
+          endIcon={<ArrowDropDownIcon />}
+          sx={{
+            backgroundColor: "white",
+            color: "#ea580c",
+            textTransform: "none",
+            fontWeight: 600,
+            "&:hover": {
+              backgroundColor: "#fff7ed",
+            },
+          }}
+        >
+          {t("topbar.languageLabel")}
+        </Button>
+        <Menu
+          anchorEl={languageAnchor}
+          open={languageMenuOpen}
+          onClose={handleLanguageClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+        >
+          <MenuItem selected={language === "en"} onClick={() => handleLanguageSelect("en")}>
+            English
+          </MenuItem>
+          <MenuItem selected={language === "si"} onClick={() => handleLanguageSelect("si")}>
+            සිංහල
+          </MenuItem>
+          <MenuItem selected={language === "ta"} onClick={() => handleLanguageSelect("ta")}>
+            தமிழ்
+          </MenuItem>
+        </Menu>
+
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors font-semibold"
+        >
+          <LogOutIcon className="w-5 h-5" /> {t("topbar.logout")}
+        </button>
+      </div>
     </header>
   );
 }

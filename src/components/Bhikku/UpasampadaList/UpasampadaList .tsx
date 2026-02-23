@@ -290,10 +290,14 @@ export default function UpasampadaList({
   console.log("recordsrecordsrecordsrecords",records)
   const [totalRecords, setTotalRecords] = useState<number | undefined>();
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [searchDraft, setSearchDraft] = useState("");
+  const [searchPending, setSearchPending] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
   const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
   const nikayaData = STATIC_NIKAYAS;
   const nikayaLoading = false;
   const nikayaError: string | null = null;
@@ -434,9 +438,50 @@ export default function UpasampadaList({
         }
       } finally {
         setLoading(false);
+        setSearchPending(false);
       }
     },
     [filters]
+  );
+
+  const runSearchFetch = useCallback(
+    (value: string) => {
+      const trimmed = value.trim();
+      if (trimmed.length > 0 && trimmed.length < 3) {
+        setSearchPending(false);
+        return;
+      }
+
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+      const ac = new AbortController();
+      searchAbortRef.current = ac;
+
+      const nextFilters = { ...filters, page: 1, searchKey: trimmed };
+      setFilters(nextFilters);
+      fetchData(ac.signal, nextFilters);
+    },
+    [fetchData, filters]
+  );
+
+  const handleSearchInput = useCallback(
+    (value: string) => {
+      setSearchDraft(value);
+      const trimmed = value.trim();
+      if (trimmed.length === 0 || trimmed.length >= 3) {
+        setSearchPending(true);
+      } else {
+        setSearchPending(false);
+      }
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+      searchDebounceRef.current = setTimeout(() => {
+        runSearchFetch(value);
+      }, 2000);
+    },
+    [runSearchFetch]
   );
 
   useEffect(() => {
@@ -445,6 +490,17 @@ export default function UpasampadaList({
     return () => ac.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // initial load only
+  
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleAdd = useCallback(() => {
     router.push("/bhikkhu/upasmpada/add");
@@ -512,6 +568,7 @@ export default function UpasampadaList({
   const clearFilters = useCallback(async () => {
     const reset = { ...DEFAULT_FILTERS };
     setFilters(reset);
+    setSearchDraft("");
     await fetchData(undefined, reset);
     setFilterPanelOpen(false);
   }, [fetchData]);
@@ -660,12 +717,9 @@ export default function UpasampadaList({
                       <span className="text-sm text-gray-600">Search</span>
                       <input
                         type="text"
-                        value={filters.searchKey}
+                        value={searchDraft}
                         onChange={(e) =>
-                          setFilters((s) => ({
-                            ...s,
-                            searchKey: e.target.value,
-                          }))
+                          handleSearchInput(e.target.value)
                         }
                         placeholder="Search by name, reg. no, etc."
                         className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -865,6 +919,21 @@ export default function UpasampadaList({
           </div>
 
           <div className="relative">
+            <div className="mb-4">
+              <label className="flex flex-col gap-1">
+                <span className="text-sm text-gray-600">Search</span>
+                <input
+                  type="text"
+                  value={searchDraft}
+                  onChange={(e) => handleSearchInput(e.target.value)}
+                  placeholder="Search by name, reg. no, etc."
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </label>
+              <p className="mt-1 text-xs text-slate-500">
+                Type at least 3 characters to search.
+              </p>
+            </div>
             <DataTable
               columns={columns}
               data={records}
@@ -872,8 +941,8 @@ export default function UpasampadaList({
               onDelete={canDelete ? handleDelete : undefined}
               hidePagination
             />
-            {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/70 backdrop-blur-sm rounded-lg">
+            {(loading || searchPending) && (
+              <div className="absolute inset-0 flex items-center justify-center bg-white/70 rounded-lg">
                 <div className="flex items-center gap-2 text-gray-700">
                   <Spinner />
                   <span className="text-sm font-medium">Loading...</span>

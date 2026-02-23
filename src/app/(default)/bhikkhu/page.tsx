@@ -6,8 +6,8 @@ import { FooterBar } from '@/components/FooterBar'
 import { Sidebar } from '@/components/Sidebar'
 import { TopBar } from '@/components/TopBar'
 import { Tabs } from '@/components/ui/Tabs'
-import { useRouter } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { getStoredUserData, type UserData } from '@/utils/userData'
 import { BHIKKU_MANAGEMENT_DEPARTMENT, ADMIN_ROLE_LEVEL } from '@/utils/config'
 
@@ -18,12 +18,19 @@ const tabItems = [
   ];
 
 
-export default function Page() {
+function BhikkhuPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const preferredTab = searchParams.get("tab");
+  const resolvedDefaultTab = useMemo(
+    () => (preferredTab === "upasampada" ? "upasampada" : "bhikkhu"),
+    [preferredTab]
+  );
+  const [activeTab, setActiveTab] = useState(resolvedDefaultTab);
 
   useEffect(() => {
     const stored = getStoredUserData();
@@ -36,6 +43,10 @@ export default function Page() {
     setUserData(stored);
     setAccessChecked(true);
   }, [router]);
+
+  useEffect(() => {
+    setActiveTab(resolvedDefaultTab);
+  }, [resolvedDefaultTab]);
 
   if (accessDenied) {
     return (
@@ -67,6 +78,8 @@ export default function Page() {
         <main className="p-6">
             <Tabs
               tabs={tabItems}
+              value={activeTab}
+              onChange={setActiveTab}
               contentClassName="pt-8"
               renderContent={(activeId) => {
                 if (activeId === 'upasampada') {
@@ -82,5 +95,13 @@ export default function Page() {
         <FooterBar />
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <BhikkhuPageContent />
+    </Suspense>
   )
 }

@@ -33,6 +33,8 @@ export type ViharaForm = {
   telephone_number: string;
   whatsapp_number: string;
   email_address: string;
+  vh_file_number: string;
+  vh_vihara_code: string;
 
   // Step B: Administrative Divisions
   province: string;
@@ -48,10 +50,23 @@ export type ViharaForm = {
   // Step D: Leadership Information
   viharadhipathi_name: string; // REGN
   viharadhipathi_regn: string;
-  period_established: string; // Date or period description
+  viharadhipathi_date: string; // Date replaced with DateField
+  period_established: string; // Period description (legacy, kept for backwards compatibility)
+  
+  // Historical Period Fields (Step D Extended)
+  vh_period_era: string; // "AD" | "BC" | "BUDDHIST_ERA"
+  vh_period_year: string; // 4 digits
+  vh_period_month: string; // 01-12
+  vh_period_day: string; // 01-31
+  vh_period_notes: string; // Optional notes for approximate dates
+  
+  // Bypass Flags (Step C, D, E)
+  vh_bypass_no_detail: boolean; // No Details (Complete) - Religious Affiliation
+  vh_bypass_no_chief: boolean; // No Chief Incumbent (Complete) - Leadership
+  vh_bypass_ltr_cert: boolean; // Letter & Cert Done - Mahanyake
 
   // Step E: Mahanyake Information
-  mahanayake_date: string;
+  mahanayake_date: string; // Date replaced with DateField
   mahanayake_letter_nu: string;
   mahanayake_remarks: string;
 
@@ -101,6 +116,8 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     fields: [
       { name: "temple_name", label: "Name of the Temple", type: "text", rules: { required: true } },
       { name: "temple_address", label: "Temple Address", type: "textarea", rows: 3, rules: { required: true } },
+      { name: "vh_file_number", label: "File Number", type: "text", rules: { required: false } },
+      { name: "vh_vihara_code", label: "Vihara Code", type: "text", rules: { required: false } },
       {
         name: "telephone_number",
         label: "Telephone Number",
@@ -139,6 +156,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     fields: [
       { name: "nikaya", label: "Nikaya (Monastic Order)", type: "text", rules: { required: true } },
       { name: "parshawaya", label: "Parshawaya (Sub-division / Sect)", type: "text", rules: { required: true } },
+      { name: "vh_bypass_no_detail", label: "ව‍ිස්තර නොමැත — No Details (Complete)", type: "checkbox", rules: { required: false } },
     ],
   },
   {
@@ -146,9 +164,15 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
     title: "Leadership Information",
     fields: [
       { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text"},
-      { name: "viharadhipathi_regn", label: "Chief Monk's Registration Number", type: "text", rules: { required: false } },
-      // { name: "viharadhipathi_name", label: "Name of Current Chief Incumbent (Viharadhipathi)", type: "text", rules: { required: true } },
+      { name: "viharadhipathi_regn", label: "Chief Monk's Registration Number (Auto-populated or enter manually)", type: "text", rules: { required: false } },
+      { name: "viharadhipathi_date", label: "Date of Appointment", type: "date", rules: { required: false } },
       { name: "period_established", label: "Period Temple Was Established", type: "date", rules: { required: true } },
+      { name: "vh_period_era", label: "Era (If different from AD)", type: "text", placeholder: "AD / BC / Buddhist Era", rules: { required: false } },
+      { name: "vh_period_year", label: "Year", type: "text", placeholder: "YYYY", rules: { required: false } },
+      { name: "vh_period_month", label: "Month (Optional)", type: "text", placeholder: "MM", rules: { required: false } },
+      { name: "vh_period_day", label: "Day (Optional)", type: "text", placeholder: "DD", rules: { required: false } },
+      { name: "vh_period_notes", label: "Notes About Period", type: "textarea", rows: 2, placeholder: "Enter approximate or historical notes if exact date unavailable", rules: { required: false } },
+      { name: "vh_bypass_no_chief", label: "විහාරාධිපති නම් කර නැත — No Chief Incumbent (Complete)", type: "checkbox", rules: { required: false } },
     ],
   },
   {
@@ -165,6 +189,7 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
         placeholder: "Add detailed remarks about the Mahanyake letter, guidance provided, or any special notes that should be kept with this registration.",
         rules: { required: false },
       },
+      { name: "vh_bypass_ltr_cert", label: "ලිපිය හා සහතිකය සම්පූර්ණ — Letter & Cert Done", type: "checkbox", rules: { required: false } },
     ],
   },
   {
@@ -239,6 +264,8 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   telephone_number: "",
   whatsapp_number: "",
   email_address: "",
+  vh_file_number: "",
+  vh_vihara_code: "",
   province: "",
   district: "",
   divisional_secretariat: "",
@@ -248,7 +275,16 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   parshawaya: "",
   viharadhipathi_name: "",
   viharadhipathi_regn: "",
+  viharadhipathi_date: "",
   period_established: "",
+  vh_period_era: "",
+  vh_period_year: "",
+  vh_period_month: "",
+  vh_period_day: "",
+  vh_period_notes: "",
+  vh_bypass_no_detail: false,
+  vh_bypass_no_chief: false,
+  vh_bypass_ltr_cert: false,
   mahanayake_date: "",
   mahanayake_letter_nu: "",
   mahanayake_remarks: "",

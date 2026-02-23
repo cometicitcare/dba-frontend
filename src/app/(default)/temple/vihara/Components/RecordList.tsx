@@ -11,21 +11,52 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { TopBar } from "@/components/TopBar";
 import { DataTable, type Column } from "@/components/DataTable";
-import { PlusIcon, RotateCwIcon, XIcon } from "lucide-react";
+import { PlusIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageVihara } from "@/services/vihara";
-import TempleAutocomplete from "@/components/Bhikku/Add/AutocompleteTemple"; // <- use provided component
-import LocationPicker from "@/components/Bhikku/Filter/LocationPicker";
-import BhikkhuCategorySelect from "@/components/Bhikku/Add/CategorySelect";
-import BhikkhuStatusSelect from "@/components/Bhikku/Add/StatusSelect";
+import { _manageTempTemple } from "@/services/temple";
+import LocationPickerCompact from "@/components/Bhikku/Filter/LocationPickerCompact";
+import NikayaParshawaCompact from "@/components/Bhikku/Filter/NikayaParshawaCompact";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
-import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPicker";
+import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerCompact";
 import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { VIHARA } from "../../constants";
 import { getStoredUserData } from "@/utils/userData";
 import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+
+/** Human-readable labels + badge colors for every known workflow_status value */
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  S1_PENDING:          { label: "Stage 1 — Pending",              color: "bg-yellow-100 text-yellow-800" },
+  S1_PRINTING:         { label: "Stage 1 — Printing",             color: "bg-blue-100 text-blue-800" },
+  S1_PEND_APPROVAL:    { label: "Stage 1 — Awaiting Approval",    color: "bg-orange-100 text-orange-800" },
+  S1_APPROVED:         { label: "Stage 1 — Approved",             color: "bg-green-100 text-green-800" },
+  S1_REJECTED:         { label: "Stage 1 — Rejected",             color: "bg-red-100 text-red-800" },
+  S1_NO_DETAIL_COMP:   { label: "No Detail — Complete (Bypass)",  color: "bg-amber-100 text-amber-800" },
+  S1_NO_CHIEF_COMP:    { label: "No Chief — Complete (Bypass)",   color: "bg-amber-100 text-amber-800" },
+  S1_LTR_CERT_DONE:    { label: "Letter & Cert — Done (Bypass)",  color: "bg-amber-100 text-amber-800" },
+  S2_PENDING:          { label: "Stage 2 — Pending",              color: "bg-teal-100 text-teal-800" },
+  S2_PRINTING:         { label: "Stage 2 — Printing",             color: "bg-cyan-100 text-cyan-800" },
+  S2_PEND_APPROVAL:    { label: "Stage 2 — Awaiting Approval",    color: "bg-indigo-100 text-indigo-800" },
+  S2_APPROVED:         { label: "Stage 2 — Approved",             color: "bg-emerald-100 text-emerald-800" },
+  COMPLETED:           { label: "Completed",                      color: "bg-green-200 text-green-900" },
+  REJECTED:            { label: "Rejected (Final)",               color: "bg-red-200 text-red-900" },
+  TEMPORARY:           { label: "Temporary",                      color: "bg-slate-100 text-slate-600" },
+  PENDING:             { label: "Pending",                        color: "bg-yellow-100 text-yellow-800" },
+};
+
+function StatusBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const meta = STATUS_META[status];
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+      meta ? meta.color : "bg-slate-100 text-slate-700"
+    }`}>
+      {meta ? meta.label : status}
+    </span>
+  );
+}
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -188,9 +219,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const filterButtonRef = useRef<HTMLButtonElement | null>(null);
-  const filterPanelRef = useRef<HTMLDivElement | null>(null);
+  const prevFiltersRef = useRef<FilterState>(DEFAULT_FILTERS);
+  const searchDebounceRef = useRef<number | null>(null);
   const nikayaData = STATIC_NIKAYAS;
   const nikayaLoading = false;
   const nikayaError: string | null = null;
@@ -241,6 +271,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     setLoading(true);
     try {
       const payload = buildFilterPayload(f);
+      
+      // Fetch regular viharas
       const response = await _manageVihara({
         action: "READ_ALL",
         payload,
@@ -249,22 +281,75 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       const apiData = pickRows<any>(response.data);
       const total = (response.data as any)?.totalRecords ?? apiData.length;
 
-      const cleaned: ViharaRow[] = apiData.map((row: any) => ({
-        vh_id: row?.vh_id ?? 0,
+      // Fetch temporary viharas
+      let tempViharas: any[] = [];
+      let tempTotal = 0;
+      try {
+        const tempPayload = {
+          page: f.page,
+          limit: f.limit,
+          search: f.searchKey ?? "",
+        };
+        
+        const tempResponse = await _manageTempTemple({
+          action: "READ_ALL",
+          payload: tempPayload,
+        });
+        
+        // Handle both response formats
+        const tempData = (tempResponse.data as any);
+        if (tempData?.data?.records) {
+          tempViharas = tempData.data.records;
+          tempTotal = tempData.data?.total ?? 0;
+        } else if (Array.isArray(tempData?.records)) {
+          tempViharas = tempData.records;
+          tempTotal = tempData?.total ?? 0;
+        } else if (Array.isArray(tempData?.data)) {
+          tempViharas = tempData.data;
+          tempTotal = tempData?.total ?? tempViharas.length;
+        }
+      } catch (tempError) {
+        console.warn("Warning: Could not fetch temporary viharas:", tempError);
+        // Continue without TEMP records if fetch fails
+      }
+
+      // Merge regular and temporary viharas
+      const allRecords = [
+        ...apiData,
+        ...tempViharas.map((temp: any) => ({
+          tv_id: temp?.tv_id,
+          vh_id: -Math.abs(temp?.tv_id || 0), // Use negative ID for TEMP records
+          vh_trn: `TEMP-${temp?.tv_id ?? ""}`,
+          name: String(temp?.tv_name ?? ""),
+          mobile: temp?.tv_mobile ?? "",
+          email: temp?.tv_email ?? "",
+          address: String(temp?.tv_address ?? ""),
+          province: temp?.tv_province ?? "",
+          district: temp?.tv_district ?? "",
+          nikaya: "",
+          workflow_status: "TEMPORARY",
+        }))
+      ];
+
+      const cleaned: ViharaRow[] = allRecords.map((row: any) => ({
+        vh_id: row?.vh_id ?? row?.tv_id ?? 0,
         vh_trn: String(row?.vh_trn ?? ""),
-        name: String(row?.vh_vname ?? ""),
-        mobile: row?.vh_mobile ?? "",
-        email: row?.vh_email ?? "",
-        address: row?.vh_addrs ?? "",
-        province: row?.vh_province ?? "",
-        district: row?.vh_district ?? "",
-        nikaya: row?.vh_nikaya ?? "",
-        workflow_status: row?.vh_workflow_status ?? "",
+        name: String(row?.vh_vname ?? row?.name ?? row?.tv_name ?? ""),
+        mobile: row?.vh_mobile ?? row?.mobile ?? row?.tv_mobile ?? "",
+        email: row?.vh_email ?? row?.email ?? row?.tv_email ?? "",
+        address: String(row?.vh_addrs ?? row?.address ?? row?.tv_address ?? ""),
+        province: row?.vh_province ?? row?.province ?? row?.tv_province ?? "",
+        district: row?.vh_district ?? row?.district ?? row?.tv_district ?? "",
+        nikaya: row?.vh_nikaya ?? row?.nikaya ?? "",
+        workflow_status: row?.vh_workflow_status ?? row?.workflow_status ?? "TEMPORARY",
       }));
 
+      // Total is sum of both regular and temp records
+      const combinedTotal = total + tempTotal;
+      
       setRecords(cleaned);
-      setTotalRecords(total);
-      setHasMoreResults((f.page * f.limit) < total);
+      setTotalRecords(combinedTotal);
+      setHasMoreResults((f.page * f.limit) < combinedTotal);
     } catch (error) {
       console.error("Error fetching vihara data:", error);
       setRecords([]);
@@ -332,20 +417,6 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     [fetchData, filters]
   );
 
-  const applyFilters = useCallback(async () => {
-    const next = { ...filters, page: 1 };
-    setFilters(next);
-    await fetchData(undefined, next);
-    setFilterPanelOpen(false);
-  }, [fetchData, filters]);
-
-  const clearFilters = useCallback(async () => {
-    const reset = { ...DEFAULT_FILTERS };
-    setFilters(reset);
-    await fetchData(undefined, reset);
-    setFilterPanelOpen(false);
-  }, [fetchData]);
-
   const handlePageChange = useCallback(
     async (nextPage: number) => {
       const safe = Math.max(1, nextPage);
@@ -385,13 +456,68 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     );
   }, []);
 
+  useEffect(() => {
+    const prev = prevFiltersRef.current;
+    const searchChanged = prev.searchKey !== filters.searchKey;
+    const nonSearchChanged =
+      prev.nikaya !== filters.nikaya ||
+      prev.parchawa !== filters.parchawa ||
+      prev.province !== filters.province ||
+      prev.district !== filters.district ||
+      prev.divisionSecretariat !== filters.divisionSecretariat ||
+      prev.gn !== filters.gn;
+
+    if (searchDebounceRef.current) {
+      window.clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+
+    // Reset to page 1 when any filter changes
+    if ((searchChanged || nonSearchChanged) && filters.page !== 1) {
+      setFilters((s) => ({ ...s, page: 1 }));
+      return;
+    }
+
+    if (searchChanged) {
+      const key = filters.searchKey.trim();
+      if (key.length > 0 && key.length < 3) {
+        prevFiltersRef.current = filters;
+        return;
+      }
+
+      const delay = key.length >= 3 ? 400 : 0;
+      searchDebounceRef.current = window.setTimeout(() => {
+        fetchData(undefined, filters);
+      }, delay);
+    } else if (nonSearchChanged) {
+      fetchData(undefined, filters);
+    }
+
+    prevFiltersRef.current = filters;
+  }, [
+    fetchData,
+    filters,
+    filters.searchKey,
+    filters.nikaya,
+    filters.parchawa,
+    filters.province,
+    filters.district,
+    filters.divisionSecretariat,
+    filters.gn,
+  ]);
+
   const columns: Column[] = useMemo(
     () => [
       { key: "vh_trn", label: "TRN", sortable: true },
       { key: "name", label: "Name", sortable: true },
       { key: "mobile", label: "Mobile" },
-      { key: "email", label: "Email" },
-      { key: "workflow_status", label: "Status", sortable: true },
+      { key: "address", label: "Address" },
+      {
+        key: "workflow_status",
+        label: "Status",
+        sortable: true,
+        render: (item: ViharaRow) => <StatusBadge status={item.workflow_status} />,
+      },
       ...(isDivisionalSec
         ? []
         : [
@@ -404,7 +530,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   <button
                     onClick={() => handleFillStageTwo(item)}
                     disabled={!canFill}
-                    className={`text-sm font-semibold rounded-lg px-3 py-1.5 transition-all ${
+                    className={`text-xs font-semibold rounded-md px-2 py-1 transition-all ${
                       canFill
                         ? "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-slate-200 text-slate-500 cursor-not-allowed"
@@ -420,44 +546,17 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     [handleFillStageTwo, isDivisionalSec]
   );
 
-  useEffect(() => {
-    if (!filterPanelOpen) return undefined;
-
-    const handleClick = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        filterPanelRef.current &&
-        !filterPanelRef.current.contains(target) &&
-        filterButtonRef.current &&
-        !filterButtonRef.current.contains(target)
-      ) {
-        setFilterPanelOpen(false);
-      }
-    };
-
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFilterPanelOpen(false);
-    };
-
-    document.addEventListener("mousedown", handleClick);
-    document.addEventListener("keydown", handleKey);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      document.removeEventListener("keydown", handleKey);
-    };
-  }, [filterPanelOpen]);
-
   return (
     <div >
-      <main className="p-6">
-          <div className="relative mb-6">
+      <main className="p-0">
+          <div className="relative mb-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
-              <h1 className="text-2xl font-bold text-gray-800">Vihara</h1>
+              <h1 className="text-xl font-bold text-gray-800">Vihara</h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={handleAdd}
                   disabled={loading}
-                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-3 py-1.5 text-sm rounded-lg transition-colors"
                 >
                   <PlusIcon className="w-5 h-5" />
                   Add Vihara
@@ -478,266 +577,51 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   <PlusIcon className="w-5 h-5" />
                   Add Upasampada
                 </button> */}
-                <button
-                  ref={filterButtonRef}
-                  type="button"
-                  onClick={() => setFilterPanelOpen((prev) => !prev)}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors ${
-                    filterPanelOpen
-                      ? "border-blue-500 bg-blue-50 text-blue-600"
-                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                  aria-expanded={filterPanelOpen}
-                  aria-haspopup="dialog"
-                >
-                  Filter
-                </button>
               </div>
             </div>
 
-            {filterPanelOpen && (
-              <div
-                ref={filterPanelRef}
-                className="absolute right-0 top-full z-30 mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl overflow-y-auto"
-                style={{ width: "300px", height: "400px" }}
-                role="dialog"
-                aria-label="Bhikku filters"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-lg font-semibold text-slate-800">
-                    Filters
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setFilterPanelOpen(false)}
-                    className="rounded-full border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50"
-                    aria-label="Close filter panel"
-                  >
-                    <XIcon className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-sm text-gray-600">Search</span>
-                      <input
-                        type="text"
-                        value={filters.searchKey}
-                        onChange={(e) =>
-                          setFilters((s) => ({
-                            ...s,
-                            searchKey: e.target.value,
-                          }))
-                        }
-                        placeholder="Search by name, reg. no, etc."
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </label>
-                  </div>
-
-                  {/* Temple Autocomplete (uses TRN) */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-temple"
-                          label="Temples"
-                          initialDisplay={filters.templeDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: trn ?? "",
-                              templeDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search temple"
-                        />
-                      </div>
-                      {filters.templeTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              templeTrn: "",
-                              templeDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Child Temple Autocomplete (uses TRN) */}
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TempleAutocomplete
-                          id="flt-child-temple"
-                          label="Child Temple"
-                          initialDisplay={filters.childTempleDisplay}
-                          onPick={({ trn, display }) =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: trn ?? "",
-                              childTempleDisplay: display,
-                            }))
-                          }
-                          storeTrn
-                          placeholder="Search child temple"
-                        />
-                      </div>
-                      {filters.childTempleTrn && (
-                        <button
-                          type="button"
-                          aria-label="Clear child temple"
-                          onClick={() =>
-                            setFilters((s) => ({
-                              ...s,
-                              childTempleTrn: "",
-                              childTempleDisplay: "",
-                            }))
-                          }
-                          className="h-9 w-9 mt-7 grid place-items-center rounded-md border hover:bg-slate-50"
-                        >
-                          <XIcon className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-gray-600">Nikaya</span>
-                    {nikayaLoading ? (
-                      <span className="text-sm text-gray-500">
-                        Loading Nikaya...
-                      </span>
-                    ) : nikayaError ? (
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-red-600">
-                        <span>Error loading Nikaya</span>
-                        <button
-                          type="button"
-                          onClick={() => loadNikayaHierarchy()}
-                          className="text-xs font-medium text-blue-600 underline disabled:text-blue-400"
-                          disabled={nikayaLoading}
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    ) : (
-                      <select
-                        value={filters.nikaya}
-                        onChange={(e) => handleNikayaChange(e.target.value)}
-                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                        disabled={!nikayaData.length}
-                      >
-                        <option value="">Select Nikaya</option>
-                        {nikayaData.map((n) => (
-                          <option
-                            key={n.nikaya.code}
-                            value={n.nikaya.code}
-                          >
-                            {n.nikaya.name} - {n.nikaya.code}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-gray-600">Parchawa</span>
-                    <select
-                      value={filters.parchawa}
-                      onChange={(e) => handleParshawaChange(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                      disabled={!filters.nikaya || parshawaOptions.length === 0}
-                    >
-                      <option value="">
-                        {!filters.nikaya
-                          ? "Select Nikaya first"
-                          : parshawaOptions.length
-                          ? "Select Chapter"
-                          : "No chapters available"}
-                      </option>
-                      {parshawaOptions.map((p) => (
-                        <option key={p.code} value={p.code}>
-                          {p.name} - {p.code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <LocationPicker
-                      value={locationSelection}
-                      onChange={(sel) => handleLocationChange(sel)}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuCategorySelect
-                      id="flt-category"
-                      label="Category"
-                      value={filters.category}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, category: code }))
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <BhikkhuStatusSelect
-                      id="flt-status"
-                      label="Current Status"
-                      value={filters.status}
-                      onPick={({ code }) =>
-                        setFilters((s) => ({ ...s, status: code }))
-                      }
-                    />
-                  </div>
-
-                  <LabeledDate
-                    label="Date From"
-                    value={filters.dateFrom}
-                    onChange={(v) =>
-                      setFilters((s) => ({ ...s, dateFrom: v }))
-                    }
-                  />
-                  <LabeledDate
-                    label="Date To"
-                    value={filters.dateTo}
-                    onChange={(v) => setFilters((s) => ({ ...s, dateTo: v }))}
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-                  <button
-                    onClick={applyFilters}
-                    disabled={loading}
-                    className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-                  >
-                    Apply Filters
-                  </button>
-                  <button
-                    onClick={clearFilters}
-                    disabled={loading}
-                    className="px-3 py-2 rounded-lg border text-gray-700 hover:bg-gray-50 disabled:opacity-60 inline-flex items-center gap-1"
-                  >
-                    <RotateCwIcon className="w-4 h-4" />
-                    Clear
-                  </button>
-                </div>
+          </div>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3 lg:grid-cols-4">
+              <div>
+                <input
+                  type="text"
+                  value={filters.searchKey}
+                  onChange={(e) =>
+                    setFilters((s) => ({
+                      ...s,
+                      searchKey: e.target.value,
+                    }))
+                  }
+                  placeholder="Search by name, reg. no, etc."
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-            )}
+              <NikayaParshawaCompact
+                nikayaValue={filters.nikaya}
+                onNikayaChange={handleNikayaChange}
+                parshawaValue={filters.parchawa}
+                onParshawaChange={handleParshawaChange}
+                nikayaOptions={nikayaData.map((n) => n.nikaya)}
+                parshawaOptions={parshawaOptions}
+                nikayaLoading={nikayaLoading}
+                nikayaError={nikayaError}
+                onRetry={loadNikayaHierarchy}
+              />
+
+              <div className="md:col-span-3 lg:col-span-4">
+                <LocationPickerCompact
+                  value={locationSelection}
+                  onChange={(sel) => handleLocationChange(sel)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="mt-2" />
           </div>
 
-<div className="relative overflow-y-auto max-h-[400px]">
+<div className="relative overflow-y-auto max-h-[240px]">
             <DataTable
               columns={columns}
               data={records}
@@ -756,8 +640,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             )}
           </div>
 
-          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-slate-600">
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-xs text-slate-600">
               {totalRecords > 0
                 ? `Showing ${
                     (filters.page - 1) * filters.limit + 1
@@ -767,14 +651,14 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                 : "No records to display"}
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+              <label className="flex items-center gap-2 text-xs text-slate-600">
                 Rows per page
                 <select
                   value={filters.limit}
                   onChange={(e) =>
                     handlePageSizeChange(Number(e.target.value))
                   }
-                  className="border border-slate-300 rounded px-2 py-1 text-sm"
+                  className="border border-slate-300 rounded px-2 py-1 text-xs"
                   disabled={loading}
                 >
                   {[5, 10, 25, 50].map((n) => (
@@ -789,7 +673,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                   type="button"
                   onClick={() => handlePageChange(filters.page - 1)}
                   disabled={loading || filters.page <= 1}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${
                     filters.page <= 1 || loading
                       ? "text-slate-400 border-slate-200"
                       : "text-slate-700 hover:bg-slate-50"
@@ -797,14 +681,14 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                 >
                   Previous
                 </button>
-                <span className="text-sm font-semibold text-slate-700">
+                <span className="text-xs font-semibold text-slate-700">
                   Page {filters.page}
                 </span>
                 <button
                   type="button"
                   onClick={() => handlePageChange(filters.page + 1)}
                   disabled={loading || !hasMoreResults}
-                  className={`px-4 py-2 rounded-lg border text-sm font-medium ${
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium ${
                     !hasMoreResults || loading
                       ? "text-slate-400 border-slate-200"
                       : "text-slate-700 hover:bg-slate-50"
@@ -834,7 +718,7 @@ function LabeledDate({
   onChange: (v: string) => void;
 }) {
   const hiddenRef = useRef<HTMLInputElement | null>(null);
-  const normalized = toYYYYMMDD(value);
+  const normalized = toYYYYMMDD(value); // Convert to display format (YYYY/MM/DD)
 
   const openPicker = () => {
     const el = hiddenRef.current;
@@ -844,22 +728,22 @@ function LabeledDate({
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-sm text-gray-600">{label}</span>
+      <span className="text-xs text-gray-600">{label}</span>
       <div className="relative flex">
         <input
           type="text"
           inputMode="numeric"
-          pattern="\\d{4}-\\d{2}-\\d{2}"
-          placeholder="YYYY-MM-DD"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          pattern="(\d{4}-\d{2}-\d{2}|\d{4}/\d{2}/\d{2})"
+          placeholder="YYYY/MM/DD"
+          value={normalized}
+          onChange={(e) => onChange(toYYYYMMDD(e.target.value))}
           onBlur={(e) => onChange(toYYYYMMDD(e.target.value))}
-          className="w-full rounded-l-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-l-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           type="button"
           onClick={openPicker}
-          className="px-3 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 hover:bg-gray-50 text-sm"
+          className="px-2 border border-l-0 border-gray-300 rounded-r-md text-gray-600 hover:bg-gray-50 text-xs"
           aria-label={`Pick ${label}`}
         >
           Pick
@@ -867,14 +751,14 @@ function LabeledDate({
         <input
           ref={hiddenRef}
           type="date"
-          value={normalized}
+          value={toYYYYMMDD(value).replace(/\//g, "-")}
           onChange={(e) => onChange(toYYYYMMDD(e.target.value))}
           className="absolute opacity-0 pointer-events-none w-0 h-0"
           tabIndex={-1}
           aria-hidden="true"
         />
       </div>
-      <span className="text-xs text-gray-500">Format: YYYY-MM-DD</span>
+      <span className="text-[11px] text-gray-500">Format: YYYY/MM/DD</span>
     </label>
   );
 }

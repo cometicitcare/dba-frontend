@@ -35,12 +35,14 @@ export default function ResidentSilmathaTable({ value, onChange, error }: Props)
     onChange(updated);
   };
 
-  const processRowUpdate = (newRow: ResidentSilmathaRow, oldRow: ResidentSilmathaRow): ResidentSilmathaRow => {
-    const updated = rows.map((r) => (r.id === newRow.id ? { ...r, ...newRow } : r));
+  const handleCellChange = <K extends keyof ResidentSilmathaRow>(id: string, field: K, value: ResidentSilmathaRow[K]) => {
+    const updated = rows.map((r) => (r.id === id ? { ...r, [field]: value } : r));
     setRows(updated);
     onChange(updated);
-    return newRow;
   };
+
+  const inputClassName =
+    "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 
   const columns: GridColDef<ResidentSilmathaRow>[] = [
     {
@@ -48,24 +50,49 @@ export default function ResidentSilmathaTable({ value, onChange, error }: Props)
       headerName: "Serial Number",
       width: 120,
       editable: false,
+      renderCell: (params) => <span className="text-sm text-slate-700">{params.value as number}</span>,
     },
     {
       field: "silmathaName",
       headerName: "Name of the Sil Māthā",
       width: 250,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "silmathaName", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "registrationNumber",
       headerName: "Registration Number",
       width: 250,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "registrationNumber", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "occupationEducation",
       headerName: "Occupation / Whether Currently Studying",
       width: 300,
-      editable: true,
+      editable: false,
+      renderCell: (params) => (
+        <input
+          className={inputClassName}
+          value={(params.value as string) ?? ""}
+          onChange={(e) => handleCellChange(params.row.id, "occupationEducation", e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ),
     },
     {
       field: "actions",
@@ -99,7 +126,6 @@ export default function ResidentSilmathaTable({ value, onChange, error }: Props)
         <DataGrid<ResidentSilmathaRow>
           rows={rows}
           columns={columns}
-          processRowUpdate={processRowUpdate}
           disableRowSelectionOnClick
           hideFooter
           sx={{

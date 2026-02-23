@@ -93,7 +93,7 @@ export default function BhikkhuStatusSelect({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+      <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
         {label}
       </label>
       <select
@@ -103,7 +103,7 @@ export default function BhikkhuStatusSelect({
         onChange={handleChange}
         required={required && !multiple}
         disabled={disabled}
-        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
+        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
       >
         {!multiple && <option value="">Select status</option>}
         {options.map((o) => (
@@ -112,7 +112,7 @@ export default function BhikkhuStatusSelect({
           </option>
         ))}
       </select>
-      {multiple ? <p className="mt-1 text-xs text-slate-500">Hold Ctrl/Cmd to select multiple.</p> : null}
+      {multiple ? <p className="mt-1 text-[11px] text-slate-500">Hold Ctrl/Cmd to select multiple.</p> : null}
     </div>
   );
 }

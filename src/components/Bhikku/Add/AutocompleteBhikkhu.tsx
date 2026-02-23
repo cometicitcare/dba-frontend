@@ -124,7 +124,7 @@ export default function BhikkhuAutocomplete({
           onKeyDown={(e) => {
             if (e.key === "Escape") setOpen(false);
           }}
-          placeholder={placeholder ?? "Type a name / REGN"}
+          placeholder={placeholder ?? "Search by name, REGN, temple, or address"}
           required={required}
           className="w-full pr-12 pl-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
           autoComplete="off"
@@ -143,25 +143,75 @@ export default function BhikkhuAutocomplete({
           </button>
         )}
         {open && focused && (
-          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+          <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-80 overflow-auto">
             {loading && <div className="px-3 py-2 text-sm text-slate-500">Searching...</div>}
             {!loading && options.length === 0 && (
               <div className="px-3 py-2 text-sm text-slate-500">No matches</div>
             )}
-            {options.map((o) => (
-              <button
-                key={o.regn}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleSelect(o);
-                }}
-                className="w-full text-left px-3 py-2 hover:bg-slate-50"
-              >
-                <div className="text-sm font-medium text-slate-800">{o.name}</div>
-                <div className="text-xs text-slate-500">{o.regn}</div>
-              </button>
-            ))}
+            {options.map((o) => {
+              // Determine if this is a temporary bhikku
+              const isTemporary = o.regn?.startsWith('TEMP-');
+              
+              // Get living temple info
+              const livTemple = o.data?.br_livtemple;
+              const livTempleInfo = typeof livTemple === 'object' ? livTemple : null;
+              const livTempleName = livTempleInfo?.vh_vname || '';
+              const livTempleAddr = livTempleInfo?.vh_addrs || '';
+              
+              // Get mahana temple info
+              const mahanaTemple = o.data?.br_mahanatemple;
+              const mahanaTempleInfo = typeof mahanaTemple === 'object' ? mahanaTemple : null;
+              const mahanaTempleName = mahanaTempleInfo?.vh_vname || '';
+              const mahanaTempleAddr = mahanaTempleInfo?.vh_addrs || '';
+              
+              // Use living temple if available, otherwise use mahana temple
+              const displayTemplate = livTempleInfo || mahanaTempleInfo;
+              const displayName = livTempleName || mahanaTempleName;
+              const displayAddr = livTempleAddr || mahanaTempleAddr;
+              const isSecondary = !livTempleInfo && mahanaTempleInfo;
+              
+              return (
+                <button
+                  key={o.regn}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelect(o);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">{o.name}</div>
+                      <div className="text-xs text-slate-500">{o.regn}</div>
+                    </div>
+                    {isTemporary && (
+                      <span className="inline-block ml-2 px-2 py-1 text-xs font-semibold text-amber-700 bg-amber-100 rounded">
+                        TEMPORARY
+                      </span>
+                    )}
+                  </div>
+                  {displayName ? (
+                    <div className="text-xs text-slate-600 mt-1">
+                      <span className="font-semibold">{isSecondary ? 'Mahana Temple:' : 'Living Temple:'}</span> {displayName}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-amber-600 mt-1">
+                      <span className="font-semibold">Temple:</span> <span className="italic">(Not assigned)</span>
+                    </div>
+                  )}
+                  {displayAddr ? (
+                    <div className="text-xs text-slate-600">
+                      <span className="font-semibold">Address:</span> {displayAddr}
+                    </div>
+                  ) : displayName ? (
+                    <div className="text-xs text-amber-600">
+                      <span className="font-semibold">Address:</span> <span className="italic">(Not recorded)</span>
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -186,7 +236,7 @@ export default function BhikkhuAutocomplete({
                 if (!name) return;
                 setAddSubmitting(true);
                 try {
-                  await _manageTempBhikku({
+                  const response = await _manageTempBhikku({
                     action: "CREATE",
                     payload: {
                       data: {
@@ -199,11 +249,24 @@ export default function BhikkhuAutocomplete({
                       },
                     },
                   });
+                  const created = (response as any)?.data?.data;
                   toast.success("Temporary bhikkhu created");
+
+                  const bhikkuRegn = created?.br_regn || "";
+                  const bhikkhuName = created?.br_mahananame || created?.br_gihiname || name;
+                  const display = `${bhikkhuName} - ${bhikkuRegn}`;
+
+                  onPick(
+                    storeRegn
+                      ? { regn: bhikkuRegn, name: bhikkhuName, display, data: created }
+                      : { name: bhikkhuName, display, data: created }
+                  );
+                  setInput(display);
                   await onAddBhikkhu?.({
                     name,
                   });
                   setAddDialogOpen(false);
+                  resetDialogFields();
                 } finally {
                   setAddSubmitting(false);
                 }
@@ -212,7 +275,7 @@ export default function BhikkhuAutocomplete({
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Name
+                  Name <span className="text-xs text-red-500">*</span>
                   <input
                     type="text"
                     value={newBhikkhuName}
@@ -232,7 +295,7 @@ export default function BhikkhuAutocomplete({
                 </label>
               </div>
               <label className="block text-sm font-medium text-slate-700">
-                Address
+                Address <span className="text-xs text-slate-500">(Optional)</span>
                 <textarea
                   value={tbAddress}
                   onChange={(e) => setTbAddress(e.target.value)}

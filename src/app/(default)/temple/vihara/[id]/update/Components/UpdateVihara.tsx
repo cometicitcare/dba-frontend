@@ -9,7 +9,7 @@ import {
   _approveStage,
   _rejectStage,
 } from "@/services/vihara";
-import request from "@/services/backendClient";
+import { _manageBhikku } from "@/services/bhikku";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -23,12 +23,13 @@ import {
   viharaSteps,
   viharaInitialValues,
   toYYYYMMDD,
+  toISOFormat,
+  toDisplayFormat,
   validateField,
   Errors,
   LandInfoTable,
   ResidentBhikkhuTable,
   ImportantNotes,
-  ViharadhipathiAppointmentLetter,
   type ViharadhipathiAppointmentLetterData,
   type ViharaForm,
   type StepConfig,
@@ -36,6 +37,7 @@ import {
   type ResidentBhikkhuRow,
 } from "../../../add/Components";
 import ViharaAngaMultipleSelector from "../../../Components/ViharaAngaMultipleSelector";
+import SasanarakshakaAutocomplete from "@/components/sasanarakshaka/AutoComplete";
 
 import { Tabs } from "@/components/ui/Tabs";
 
@@ -128,7 +130,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     const maxBaseStepId = baseSteps.reduce((max, step) => Math.max(max, step.id), 0);
     const certTab: StepConfig<ViharaForm> = {
       id: maxBaseStepId + 1,
-      title: "Certificates",
+      title: "Letter",
       fields: [],
     };
     const scannedTab: StepConfig<ViharaForm> = {
@@ -206,6 +208,32 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   });
   const [errors, setErrors] = useState<Errors<ViharaForm>>({});
   const [saving, setSaving] = useState(false);
+  const [bypassConfirm, setBypassConfirm] = useState<{
+    field: keyof ViharaForm;
+    label: string;
+  } | null>(null);
+  const [unlockConfirm, setUnlockConfirm] = useState(false);
+  // Stage F bypass mutual exclusivity + tab locking
+  const BYPASS_FIELDS_CONFIG = [
+    { field: "vh_bypass_no_detail" as keyof ViharaForm, fromTabId: 3 },
+    { field: "vh_bypass_no_chief" as keyof ViharaForm, fromTabId: 4 },
+    { field: "vh_bypass_ltr_cert" as keyof ViharaForm, fromTabId: 5 },
+  ];
+  /** Maps bypass boolean field → dedicated CRUDAction that triggers status transition */
+  const BYPASS_ACTION_MAP: Record<string, string> = {
+    vh_bypass_no_detail: "BYPASS_NO_DETAIL",
+    vh_bypass_no_chief:  "BYPASS_NO_CHIEF",
+    vh_bypass_ltr_cert:  "BYPASS_LTR_CERT",
+  };
+  const BYPASS_STATUSES = new Set(["S1_NO_DETAIL_COMP", "S1_NO_CHIEF_COMP", "S1_LTR_CERT_DONE"]);
+  const activeBypassEntry = BYPASS_FIELDS_CONFIG.find((b) => (values[b.field] as boolean) === true) ?? null;
+  const lockedFromTabId: number | null = activeBypassEntry?.fromTabId ?? null;
+  const isTabLocked = (tabId: number): boolean => {
+    if (lockedFromTabId === null) return false;
+    if (canModerate) return false; // admins can always navigate
+    // Lock only SUBSEQUENT tabs — the tab that owns the active bypass toggle stays accessible
+    return tabId > lockedFromTabId;
+  };
   const [loading, setLoading] = useState(true);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const certificatePaperRef = useRef<HTMLDivElement | null>(null);
@@ -220,9 +248,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [scannedFile, setScannedFile] = useState<File | null>(null);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [uploadingScan, setUploadingScan] = useState(false);
-  const [sasanarakshakaOptions, setSasanarakshakaOptions] = useState<Array<{ id: number; name: string }>>([]);
-  const [sasanarakshakaLoading, setSasanarakshakaLoading] = useState(false);
-  const [sasanarakshakaError, setSasanarakshakaError] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -236,6 +261,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     nk_nname: "",
     br_fathrsaddrs: "",
   });
+  
+  // Religious Affiliation state (Nikaya & Parshawa)
+  const [nikayaData, setNikayaData] = useState<NikayaAPIItem[]>(STATIC_NIKAYA_DATA);
+  const [nikayaLoading, setNikayaLoading] = useState(false);
+  const [nikayaError, setNikayaError] = useState<string | null>(null);
+  const [display, setDisplay] = useState<Record<string, string>>({
+    nikaya: "",
+    parshawaya: "",
+  });
+  
+  const letterEditorRef = useRef<HTMLDivElement | null>(null);
+  const [letterHtml, setLetterHtml] = useState<string>("");
+  const [letterDirty, setLetterDirty] = useState(false);
+  const letterEditorInitialized = useRef(false);
+  const letterHtmlRef = useRef<string>("");
+  const letterDirtyRef = useRef(false);
   
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const locationNames = useMemo(() => {
@@ -293,10 +334,128 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       values,
     ]
   );
+
+  const escapeHtml = useCallback((value?: string) => {
+    const input = String(value ?? "");
+    return input
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }, []);
+
+  const buildLetterHtml = useCallback(
+    (data: ViharadhipathiAppointmentLetterData) => {
+      const v = (value?: string) => escapeHtml(value ?? "");
+      return `
+        <div class="letter-header">
+          <div class="reference-number">
+            <span data-field="reference_number">${v(data.reference_number)}</span>
+          </div>
+          <div class="date">
+            දිනය: <span data-field="letter_date">${v(data.letter_date)}</span>
+          </div>
+        </div>
+
+        <div class="letter-recipient">
+          <div class="recipient-title">
+            විහාරාධිපති <span data-field="appointed_monk_name">${v(data.appointed_monk_name)}</span> ස්වාමීන් වහන්සේ,
+          </div>
+          <div><span data-field="viharasthana_full_name">${v(data.viharasthana_full_name)}</span>,</div>
+          <div><span data-field="viharasthana_location">${v(data.viharasthana_location)}</span>,</div>
+          <div><span data-field="district">${v(data.district)}</span>.</div>
+        </div>
+
+        <div class="letter-section">
+          ගරු වහන්සේ,
+        </div>
+
+        <div class="letter-section">
+          <strong><u>විහාරාධිපති තනතුර පත් කිරීම පිළිබඳ දැනුම්දීම</u></strong>
+        </div>
+
+        <div class="letter-body">
+          <strong>${v(data.district)}</strong> දිස්ත්‍රික්කයේ,
+          <strong>${v(data.divisional_secretariat)}</strong> ප්‍රාදේශීය ලේකම් කොට්ඨාසයේ,
+          <strong>${v(data.grama_niladari)}</strong> ග්‍රාම නිලධාරී වසමේ,
+          <strong>${v(data.viharasthana_location)}</strong>, <strong>${v(data.viharasthana_area)}</strong>
+          <strong>${v(data.viharasthana_full_name)}</strong> විහාරස්ථානයේ විහාරාධිපති තනතුරට,
+          අතිපුජ්‍ය මහ නායක හිමියන් විසින් යොමු කර ඇති,
+          අංක <strong>${v(data.mahanayaka_lt_no)}</strong>,
+          <strong>${v(data.mahanayaka_lt_date)}</strong> දිනැති ලිපිය පිළිගැන,
+          <strong>${v(data.appointed_monk_title)}</strong>
+          <strong>${v(data.appointed_monk_name)}</strong> ස්වාමීන් වහන්සේ පත් කළ බව දැනුම් දෙමි.
+        </div>
+
+        <div class="letter-section">
+          මෙයට - සසුනට වැඩී,
+          <br /><br />
+          ................................. 
+          <div class="signature-title">ආර්.ඒම්.ජේ.සෙනෙවිරත්න</div>
+          <div class="signature-title">බෞද්ධ කටයුතු කොමසාරිස් ජනරාල්,</div>
+          <div class="letter-section">
+            දුරකථනය : 0113159682<br />
+            ෆැක්ස් : 0112337335<br />
+            විද්‍යුත් තැපෑල : dbavihara@gmail.com
+          </div>
+        </div>
+
+        <div class="letter-section">
+          විශේෂ කරුණු: <strong>${v(data.remarks)}</strong>
+        </div>
+
+        <div class="letter-copyto">
+          <div class="copy-to-header">පිටපත් :</div>
+          <ul class="copy-to-list">
+            <li>
+              1. <span data-field="appointed_monk_title">${v(data.appointed_monk_title)}</span>
+              <span data-field="br_mahananame">${v(data.br_mahananame)}</span> මහනායක ස්වාමීන් වහන්සේගේ - ගරු වරනීය දැන ගැනීම සඳහා
+              <span data-field="nk_nname">${v(data.nk_nname)}</span>
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;<span data-field="br_fathrsaddrs">${v(data.br_fathrsaddrs)}</span>
+            </li>
+            <li>
+              2. ප්‍රාදේශීය ලේකම්, - කාරුණික දැන ගැනීමට හා අවශ්‍ය කටයුතු සඳහා
+              <br />
+              &nbsp;&nbsp;&nbsp;&nbsp;ලේකම් කාර්යාලය, <span data-field="divisional_secretariat_office">${v(data.divisional_secretariat_office)}</span>
+            </li>
+          </ul>
+        </div>
+      `;
+    },
+    [escapeHtml]
+  );
+
+  const defaultLetterHtml = useMemo(() => buildLetterHtml(letterData), [buildLetterHtml, letterData]);
+
+  useEffect(() => {
+    if (!letterDirtyRef.current) {
+      setLetterHtml(defaultLetterHtml);
+      letterHtmlRef.current = defaultLetterHtml;
+    }
+  }, [defaultLetterHtml, letterDirty]);
+
+  useEffect(() => {
+    if (!letterEditorRef.current) return;
+    const nextHtml = letterHtml || defaultLetterHtml;
+    const isFocused = document.activeElement === letterEditorRef.current;
+    if (!letterEditorInitialized.current) {
+      letterEditorRef.current.innerHTML = nextHtml;
+      letterHtmlRef.current = nextHtml;
+      letterEditorInitialized.current = true;
+      return;
+    }
+    if (isFocused) return;
+    if (letterEditorRef.current.innerHTML !== nextHtml) {
+      letterEditorRef.current.innerHTML = nextHtml;
+    }
+  }, [letterHtml, defaultLetterHtml]);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
-  const isCertificatesTab = stepTitle === "Certificates";
+  const isCertificatesTab = stepTitle === "Letter";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+
   const stageApproved =
     (activeMajorStep === 1 && workflowStatus === "S1_APPROVED") ||
     (activeMajorStep === 2 && workflowStatus === "S2_APPROVED");
@@ -312,61 +471,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return `${API_BASE_URL}${normalizedPath}`;
   };
 
-  useEffect(() => {
-    let mounted = true;
-    const getAuthToken = () => {
-      if (typeof window === "undefined") return null;
-      try {
-        const raw = localStorage.getItem("user");
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as any;
-        return (
-          parsed?.token ??
-          parsed?.access_token ??
-          parsed?.accessToken ??
-          parsed?.data?.token ??
-          parsed?.data?.access_token ??
-          parsed?.user?.token ??
-          parsed?.user?.access_token ??
-          null
-        );
-      } catch {
-        return null;
-      }
-    };
-
-    const fetchSasanarakshaka = async () => {
-      try {
-        setSasanarakshakaLoading(true);
-        setSasanarakshakaError(null);
-        const token = getAuthToken();
-        const response = await request.get<{
-          data?: Array<{ sr_id: number; sr_ssbname: string }>;
-        }>("https://api.dbagovlk.com/api/v1/sasanarakshaka", {
-          params: { page: 1, limit: 1000 },
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        const list = Array.isArray(response?.data?.data) ? response.data.data : [];
-        if (mounted) {
-          setSasanarakshakaOptions(
-            list
-              .filter((item) => item?.sr_ssbname)
-              .map((item) => ({ id: item.sr_id, name: item.sr_ssbname }))
-          );
-        }
-      } catch (err) {
-        console.error("Failed to load Sasanarakshaka list", err);
-        if (mounted) setSasanarakshakaError("Failed to load list.");
-      } finally {
-        if (mounted) setSasanarakshakaLoading(false);
-      }
-    };
-
-    fetchSasanarakshaka();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   // Helper function to map API fields to form fields
   const mapApiToFormFields = (apiData: any): Partial<ViharaForm> => {
@@ -395,13 +499,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       occupationEducation: bhikkhu.occupationEducation ?? bhikkhu.occupation_education ?? "",
     }));
 
-    return {
+    const formFields = {
       // Step A: Basic Information
       temple_name: apiData.vh_vname ?? "",
       temple_address: apiData.vh_addrs ?? "",
       telephone_number: apiData.vh_mobile ?? "",
       whatsapp_number: apiData.vh_whtapp ?? "",
       email_address: apiData.vh_email ?? "",
+      vh_file_number: apiData.vh_file_number ?? "",
+      vh_vihara_code: apiData.vh_vihara_code ?? "",
       
       // Step B: Administrative Divisions
       province: apiData.vh_province ?? "",
@@ -417,10 +523,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         // Step D: Leadership
         viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
         viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
-        period_established: apiData.vh_period_established ?? "",
+        viharadhipathi_date: toDisplayFormat(apiData.viharadhipathi_date) ?? "",
+        period_established: toDisplayFormat(apiData.vh_period_established) ?? "",
+
+        // Stage F: bypass flags
+        vh_bypass_no_detail: apiData.vh_bypass_no_detail ?? false,
+        vh_bypass_no_chief:  apiData.vh_bypass_no_chief  ?? false,
+        vh_bypass_ltr_cert:  apiData.vh_bypass_ltr_cert  ?? false,
+
+        // Stage F: establishment period
+        vh_period_era:   apiData.vh_period_era   ?? "",
+        vh_period_year:  apiData.vh_period_year  ?? "",
+        vh_period_month: apiData.vh_period_month ?? "",
+        vh_period_day:   apiData.vh_period_day   ?? "",
+        vh_period_notes: apiData.vh_period_notes ?? "",
 
         // Step E: Mahanyake Information
-        mahanayake_date: apiData.vh_mahanayake_date ?? "",
+        mahanayake_date: toDisplayFormat(apiData.vh_mahanayake_date) ?? "",
         mahanayake_letter_nu: apiData.vh_mahanayake_letter_nu ?? "",
         mahanayake_remarks: apiData.vh_mahanayake_remarks ?? "",
         
@@ -462,6 +581,35 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       annex2_approval_construction: apiData.vh_annex2_approval_construction ?? false,
       annex2_referral_resubmission: apiData.vh_annex2_referral_resubmission ?? false,
     };
+    
+    // AUTO-DETECT PROVINCE FROM DISTRICT if province is missing
+    // This fixes the issue where district is saved but province is not
+    if ((!formFields.province || formFields.province === "") && formFields.district) {
+      // Find which province this district belongs to
+      const districtCode = formFields.district;
+      const provinces = (selectionsData as any)?.provinces || [];
+      if (Array.isArray(provinces)) {
+        for (const province of provinces) {
+          const districtMatch = province.districts?.find(
+            (d: any) => d.code === districtCode || d.dd_dcode === districtCode
+          );
+          if (districtMatch) {
+            formFields.province = province.cp_code || province.code;
+            console.log(`🔍 DEBUG: Auto-detected province "${formFields.province}" from district code "${districtCode}"`);
+            break;
+          }
+        }
+      }
+    }
+    
+    console.log("🔍 DEBUG: Mapped form fields for admin divisions:", {
+      province: formFields.province,
+      district: formFields.district,
+      divisional_secretariat: formFields.divisional_secretariat,
+      grama_niladhari_division: formFields.grama_niladhari_division,
+    });
+    
+    return formFields;
   };
 
   // Load data for update
@@ -484,7 +632,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         });
 
         const apiData = (response.data as any)?.data || response.data;
-        console.log("Loading vihara data from API:", apiData);
         
         // Map API fields to form fields
         const formData = mapApiToFormFields(apiData);
@@ -493,7 +640,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           ...formData,
         };
         setValues(filledValues);
-        console.log("Form values auto-filled:", filledValues);
 
         const mainBhikkuInfo = apiData?.nikaya_info?.main_bhikku_info;
         setNikayaLetterInfo({
@@ -569,6 +715,36 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     loadViharaData();
   }, [viharaId]);
 
+  // Auto-lookup bhikkhu name from registration number if name is missing
+  useEffect(() => {
+    const lookupBhikkhuName = async () => {
+      // If we have regn but no name, lookup the bhikkhu
+      if (values.viharadhipathi_regn && !values.viharadhipathi_name) {
+        try {
+          const response = await _manageBhikku({
+            action: "READ_ALL",
+            payload: { skip: 0, limit: 1, search: values.viharadhipathi_regn },
+          });
+          const bhikkhus = (response as any)?.data?.data ?? [];
+          if (bhikkhus.length > 0) {
+            const bhikkhu = bhikkhus[0];
+            const bhikkhuName = bhikkhu.br_mahananame || bhikkhu.br_gihiname || "";
+            if (bhikkhuName) {
+              handleSetMany({
+                viharadhipathi_name: bhikkhuName,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("Could not lookup bhikkhu name:", e);
+        }
+      }
+    };
+
+    lookupBhikkhuName();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values.viharadhipathi_regn, values.viharadhipathi_name]);
+
   const fieldLabels: Record<string, string> = useMemo(() => {
     const map: Record<string, string> = {};
     baseSteps.forEach((s) => s.fields.forEach((f) => (map[String(f.name)] = f.label)));
@@ -637,6 +813,88 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     return valid;
   };
 
+  // Helper function to find nikaya by code
+  const findNikayaByCode = useCallback((code?: string | null) => {
+    if (!code) return undefined;
+    return nikayaData.find((n) => n.nikaya.code === code);
+  }, [nikayaData]);
+
+  // Helper function to get parshawa options based on selected nikaya
+  const parshawaOptions = useCallback((nikayaCode?: string) => {
+    if (!nikayaCode) return [];
+    const nikayaItem = findNikayaByCode(nikayaCode);
+    return nikayaItem?.parshawayas || [];
+  }, [findNikayaByCode]);
+
+  // Handler for picking nikaya
+  const onPickNikaya = useCallback((nikayaCode: string) => {
+    handleInputChange("nikaya", nikayaCode);
+    const item = findNikayaByCode(nikayaCode);
+    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : nikayaCode }));
+  }, [findNikayaByCode]);
+
+  // Handler for picking parshawaya
+  const onPickParshawa = useCallback((parshawaCode: string) => {
+    handleInputChange("parshawaya", parshawaCode);
+    const nikaya = findNikayaByCode(values.nikaya);
+    const p = nikaya?.parshawayas.find((x) => x.code === parshawaCode);
+    setDisplay((d) => ({ ...d, parshawaya: p ? `${p.name} - ${p.code}` : parshawaCode }));
+  }, [findNikayaByCode, values.nikaya]);
+
+  // Update display text when form values change (e.g., on load)
+  useEffect(() => {
+    const nikayaItem = findNikayaByCode(values.nikaya);
+    if (nikayaItem) {
+      setDisplay((d) => ({
+        ...d,
+        nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}`,
+      }));
+    }
+
+    const nikaya = findNikayaByCode(values.nikaya);
+    if (nikaya && values.parshawaya) {
+      const p = nikaya.parshawayas.find((x) => x.code === values.parshawaya);
+      if (p) {
+        setDisplay((d) => ({
+          ...d,
+          parshawaya: `${p.name} - ${p.code}`,
+        }));
+      }
+    }
+  }, [values.nikaya, values.parshawaya, findNikayaByCode]);
+
+  // Helper function to ensure viharadhipathi is added to resident bhikkhus before submission
+  const ensureViharadhipathiInResidentBhikkhus = (bhikkhus: any[]): any[] => {
+    if (!values.viharadhipathi_name || !values.viharadhipathi_regn) {
+      return bhikkhus;
+    }
+
+    // Check if viharadhipathi already exists
+    const existingIndex = bhikkhus.findIndex(
+      (b: any) => (b.registrationNumber || b.registration_number) === values.viharadhipathi_regn
+    );
+
+    // If exists, remove it first
+    if (existingIndex >= 0) {
+      bhikkhus.splice(existingIndex, 1);
+    }
+
+    // Add viharadhipathi as first entry
+    const viharadhipathiEntry = {
+      id: `bhikkhu-viharadhipathi-${Date.now()}`,
+      serialNumber: 1,
+      bhikkhuName: values.viharadhipathi_name,
+      registrationNumber: values.viharadhipathi_regn,
+      occupationEducation: "Chief Incumbent (Viharadhipathi)",
+    };
+
+    // Insert at beginning and update serial numbers
+    return [viharadhipathiEntry, ...bhikkhus].map((b, idx) => ({
+      ...b,
+      serialNumber: idx + 1,
+    }));
+  };
+
   const buildPartialPayloadForTab = (tabId: number): Partial<any> => {
     const s = steps.find((step) => step.id === tabId);
     if (!s) return {};
@@ -672,9 +930,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     
     if (tabId === 7) { // Resident Bhikkhus tab
       try {
-        const parsedBhikkhus = values.resident_bhikkhus 
+        let parsedBhikkhus = values.resident_bhikkhus 
           ? (typeof values.resident_bhikkhus === 'string' ? JSON.parse(values.resident_bhikkhus) : values.resident_bhikkhus)
           : [];
+        
+        // Ensure viharadhipathi is in resident bhikkhus as first entry
+        parsedBhikkhus = ensureViharadhipathiInResidentBhikkhus(parsedBhikkhus);
+        
         const mappedBhikkhus = parsedBhikkhus.map((bhikkhu: any) => ({
           serial_number: bhikkhu.serialNumber ?? bhikkhu.serial_number,
           bhikkhu_name: bhikkhu.bhikkhuName ?? bhikkhu.bhikkhu_name,
@@ -702,6 +964,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         telephone_number: "vh_mobile",
         whatsapp_number: "vh_whtapp",
         email_address: "vh_email",
+        vh_file_number: "vh_file_number",
+        vh_vihara_code: "vh_vihara_code",
         province: "vh_province",
         district: "vh_district",
         divisional_secretariat: "vh_divisional_secretariat",
@@ -740,8 +1004,30 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       };
       
       const apiFieldName = fieldMapping[f.name] || f.name;
-      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toYYYYMMDD(String(v)) : v);
+      // Convert dates to ISO format (YYYY-MM-DD) for API
+      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v)) : v);
     });
+    
+    // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
+    // If user provided district but forgot province, auto-detect it from district code
+    if (tabId === 2 && (payload.vh_district || payload.vh_divisional_secretariat || payload.vh_gndiv)) {
+      if (!payload.vh_province && payload.vh_district) {
+        // Auto-detect province from district code
+        const districtCode = payload.vh_district;
+        const provinces = (selectionsData as any)?.provinces || [];
+        if (Array.isArray(provinces)) {
+          for (const province of provinces) {
+            const districtMatch = province.districts?.find(
+              (d: any) => d.code === districtCode || d.dd_dcode === districtCode
+            );
+            if (districtMatch) {
+              payload.vh_province = province.cp_code || province.code;
+              break;
+            }
+          }
+        }
+      }
+    }
     
     return payload;
   };
@@ -756,7 +1042,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
       console.log("Saving partial payload for tab:", partial);
       
-      await _manageVihara({
+      const updateResponse = await _manageVihara({
         action: "UPDATE",
         payload: {
           ...(vhId ? { vh_id: vhId } : {}),
@@ -764,9 +1050,76 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           data: partial,
         },
       } as any);
+      
+      // After successful UPDATE, reload the vihara data to confirm the save
+      // This ensures the form always displays what's actually in the database
+      const updatedData = (updateResponse as any)?.data?.data || (updateResponse as any)?.data;
+      if (updatedData) {
+        const formData = mapApiToFormFields(updatedData);
+        const filledValues = {
+          ...viharaInitialValues,
+          ...formData,
+        };
+        setValues(filledValues);
+      }
+      
       toast.success(`Saved "${stepTitle}"`, { autoClose: 1200 });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to save. Please try again.";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleBypassSave = async () => {
+    if (!bypassConfirm) return;
+    const field = bypassConfirm.field as string;
+    setBypassConfirm(null);
+    try {
+      setSaving(true);
+      const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
+      const bypassAction = BYPASS_ACTION_MAP[field];
+      if (!bypassAction || !vhId) {
+        toast.error("Cannot save bypass: missing record ID or unknown bypass type.");
+        return;
+      }
+      await _manageVihara({
+        action: bypassAction,
+        payload: { vh_id: vhId },
+      } as any);
+      setValues((prev) => ({ ...prev, [field]: true }));
+      toast.success("Saved.", { autoClose: 800 });
+      setTimeout(() => router.push("/temple/vihara"), 950);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save.";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUnlockBypass = async () => {
+    setUnlockConfirm(false);
+    try {
+      setSaving(true);
+      const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
+      if (!vhId) { toast.error("Cannot unlock: missing record ID."); return; }
+      await _manageVihara({
+        action: "UNLOCK_BYPASS",
+        payload: { vh_id: vhId },
+      } as any);
+      // Reset bypass flags locally and update status
+      setValues((prev) => ({
+        ...prev,
+        vh_bypass_no_detail: false,
+        vh_bypass_no_chief:  false,
+        vh_bypass_ltr_cert:  false,
+      }));
+      setWorkflowStatus("S1_PENDING");
+      toast.success("Record unlocked. Status reset to pending.", { autoClose: 1500 });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to unlock record.";
       toast.error(msg);
     } finally {
       setSaving(false);
@@ -816,16 +1169,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       // Step C: Religious Affiliation
       vh_nikaya: formData.nikaya,
       vh_parshawa: formData.parshawaya,
+      vh_bypass_no_detail: formData.vh_bypass_no_detail,
       
-      // Step D: Leadership
+      // Step D: Leadership - Convert dates to ISO format
       vh_viharadhipathi_name: formData.viharadhipathi_name,
       vh_viharadhipathi_regn: formData.viharadhipathi_regn,
-      vh_period_established: formData.period_established,
-      vh_mahanayake_date: formData.mahanayake_date,
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date) || null,
+      vh_period_established: toISOFormat(formData.period_established) || null,
+      vh_period_era: formData.vh_period_era,
+      vh_period_year: formData.vh_period_year,
+      vh_period_month: formData.vh_period_month,
+      vh_period_day: formData.vh_period_day,
+      vh_period_notes: formData.vh_period_notes,
+      vh_bypass_no_chief: formData.vh_bypass_no_chief,
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date) || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu,
       vh_mahanayake_remarks: formData.mahanayake_remarks,
+      vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert,
       
-      // Step F: Assets & Activities
+      // Step F: Temple Assets & Activities
       vh_buildings_description: formData.buildings_description,
       vh_dayaka_families_count: formData.dayaka_families_count,
       vh_kulangana_committee: formData.kulangana_committee,
@@ -833,19 +1195,19 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_temple_working_committee: formData.temple_working_committee,
       vh_other_associations: formData.other_associations,
       
-      // Step F: Land Information
+      // Step G: Land Information
       temple_owned_land: mappedLand,
       vh_land_info_certified: formData.land_info_certified,
       
-      // Step G: Resident Bhikkhus
+      // Step H: Resident Bhikkhus
       resident_bhikkhus: mappedBhikkhus,
       vh_resident_bhikkhus_certified: formData.resident_bhikkhus_certified,
       
-      // Step H: Inspection
+      // Step I: Inspection
       vh_inspection_report: formData.inspection_report,
       vh_inspection_code: formData.inspection_code,
       
-      // Step I: Ownership
+      // Step J: Ownership
       vh_grama_niladhari_division_ownership: formData.grama_niladhari_division_ownership,
       vh_sanghika_donation_deed: formData.sanghika_donation_deed,
       vh_government_donation_deed: formData.government_donation_deed,
@@ -854,7 +1216,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_recommend_new_center: formData.recommend_new_center,
       vh_recommend_registered_temple: formData.recommend_registered_temple,
       
-      // Step J: Annex II
+      // Step K: Annex II
       vh_annex2_recommend_construction: formData.annex2_recommend_construction,
       vh_annex2_land_ownership_docs: formData.annex2_land_ownership_docs,
       vh_annex2_chief_incumbent_letter: formData.annex2_chief_incumbent_letter,
@@ -863,52 +1225,6 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_annex2_approval_construction: formData.annex2_approval_construction,
       vh_annex2_referral_resubmission: formData.annex2_referral_resubmission,
     };
-  };
-
-
-  // Display/labels for review
-  const [display, setDisplay] = useState<{
-    viharadhipathi_name?: string;
-    nikaya?: string;
-    parshawaya?: string;
-  }>({});
-
-  // Nikaya & Parshawa
-  const nikayaData = STATIC_NIKAYA_DATA;
-  const nikayaLoading = false;
-  const nikayaError: string | null = null;
-
-  const findNikayaByCode = useCallback((code?: string | null) => nikayaData.find((n) => n.nikaya.code === (code ?? "")), [nikayaData]);
-  const parshawaOptions = useCallback((nikayaCode?: string | null) => findNikayaByCode(nikayaCode)?.parshawayas ?? [], [findNikayaByCode]);
-
-  // Update display state when values change (for auto-fill)
-  useEffect(() => {
-    if (values.nikaya) {
-      const nikayaItem = findNikayaByCode(values.nikaya);
-      if (nikayaItem) {
-        setDisplay((d) => ({ ...d, nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}` }));
-      }
-    }
-    if (values.parshawaya && values.nikaya) {
-      const nikayaItem = findNikayaByCode(values.nikaya);
-      const parshawaItem = nikayaItem?.parshawayas.find((p) => p.code === values.parshawaya);
-      if (parshawaItem) {
-        setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
-      }
-    }
-  }, [values.nikaya, values.parshawaya, findNikayaByCode]);
-
-  const onPickNikaya = (code: string) => {
-    const item = findNikayaByCode(code);
-    handleInputChange("nikaya", code);
-    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : code }));
-  };
-
-  const onPickParshawa = (code: string) => {
-    handleInputChange("parshawaya", code);
-    const nikaya = findNikayaByCode(values.nikaya);
-    const p = nikaya?.parshawayas.find((x) => x.code === code);
-    setDisplay((d) => ({ ...d, parshawaya: p ? `${p.name} - ${p.code}` : code }));
   };
 
   // Parse JSON arrays for tables
@@ -1079,6 +1395,22 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       text-align: center;
       word-break: break-all;
     }
+    .letter-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .letter-editor {
+      min-height: 9in;
+      outline: none;
+      font-family: "Noto Sans Sinhala", "Noto Sans Tamil", Arial, sans-serif;
+      line-height: 1.6;
+      color: #0f172a;
+    }
+    .letter-editor[contenteditable="true"]:focus {
+      outline: 2px solid #94a3b8;
+      outline-offset: 4px;
+    }
     @media print {
       body {
         margin: 0 !important;
@@ -1099,6 +1431,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         right: 0;
         margin: 0 auto;
         box-shadow: none !important;
+      }
+      .letter-toolbar {
+        display: none !important;
       }
     }
     .simple-certificate {
@@ -1136,6 +1471,13 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [certificateNumberLabel, display.nikaya, display.parshawaya, locationNames.divisional_secretariat, values.parshawaya, values.period_established, values.pradeshya_sabha, values.temple_address, values.temple_name, values.viharadhipathi_name, values.nikaya]);
 
   const handlePrintCertificate = () => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      setLetterDirty(true);
+      letterDirtyRef.current = true;
+    }
     const targetId = ensureActivePrintTarget();
     setActivePrintAreaId(targetId);
     window.print();
@@ -1188,6 +1530,86 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       setPrintDialogOpen(false);
       handlePrintCertificate();
       setPrintingMarking(false);
+    }
+  };
+
+  const applyLetterCommand = (command: string, value?: string) => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand(command, false, value);
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const normalizeFontSizes = () => {
+    if (!letterEditorRef.current) return;
+    const sizeMap: Record<string, string> = {
+      "1": "10px",
+      "2": "12px",
+      "3": "14px",
+      "4": "16px",
+      "5": "18px",
+      "6": "24px",
+      "7": "32px",
+    };
+    const nodes = letterEditorRef.current.querySelectorAll("font[size]");
+    nodes.forEach((node) => {
+      const sizeAttr = node.getAttribute("size") || "3";
+      const span = document.createElement("span");
+      span.style.fontSize = sizeMap[sizeAttr] || "14px";
+      span.innerHTML = node.innerHTML;
+      node.replaceWith(span);
+    });
+  };
+
+  const applyLetterFontSize = (size: "3" | "4" | "5") => {
+    if (!letterEditorRef.current) return;
+    letterEditorRef.current.focus();
+    try {
+      document.execCommand("fontSize", false, size);
+      normalizeFontSizes();
+    } catch {
+      // ignore unsupported commands
+    }
+    const html = letterEditorRef.current.innerHTML || "";
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterHtmlRef.current = html;
+    letterDirtyRef.current = true;
+  };
+
+  const handleLetterInput = () => {
+    if (!letterEditorRef.current) return;
+    letterHtmlRef.current = letterEditorRef.current.innerHTML || "";
+    if (!letterDirtyRef.current) {
+      letterDirtyRef.current = true;
+      setLetterDirty(true);
+    }
+  };
+
+  const handleLetterBlur = () => {
+    if (!letterEditorRef.current) return;
+    const html = letterEditorRef.current.innerHTML || "";
+    letterHtmlRef.current = html;
+    setLetterHtml(html);
+    setLetterDirty(true);
+    letterDirtyRef.current = true;
+  };
+
+  const handleResetLetter = () => {
+    setLetterHtml(defaultLetterHtml);
+    setLetterDirty(false);
+    letterHtmlRef.current = defaultLetterHtml;
+    letterDirtyRef.current = false;
+    if (letterEditorRef.current) {
+      letterEditorRef.current.innerHTML = defaultLetterHtml;
     }
   };
 
@@ -1368,6 +1790,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     setApproveDialogOpen(false);
   };
   const handleOpenPrintDialog = (targetId: CertificateTypeId) => {
+    if (letterEditorRef.current) {
+      const html = letterEditorRef.current.innerHTML || "";
+      letterHtmlRef.current = html;
+      setLetterHtml(html);
+      if (!letterDirtyRef.current) {
+        setLetterDirty(true);
+        letterDirtyRef.current = true;
+      }
+    }
     setActivePrintAreaId(targetId);
     setPrintDialogOpen(true);
   };
@@ -1474,7 +1905,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
               <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-2xl font-bold text-white mb-1">
+                    <h1 className="text-xl font-bold text-white mb-1">
                       Update Registration
                     </h1>
                     <p className="text-slate-300 text-sm">Editing: {viharaId}</p>
@@ -1528,25 +1959,30 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
               </div>
 
               <div className="px-4 md:px-10 py-6" ref={sectionRef}>
-                {visibleMajorStepGroups.length > 1 && (
+                {majorStepGroups.length > 1 && (
                   <div className="flex flex-wrap gap-3 mb-4">
-                    {visibleMajorStepGroups.map((group, idx) => {
+                    {majorStepGroups.map((group, idx) => {
                       const isActive = group.id === activeMajorStep;
+                      const isVisible = visibleMajorStepGroups.some((g) => g.id === group.id);
                       const firstTabId = group.tabs[0]?.id;
                       return (
                         <button
                           key={group.id}
                           onClick={() => {
+                            if (!isVisible) return;
                             setActiveMajorStep(group.id);
                             if (firstTabId) {
                               setActiveTabId(firstTabId);
                             }
                             scrollTop();
                           }}
+                          disabled={!isVisible}
                           className={`px-4 py-2 rounded-full text-sm font-semibold border transition-all ${
                             isActive
                               ? "bg-slate-800 text-white border-slate-800 shadow-sm"
-                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                              : isVisible
+                              ? "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                              : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
                           }`}
                         >
                           Vihara flow {idx + 1}
@@ -1559,9 +1995,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                   tabs={steps.map((s) => ({
                     id: String(s.id),
                     label: s.title,
+                    disabled: isTabLocked(s.id),
                   }))}
                   value={String(activeTabId)}
                   onChange={(id) => {
+                    if (isTabLocked(Number(id))) return;
                     setActiveTabId(Number(id));
                     scrollTop();
                   }}
@@ -1574,7 +2012,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                         </div>
                       ) : (
                         <div className="min-h-[360px]">
-                          <h2 className="text-xl font-bold text-slate-800 mb-5">
+                          <h2 className="text-lg font-bold text-slate-800 mb-3">
                             {stepTitle}
                           </h2>
 
@@ -1604,7 +2042,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                           <p className="text-xs uppercase tracking-[0.5em] text-slate-400">
                                             Certificate number
                                           </p>
-                                          <p className="text-2xl font-semibold text-slate-900">
+                                          <p className="text-xl font-semibold text-slate-900">
                                             {certificateNumberLabel}
                                           </p>
                                           <p className="break-all text-slate-500">
@@ -1664,15 +2102,124 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </section>
                                       </div>
                                     ) : (
-                                      <div className="flex justify-center">
-                                        <section
-                                          id={printAreaId}
-                                          data-printing={isActivePrint ? "true" : undefined}
-                                          ref={certificatePaperRef}
-                                          className="certificate-page relative"
-                                        >
-                                          <ViharadhipathiAppointmentLetter data={letterData} />
-                                        </section>
+                                      <div className="space-y-4">
+                                        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow">
+                                          <div className="letter-toolbar">
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("3")}
+                                            >
+                                              A-
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("4")}
+                                            >
+                                              A
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterFontSize("5")}
+                                            >
+                                              A+
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("bold")}
+                                            >
+                                              Bold
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("italic")}
+                                            >
+                                              Italic
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("underline")}
+                                            >
+                                              Underline
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("insertHTML", "<br />")}
+                                            >
+                                              New Line
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyLeft")}
+                                            >
+                                              Align Left
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyCenter")}
+                                            >
+                                              Center
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("justifyRight")}
+                                            >
+                                              Align Right
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={() => applyLetterCommand("removeFormat")}
+                                            >
+                                              Clear Format
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                              onClick={handleResetLetter}
+                                            >
+                                              Reset Template
+                                            </button>
+                                          </div>
+                                          <p className="mt-2 text-xs text-slate-500">
+                                            Click inside the letter and edit text. Formatting will be printed with the QR code.
+                                          </p>
+                                        </div>
+
+                                        <div className="flex justify-center">
+                                          <section
+                                            id={printAreaId}
+                                            data-printing={isActivePrint ? "true" : undefined}
+                                            ref={certificatePaperRef}
+                                            className="certificate-page relative"
+                                          >
+                                            <div className="letter-page">
+                                              <div
+                                                ref={letterEditorRef}
+                                                className="letter-editor"
+                                                contentEditable
+                                                suppressContentEditableWarning
+                                                onInput={handleLetterInput}
+                                                onBlur={handleLetterInput}
+                                                dangerouslySetInnerHTML={{ __html: letterHtml || defaultLetterHtml }}
+                                              />
+                                            </div>
+                                            <div className="letter-qr">
+                                              <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                                <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                              </div>
+                                            </div>
+                                          </section>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1682,10 +2229,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                           ) : isScannedFilesTab ? (
                             <div className="space-y-6">
+                              <style>{certificateTemplateStyles}</style>
                               <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow">
                                   {activeMajorStep === 1 ? (
                                     existingScanUrlStageOne ? (
-                                      <ViharadhipathiAppointmentLetter data={letterData} />
+                                      <div className="flex justify-center">
+                                        <section className="certificate-page relative">
+                                          <div className="letter-page">
+                                            <div
+                                              className="letter-editor"
+                                              dangerouslySetInnerHTML={{ __html: letterHtml }}
+                                            />
+                                          </div>
+                                          <div className="letter-qr">
+                                            <div className="rounded-lg border border-slate-200 bg-white p-2">
+                                              <QRCode value={certificateQrValue} size={80} className="h-20 w-20" />
+                                            </div>
+                                          </div>
+                                        </section>
+                                      </div>
                                     ) : null
                                   ) : (
                                     renderExistingScan(existingScanUrlStageTwo)
@@ -1746,7 +2308,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               </div>
                             </div>
                           ) : (
-                            <div className={`grid grid-cols-1 ${gridCols} gap-5`}>
+                            <div className={`grid grid-cols-1 ${gridCols} gap-3`}>
                               {current?.id === 8 && (
                                 <div className="md:col-span-2">
                           <LandInfoTable value={landInfoRows} onChange={handleLandInfoChange} error={errors.temple_owned_land} />
@@ -1758,9 +2320,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("land_info_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.land_info_certified && <p className="mt-1 text-sm text-red-600">{errors.land_info_certified}</p>}
+                            {errors.land_info_certified && <p className="mt-1 text-xs text-red-600">{errors.land_info_certified}</p>}
                           </div>
                           <ImportantNotes className="mt-4">
                             <strong>Important Notes:</strong>
@@ -1783,9 +2345,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 onChange={(e) => handleInputChange("resident_bhikkhus_certified", e.target.checked)}
                                 className="w-4 h-4"
                               />
-                              <span className="text-sm font-medium text-slate-700">I certify that the above information is true and correct.</span>
+                              <span className="text-xs font-medium text-slate-700">I certify that the above information is true and correct.</span>
                             </label>
-                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-sm text-red-600">{errors.resident_bhikkhus_certified}</p>}
+                            {errors.resident_bhikkhus_certified && <p className="mt-1 text-xs text-red-600">{errors.resident_bhikkhus_certified}</p>}
                           </div>
                               </div>
                             )}
@@ -1812,9 +2374,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1844,9 +2406,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1874,9 +2436,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               })}
@@ -1899,10 +2461,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     <LocationPicker
                                       key={`location-${values.province}-${values.district}-${values.divisional_secretariat}-${values.grama_niladhari_division}`}
                                       value={{
-                                        provinceCode: (values.province as string) || undefined,
-                                        districtCode: (values.district as string) || undefined,
-                                        divisionCode: (values.divisional_secretariat as string) || undefined,
-                                        gnCode: (values.grama_niladhari_division as string) || undefined,
+                                        provinceCode: values.province ? (values.province as string) : undefined,
+                                        districtCode: values.district ? (values.district as string) : undefined,
+                                        divisionCode: values.divisional_secretariat ? (values.divisional_secretariat as string) : undefined,
+                                        gnCode: values.grama_niladhari_division ? (values.grama_niladhari_division as string) : undefined,
                                       }}
                                       onChange={(sel) => {
                                         handleSetMany({
@@ -1922,7 +2484,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       }}
                                     />
                                     {(errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division) && (
-                                      <p className="mt-1 text-sm text-red-600">
+                                      <p className="mt-1 text-xs text-red-600">
                                         {errors.province || errors.district || errors.divisional_secretariat || errors.grama_niladhari_division}
                                       </p>
                                     )}
@@ -1936,27 +2498,21 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "pradeshya_sabha") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
-                                    {sasanarakshakaLoading ? (
-                                      <div className="text-sm text-slate-600">Loading list...</div>
-                                    ) : sasanarakshakaError ? (
-                                      <div role="alert" className="text-sm text-red-600">{sasanarakshakaError}</div>
-                                    ) : (
-                                      <select
-                                        id={id}
-                                        value={val}
-                                        onChange={(e) => handleInputChange(f.name, e.target.value)}
-                                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
-                                      >
-                                        <option value="">Select Sasanarakshaka Bala Mandalaya</option>
-                                        {sasanarakshakaOptions.map((opt) => (
-                                          <option key={opt.id} value={opt.name}>
-                                            {opt.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    )}
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    <SasanarakshakaAutocomplete
+                                      id={id}
+                                      label={f.label}
+                                      placeholder="Type SSB name or code"
+                                      initialDisplay={val}
+                                      onPick={(picked) => {
+                                        handleSetMany({
+                                          pradeshya_sabha: picked.code ?? "",
+                                        });
+                                      }}
+                                      onInputChange={() => {
+                                        handleInputChange(f.name, "");
+                                      }}
+                                    />
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1965,11 +2521,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "nikaya") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     {nikayaLoading ? (
                                       <div className="text-sm text-slate-600">Loading Nikaya…</div>
                                     ) : nikayaError ? (
-                                      <div role="alert" className="text-sm text-red-600">Error: {nikayaError}</div>
+                                      <div role="alert" className="text-xs text-red-600">Error: {nikayaError}</div>
                                     ) : (
                                       <select
                                         key={`nikaya-select-${values.nikaya}`}
@@ -1977,7 +2533,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         value={values.nikaya ?? ""}
                                         onChange={(e) => onPickNikaya(e.target.value)}
                                         required={!!f.rules?.required}
-                                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                       >
                                         <option value="">Select Nikaya</option>
                                         {nikayaData.map((n) => (
@@ -1987,7 +2543,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         ))}
                                       </select>
                                     )}
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -1996,7 +2552,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 const options = parshawaOptions(values.nikaya);
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">{f.label}</label>
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <select
                                       key={`parshawaya-select-${values.nikaya}-${values.parshawaya}`}
                                       id={id}
@@ -2004,7 +2560,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       onChange={(e) => onPickParshawa(e.target.value)}
                                       required={!!f.rules?.required}
                                       disabled={!values.nikaya || options.length === 0}
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all disabled:bg-slate-100"
                                     >
                                       <option value="">{values.nikaya ? "Select Parshawaya" : "Select Nikaya first"}</option>
                                       {options.map((p) => (
@@ -2013,7 +2569,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         </option>
                                       ))}
                                     </select>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2031,15 +2587,109 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       label={f.label}
                                       required={!!f.rules?.required}
                                       initialDisplay={displayValue}
-                                      placeholder="Type a Bhikkhu name or registration number"
+                                      placeholder="Search by name, REGN, temple, or address"
+                                      showAddButton={true}
                                       onPick={(picked) => {
+                                        const regnValue = picked.regn || String(picked.data?.br_regn ?? "");
                                         handleSetMany({
                                           viharadhipathi_name: picked.name ?? "",
-                                          viharadhipathi_regn: picked.regn ?? "",
+                                          viharadhipathi_regn: regnValue,
                                         });
+                                        
+                                        // Auto-add viharadhipathi to resident bhikkhus as first entry
+                                        try {
+                                          const currentBhikkhus = JSON.parse(values.resident_bhikkhus || "[]");
+                                          
+                                          // Check if this bhikkhu already exists in the table
+                                          const existingIndex = currentBhikkhus.findIndex(
+                                            (b: any) => (b.registrationNumber || b.registration_number) === regnValue
+                                          );
+                                          
+                                          // Remove existing entry if found
+                                          if (existingIndex >= 0) {
+                                            currentBhikkhus.splice(existingIndex, 1);
+                                          }
+                                          
+                                          // Add as first entry
+                                          const newEntry = {
+                                            id: `bhikkhu-viharadhipathi-${Date.now()}`,
+                                            serialNumber: 1,
+                                            bhikkhuName: picked.name ?? "",
+                                            registrationNumber: regnValue,
+                                            occupationEducation: "Chief Incumbent (Viharadhipathi)",
+                                          };
+                                          
+                                          // Insert at beginning and update serial numbers
+                                          const updatedBhikkhus = [newEntry, ...currentBhikkhus].map((b, idx) => ({
+                                            ...b,
+                                            serialNumber: idx + 1,
+                                          }));
+                                          
+                                          handleInputChange("resident_bhikkhus", JSON.stringify(updatedBhikkhus));
+                                        } catch (e) {
+                                          console.error("Error auto-adding viharadhipathi to resident bhikkhus:", e);
+                                        }
                                       }}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                                  </div>
+                                );
+                              }
+
+                              // Bypass toggle fields (Stage F)
+                              if (f.type === "checkbox") {
+                                const BYPASS_FIELDS = ["vh_bypass_no_detail", "vh_bypass_no_chief", "vh_bypass_ltr_cert"];
+                                if (BYPASS_FIELDS.includes(id)) {
+                                  const checked = (values[f.name] as boolean) || false;
+                                  const parts = f.label.split(" — ");
+                                  const otherBypassIsOn = !!activeBypassEntry && activeBypassEntry.field !== id;
+                                  const isLockedOn = checked && !canModerate;
+                                  const toggleDisabled = otherBypassIsOn || isLockedOn;
+                                  return (
+                                    <div key={id} className="md:col-span-2">
+                                      <div className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-colors ${checked ? "bg-amber-50 border-amber-300" : toggleDisabled ? "bg-slate-100 border-slate-200 opacity-60" : "bg-slate-50 border-slate-200"}`}>
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-semibold text-slate-800">{parts[1] ?? parts[0]}</p>
+                                          <p className="text-xs text-slate-500 mt-0.5">{parts[0]}</p>
+                                          {isLockedOn && <p className="text-[10px] text-amber-600 mt-1 font-medium">Admin access required to disable</p>}
+                                          {otherBypassIsOn && <p className="text-[10px] text-slate-400 mt-1">Another bypass is already active</p>}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={checked}
+                                          disabled={toggleDisabled}
+                                          title={otherBypassIsOn ? "Another bypass is active for this record" : isLockedOn ? "Only administrators can disable this" : undefined}
+                                          onClick={() => {
+                                            if (toggleDisabled) return;
+                                            if (!checked) {
+                                              setBypassConfirm({ field: f.name as keyof ViharaForm, label: f.label });
+                                            } else {
+                                              handleInputChange(f.name, false);
+                                            }
+                                          }}
+                                          className={`relative shrink-0 inline-flex h-6 w-11 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${toggleDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${checked ? "bg-indigo-600" : "bg-slate-300"}`}
+                                        >
+                                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? "translate-x-5" : "translate-x-0"}`} />
+                                        </button>
+                                      </div>
+                                      {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                                    </div>
+                                  );
+                                }
+                                // Non-bypass checkbox
+                                return (
+                                  <div key={id} className="md:col-span-2">
+                                    <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                                      <input
+                                        type="checkbox"
+                                        checked={(values[f.name] as boolean) || false}
+                                        onChange={(e) => handleInputChange(f.name, e.target.checked)}
+                                        className="w-4 h-4 cursor-pointer"
+                                      />
+                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                    </label>
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2055,9 +2705,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                         onChange={(e) => handleInputChange(f.name, e.target.checked)}
                                         className="w-4 h-4"
                                       />
-                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                      <span className="text-xs font-medium text-slate-700">{f.label}</span>
                                     </label>
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2066,7 +2716,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "inspection_code") {
                                 return (
                                   <div key={id}>
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       This temple has been personally inspected by me. Accordingly, the following code has been issued:
                                     </label>
                                     <input
@@ -2075,9 +2725,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter code"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2086,7 +2736,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "grama_niladhari_division_ownership") {
                                 return (
                                   <div key={id} className="md:col-span-2">
-                                    <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
                                       In the Grama Niladhari Division of .........................
                                     </label>
                                     <input
@@ -2095,9 +2745,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       value={val}
                                       onChange={(e) => handleInputChange(f.name, e.target.value)}
                                       placeholder="Enter division name"
-                                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2120,6 +2770,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 );
                               }
 
+                              // Date fields - Use DateField component from vihara/add
+                              if (f.type === "date") {
+                                return (
+                                  <div key={id}>
+                                    <DateField
+                                      id={id}
+                                      label={f.label}
+                                      value={val}
+                                      onChange={(displayValue) => handleInputChange(f.name, displayValue)}
+                                      required={!!f.rules?.required}
+                                      placeholder="YYYY/MM/DD"
+                                      error={err}
+                                    />
+                                  </div>
+                                );
+                              }
+
                               // Textarea fields
                               if (f.type === "textarea") {
                                 const idStr = String(f.name);
@@ -2129,7 +2796,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                   : (idStr === "inspection_report" || idStr === "buildings_description" ? "md:col-span-2" : "");
                                 return (
                                   <div key={idStr} className={spanClass}>
-                                    <label htmlFor={idStr} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                    <label htmlFor={idStr} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                     <textarea
                                       id={idStr}
                                       value={val}
@@ -2138,7 +2805,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
                                       placeholder={f.placeholder}
                                     />
-                                    {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
@@ -2146,7 +2813,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               // Regular text/email/tel inputs
                               return (
                                 <div key={id} className={current?.id === 7 && id === "dayaka_families_count" ? "md:col-span-3" : ""}>
-                                  <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">{f.label}</label>
+                                  <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">{f.label}</label>
                                   <input
                                     id={id}
                                     type={f.type}
@@ -2155,7 +2822,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
                                     placeholder={f.placeholder}
                                   />
-                                  {err ? <p className="mt-1 text-sm text-red-600">{err}</p> : null}
+                                  {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                 </div>
                               );
                             })}
@@ -2182,7 +2849,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               <button
                                 onClick={handleSaveTab}
                                 disabled={saving || loading}
-                                className="flex items-center justify-center gap-2 px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
+                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-800 transition-all disabled:opacity-70"
                               >
                                 {saving ? "Saving…" : "Save this section"}
                               </button>
@@ -2357,6 +3024,123 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                   </Dialog>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
+
+      {/* ── Admin Unlock Bypass Banner ───────────────────────────────── */}
+      {canModerate && BYPASS_STATUSES.has(workflowStatus) && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            type="button"
+            onClick={() => setUnlockConfirm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl shadow-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+            </svg>
+            Unlock Record
+          </button>
+        </div>
+      )}
+
+      {/* ── Unlock Bypass Confirm Modal ──────────────────────────────── */}
+      {unlockConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Unlock Bypass Record?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Admin action — resets status to pending</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This will <strong className="text-slate-800">clear the active bypass flag</strong> and reset the record status back to{" "}
+                <strong className="text-slate-800">S1_PENDING</strong>.
+              </p>
+              <p className="text-sm text-slate-500 mt-2">
+                The record will be fully editable again. This action is logged with your credentials. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setUnlockConfirm(false)}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUnlockBypass}
+                disabled={saving}
+                className="px-5 py-2 text-sm font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Unlocking…</>
+                ) : "Unlock Record"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bypass Toggle Confirm Modal ─────────────────────────────── */}
+      {bypassConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Mark as Complete?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{bypassConfirm.label.split(" — ")[0]}</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                Enabling{" "}
+                <strong className="text-slate-800">
+                  {bypassConfirm.label.split(" — ")[1] ?? bypassConfirm.label}
+                </strong>{" "}
+                will mark this section as complete.
+              </p>
+              <p className="text-sm text-slate-500 mt-2">
+                Your record will be <strong>saved</strong> and you will return to the vihara list. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setBypassConfirm(null)}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBypassSave}
+                disabled={saving}
+                className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
+                ) : "Save & Return"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2368,3 +3152,4 @@ export default function UpdateVihara({ role, department }: { role: string | unde
     </Suspense>
   );
 }
+

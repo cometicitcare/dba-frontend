@@ -1,0 +1,18 @@
+{
+  "topbar": {
+    "languageLabel": "Language",
+    "logout": "Logout",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "search": "Search"
+  },
+  "auth": {
+    "login": "Login",
+    "forgotPassword": "Forgot password?",
+    "welcome": "Welcome, {name}"
+  }
+}

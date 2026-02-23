@@ -206,7 +206,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               {columns.map((c) => (
                 <th
                   key={String(c.key)}
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-3 py-1 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide"
                 >
                   {c.sortable ? (
                     <button
@@ -229,7 +229,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               {(onEdit || onDelete) && 
               (activePage !== NILAME && activePage !== DEWALA) && 
               (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-1 text-left text-[11px] font-medium text-gray-500 uppercase tracking-wide">
                   Action
                 </th>
               )}
@@ -254,7 +254,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                       : String(rawValue);
 
                   return (
-                    <td key={colKey} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td key={colKey} className="px-3 py-1 whitespace-nowrap text-xs text-gray-900">
                       {content}
                     </td>
                   );
@@ -262,7 +262,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                 {(onEdit || onDelete) && 
                 (activePage !== NILAME && activePage !== DEWALA)
                  && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="px-3 py-1 whitespace-nowrap text-xs">
                     <div className="flex gap-2">
                       {onEdit && (
                         <button
@@ -291,7 +291,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               <tr>
                 <td
                   colSpan={columns.length + (onEdit || onDelete ? 1 : 0)}
-                  className="px-6 py-8 text-center text-sm text-gray-500"
+                  className="px-4 py-6 text-center text-xs text-gray-500"
                 >
                   No records found
                 </td>
@@ -302,15 +302,15 @@ export function DataTable<T extends Record<string, unknown> = any>({
       </div>
 
       {!hidePagination && (
-        <div className="px-6 py-4 border-t border-gray-200 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-gray-700">
+        <div className="px-4 py-3 border-t border-gray-200 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-gray-700">
             Showing {sorted.length === 0 ? 0 : startIndex + 1} to{" "}
             {Math.min(startIndex + itemsPerPage, sorted.length)} of {sorted.length} entries
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-700">Records per page</span>
+              <span className="text-xs text-gray-700">Records per page</span>
               <select
                 value={itemsPerPage}
                 onChange={(e) => {
@@ -318,7 +318,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
                   setItemsPerPage(n);
                   setCurrentPage(1);
                 }}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
+                className="border border-gray-300 rounded px-2 py-1 text-xs"
               >
                 {[5, 10, 25, 50, 100, 250].map((n) => (
                   <option key={n} value={n}>
@@ -332,7 +332,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               <button
                 onClick={() => goToPage(1)}
                 disabled={safeCurrentPage === 1}
-                className={`px-2 py-1 rounded border text-sm ${
+                className={`px-2 py-1 rounded border text-xs ${
                   safeCurrentPage === 1
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-white hover:bg-gray-50 text-gray-700"
@@ -345,7 +345,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               <button
                 onClick={() => goToPage(safeCurrentPage - 1)}
                 disabled={safeCurrentPage === 1}
-                className={`px-2 py-1 rounded border text-sm ${
+                className={`px-2 py-1 rounded border text-xs ${
                   safeCurrentPage === 1
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-white hover:bg-gray-50 text-gray-700"
@@ -358,14 +358,14 @@ export function DataTable<T extends Record<string, unknown> = any>({
 
               {visibleRange.map((p, i) =>
                 p === "…" ? (
-                  <span key={`ellipsis-${i}`} className="px-2 py-1 text-sm text-gray-500">
+                  <span key={`ellipsis-${i}`} className="px-2 py-1 text-xs text-gray-500">
                     …
                   </span>
                 ) : (
                   <button
                     key={p}
                     onClick={() => goToPage(p)}
-                    className={`px-3 py-1 rounded text-sm ${
+                    className={`px-2.5 py-1 rounded text-xs ${
                       p === safeCurrentPage
                         ? "bg-blue-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -379,7 +379,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               <button
                 onClick={() => goToPage(safeCurrentPage + 1)}
                 disabled={safeCurrentPage === totalPages}
-                className={`px-2 py-1 rounded border text-sm ${
+                className={`px-2 py-1 rounded border text-xs ${
                   safeCurrentPage === totalPages
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-white hover:bg-gray-50 text-gray-700"
@@ -392,7 +392,7 @@ export function DataTable<T extends Record<string, unknown> = any>({
               <button
                 onClick={() => goToPage(totalPages)}
                 disabled={safeCurrentPage === totalPages}
-                className={`px-2 py-1 rounded border text-sm ${
+                className={`px-2 py-1 rounded border text-xs ${
                   safeCurrentPage === totalPages
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                     : "bg-white hover:bg-gray-50 text-gray-700"

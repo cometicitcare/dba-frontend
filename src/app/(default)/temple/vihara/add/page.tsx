@@ -22,10 +22,11 @@ const Page = () => {
   }, [router]);
 
   const department = userData?.department;
+  const roleLevel = userData?.roleLevel || '';
 
   return (
     <div>
-      <AddVihara department={department} />
+      <AddVihara department={department} role={roleLevel} />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState, Suspense, useEffect, useCallback } fr
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageArama } from "@/services/arama";
 import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
+import SasanarakshakaAutocomplete from "@/components/sasanarakshaka/AutoComplete";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -49,6 +50,7 @@ function AddAramaPageInner() {
 
   const reviewEnabled = true;
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const showDemoFill = process.env.NEXT_PUBLIC_SHOW_DEMO_FILL === "true";
 
   const effectiveSteps: Array<StepConfig<AramaForm>> = useMemo(() => {
     if (!reviewEnabled) return steps;
@@ -95,6 +97,148 @@ function AddAramaPageInner() {
       setErrors(nextErrors);
       return next;
     });
+  };
+
+  const randomDigits = (count: number) =>
+    Array.from({ length: count }, () => Math.floor(Math.random() * 10)).join("");
+
+  const randomPhone075 = () => `075${randomDigits(7)}`;
+
+  const randomEmail = () => `user${randomDigits(4)}@example.com`;
+
+  function pickRandom<T>(list: T[], fallback: T): T;
+  function pickRandom<T>(list: T[], fallback?: T): T | undefined;
+  function pickRandom<T>(list: T[], fallback?: T): T | undefined {
+    return list.length ? list[Math.floor(Math.random() * list.length)] : fallback;
+  }
+
+  type GnDivision = {
+    gn_gnc?: string;
+    gn_code?: string;
+    gn_gnname?: string;
+  };
+
+  type DivisionalSecretariat = {
+    dv_dvcode?: string;
+    dv_dvname?: string;
+    gn_divisions?: GnDivision[];
+  };
+
+  type District = {
+    dd_dcode?: string;
+    dd_dname?: string;
+    divisional_secretariats?: DivisionalSecretariat[];
+  };
+
+  type Province = {
+    cp_code?: string;
+    cp_name?: string;
+    districts?: District[];
+  };
+
+  type SelectionsData = {
+    provinces?: Province[];
+  };
+
+  const buildRandomFormData = (): Partial<AramaForm> => {
+    const data = selectionsData as SelectionsData;
+    const provinces = Array.isArray(data.provinces) ? data.provinces : [];
+    const province = pickRandom(provinces);
+    const districts = province?.districts ?? [];
+    const district = pickRandom(districts);
+    const divisions = district?.divisional_secretariats ?? [];
+    const division = pickRandom(divisions);
+    const gns = division?.gn_divisions ?? [];
+    const gn = pickRandom(gns);
+
+    const provinceCode = province?.cp_code ?? "";
+    const districtCode = district?.dd_dcode ?? "";
+    const divisionCode = division?.dv_dvcode ?? "";
+    const gnCode = gn?.gn_gnc ?? gn?.gn_code ?? "";
+
+    const landRow: LandInfoRow = {
+      id: `land-${Date.now()}`,
+      serialNumber: 1,
+      landName: "Land " + randomDigits(2),
+      village: "Village " + randomDigits(2),
+      district: district?.dd_dname ?? "",
+      extent: `${Math.floor(Math.random() * 5) + 1} acres`,
+      cultivationDescription: "Temple buildings",
+      ownershipNature: pickRandom(["Bandara", "Rajakariya", "Other"], "Other"),
+      deedNumber: `DEED${randomDigits(4)}`,
+      titleRegistrationNumber: `TITLE${randomDigits(4)}`,
+      taxDetails: "Paid",
+      landOccupants: "Temple",
+    };
+
+    const residentRow: ResidentSilmathaRow = {
+      id: `silmatha-${Date.now()}`,
+      serialNumber: 1,
+      silmathaName: `Silmatha ${randomDigits(2)}`,
+      registrationNumber: `REG${randomDigits(5)}`,
+      occupationEducation: "Studying",
+    };
+
+    const establishedYear = String(2010 + Math.floor(Math.random() * 15));
+
+    return {
+      arama_name: `Sample Arama ${randomDigits(3)}`,
+      arama_address: `${Math.floor(Math.random() * 200) + 1} Temple Road`,
+      telephone_number: randomPhone075(),
+      whatsapp_number: randomPhone075(),
+      email_address: randomEmail(),
+      province: provinceCode,
+      district: districtCode,
+      divisional_secretariat: divisionCode,
+      provincial_sasanaarakshaka_council: province?.cp_name ?? "Province Council",
+      grama_niladhari_division: gnCode,
+      chief_nun_name: `Chief Nun ${randomDigits(2)}`,
+      chief_nun_registration_number: `REG${randomDigits(6)}`,
+      established_period: establishedYear,
+      land_size: `${Math.floor(Math.random() * 5) + 1} acres`,
+      land_ownership: "Private",
+      legal_ownership_proof: "Grant Deed",
+      existing_buildings_facilities: "Main hall, meditation room",
+      donor_families_count: String(Math.floor(Math.random() * 80) + 10),
+      committees: "Donor Society",
+      arama_owned_land: JSON.stringify([landRow]),
+      land_info_certified: true,
+      resident_silmathas: JSON.stringify([residentRow]),
+      resident_silmathas_certified: true,
+      inspection_report: "Well maintained.",
+      inspection_code: `INSP${randomDigits(4)}`,
+      ownership_district: district?.dd_dname ?? "",
+      ownership_divisional_secretariat: division?.dv_dvname ?? "",
+      ownership_grama_niladhari_division: gn?.gn_gnname ?? "",
+      ownership_arama_name: `Sample Arama ${randomDigits(3)}`,
+      pooja_deed_obtained: true,
+      government_pooja_deed_obtained: false,
+      government_pooja_deed_in_progress: false,
+      institution_name: "Buddhist Affairs Department",
+      institution_consent_obtained: true,
+      recommend_new_center: true,
+      recommend_registered_arama: false,
+      annex2_chief_nun_registered: true,
+      annex2_land_ownership_docs: true,
+      annex2_institution_consent: true,
+      annex2_district_association_recommendation: true,
+      annex2_divisional_secretary_recommendation: true,
+      annex2_recommend_district: district?.dd_dname ?? "",
+      annex2_recommend_divisional_secretariat: division?.dv_dvname ?? "",
+      annex2_recommend_grama_niladhari_division: gn?.gn_gnname ?? "",
+      annex2_recommend_arama_name: `Sample Arama ${randomDigits(3)}`,
+      secretary_approve_construction: true,
+      secretary_not_approve_construction: false,
+      secretary_refer_registration: false,
+      secretary_refer_resubmission: false,
+      secretary_resubmission_notes: "",
+    };
+  };
+
+  const handleFillDemo = () => {
+    const randomData = buildRandomFormData();
+    handleSetMany(randomData);
+    toast.info("Random data filled.", { autoClose: 1200 });
   };
 
   const validateStep = (stepIndex: number): boolean => {
@@ -232,6 +376,8 @@ function AddAramaPageInner() {
       ar_dayaka_sabha: "", // Not in form
       ar_temple_working_committee: "", // Not in form
       ar_other_associations: "", // Not in form
+      ar_landSize: formData.land_size ?? "",
+      ar_landOwnerShipType: formData.land_ownership ?? "",
       
       // Step 5: Land Information
       temple_owned_land: mappedLand,
@@ -491,7 +637,7 @@ function AddAramaPageInner() {
     <div className="w-full min-h-screen bg-gray-50">
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
       <Sidebar isOpen={sidebarOpen} />
-      <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
+      <div className={`transition-all duration-300 pt-20 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
         <main className="p-2 mb-20">
           <div className="w-full">
             <div className="bg-white shadow-xl overflow-hidden">
@@ -501,6 +647,15 @@ function AddAramaPageInner() {
                     <h1 className="text-2xl font-bold text-white mb-1">Arama Registration Form</h1>
                     <p className="text-slate-300 text-sm">Please complete all required information</p>
                   </div>
+                  {showDemoFill ? (
+                    <button
+                      type="button"
+                      onClick={handleFillDemo}
+                      className="px-4 py-2 text-sm font-medium bg-white text-slate-800 rounded-lg shadow hover:bg-slate-100 transition-all"
+                    >
+                      Fill Sample Data
+                    </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -641,17 +796,23 @@ function AddAramaPageInner() {
                             </p>
                           )}
                           <div className="mt-4">
-                            <label htmlFor="provincial_sasanaarakshaka_council" className="block text-sm font-medium text-slate-700 mb-2">
-                              Provincial Sasanaarakshaka Council
-                            </label>
-                            <input
+                            <SasanarakshakaAutocomplete
                               id="provincial_sasanaarakshaka_council"
-                              type="text"
-                              value={(values.provincial_sasanaarakshaka_council as string) ?? ""}
-                              onChange={(e) => handleInputChange("provincial_sasanaarakshaka_council", e.target.value)}
-                              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                              label="Provincial Sasanaarakshaka balamandalaya"
+                              placeholder="Type SSB name or code"
+                              initialDisplay={(values.provincial_sasanaarakshaka_council as string) ?? ""}
+                              onPick={(picked) => {
+                                handleSetMany({
+                                  provincial_sasanaarakshaka_council: picked.code ?? "",
+                                });
+                              }}
+                              onInputChange={() => {
+                                handleInputChange("provincial_sasanaarakshaka_council", "");
+                              }}
                             />
-                            {errors.provincial_sasanaarakshaka_council && <p className="mt-1 text-sm text-red-600">{errors.provincial_sasanaarakshaka_council}</p>}
+                            {errors.provincial_sasanaarakshaka_council && (
+                              <p className="mt-1 text-sm text-red-600">{errors.provincial_sasanaarakshaka_council}</p>
+                            )}
                           </div>
                         </div>
                       )}

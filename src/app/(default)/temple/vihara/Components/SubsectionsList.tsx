@@ -766,7 +766,7 @@ function LabeledDate({
   onChange: (v: string) => void;
 }) {
   const hiddenRef = useRef<HTMLInputElement | null>(null);
-  const normalized = toYYYYMMDD(value);
+  const normalized = toYYYYMMDD(value); // Convert to display format (YYYY/MM/DD)
 
   const openPicker = () => {
     const el = hiddenRef.current;
@@ -781,10 +781,10 @@ function LabeledDate({
         <input
           type="text"
           inputMode="numeric"
-          pattern="\\d{4}-\\d{2}-\\d{2}"
-          placeholder="YYYY-MM-DD"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          pattern="(\d{4}-\d{2}-\d{2}|\d{4}/\d{2}/\d{2})"
+          placeholder="YYYY/MM/DD"
+          value={normalized}
+          onChange={(e) => onChange(toYYYYMMDD(e.target.value))}
           onBlur={(e) => onChange(toYYYYMMDD(e.target.value))}
           className="w-full rounded-l-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
@@ -799,14 +799,14 @@ function LabeledDate({
         <input
           ref={hiddenRef}
           type="date"
-          value={normalized}
+          value={toYYYYMMDD(value).replace(/\//g, "-")}
           onChange={(e) => onChange(toYYYYMMDD(e.target.value))}
           className="absolute opacity-0 pointer-events-none w-0 h-0"
           tabIndex={-1}
           aria-hidden="true"
         />
       </div>
-      <span className="text-xs text-gray-500">Format: YYYY-MM-DD</span>
+      <span className="text-xs text-gray-500">Format: YYYY/MM/DD</span>
     </label>
   );
 }
