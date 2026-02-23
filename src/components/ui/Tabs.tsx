@@ -6,6 +6,8 @@ import React, { useState } from "react";
 type TabItem = {
   id: string;
   label: string;
+  /** When true the tab renders dimmed and is non-interactive */
+  disabled?: boolean;
 };
 
 type TabsProps = {
@@ -60,16 +62,22 @@ export const Tabs: React.FC<TabsProps> = ({
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => handleChange(tab.id)}
+                onClick={() => !tab.disabled && handleChange(tab.id)}
+                disabled={tab.disabled}
+                title={tab.disabled ? "This section is locked" : undefined}
                 className={[
-                  "relative pb-3 pt-6 font-medium", // removed hard-coded text-lg
-                  labelClassName, // allows consumer control (e.g., text-sm, text-base)
+                  "relative pb-3 pt-6 font-medium",
+                  labelClassName,
                   "transition-colors",
-                  isActive ? "text-slate-900" : "text-slate-500 hover:text-slate-700",
+                  tab.disabled
+                    ? "opacity-40 cursor-not-allowed text-slate-400"
+                    : isActive
+                    ? "text-slate-900"
+                    : "text-slate-500 hover:text-slate-700",
                 ].join(" ")}
               >
                 {tab.label}
-                {isActive && (
+                {isActive && !tab.disabled && (
                   <span className="absolute left-0 -bottom-[1px] h-[3px] w-full bg-slate-900 rounded-full" />
                 )}
               </button>

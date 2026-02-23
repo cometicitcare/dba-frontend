@@ -186,7 +186,7 @@ export default function BhikkhuAutocomplete({
                 if (!name) return;
                 setAddSubmitting(true);
                 try {
-                  await _manageTempBhikku({
+                  const response = await _manageTempBhikku({
                     action: "CREATE",
                     payload: {
                       data: {
@@ -199,11 +199,32 @@ export default function BhikkhuAutocomplete({
                       },
                     },
                   });
+                  
+                  // Get the created bhikkhu with br_regn from response
+                  const created = (response as any)?.data?.data;
+                  const brRegn = created?.br_regn || "";
+                  const bhikkhuName = created?.br_mahananame || created?.br_gihiname || name;
+                  const display = `${bhikkhuName} — ${brRegn}`;
+                  
                   toast.success("Temporary bhikkhu created");
+                  
+                  // Call onPick to populate the parent form field
+                  onPick({
+                    regn: brRegn,
+                    name: bhikkhuName,
+                    display,
+                    data: created,
+                  });
+                  
+                  // Update the visible input field
+                  setInput(display);
+                  
                   await onAddBhikkhu?.({
-                    name,
+                    name: bhikkhuName,
+                    phone: brRegn,
                   });
                   setAddDialogOpen(false);
+                  resetDialogFields();
                 } finally {
                   setAddSubmitting(false);
                 }
@@ -212,7 +233,7 @@ export default function BhikkhuAutocomplete({
             >
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Name
+                  Name <span className="text-xs text-red-500">*</span>
                   <input
                     type="text"
                     value={newBhikkhuName}
@@ -232,7 +253,7 @@ export default function BhikkhuAutocomplete({
                 </label>
               </div>
               <label className="block text-sm font-medium text-slate-700">
-                Address
+                Address <span className="text-xs text-slate-500">(Optional)</span>
                 <textarea
                   value={tbAddress}
                   onChange={(e) => setTbAddress(e.target.value)}

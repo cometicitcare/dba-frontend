@@ -14,6 +14,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { PlusIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageVihara } from "@/services/vihara";
+import { _manageTempTemple } from "@/services/temple";
 import LocationPickerCompact from "@/components/Bhikku/Filter/LocationPickerCompact";
 import NikayaParshawaCompact from "@/components/Bhikku/Filter/NikayaParshawaCompact";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
@@ -24,6 +25,38 @@ import "react-toastify/dist/ReactToastify.css";
 import { VIHARA } from "../../constants";
 import { getStoredUserData } from "@/utils/userData";
 import { DIVITIONAL_SEC_MANAGEMENT_DEPARTMENT } from "@/utils/config";
+
+/** Human-readable labels + badge colors for every known workflow_status value */
+const STATUS_META: Record<string, { label: string; color: string }> = {
+  S1_PENDING:          { label: "Stage 1 — Pending",              color: "bg-yellow-100 text-yellow-800" },
+  S1_PRINTING:         { label: "Stage 1 — Printing",             color: "bg-blue-100 text-blue-800" },
+  S1_PEND_APPROVAL:    { label: "Stage 1 — Awaiting Approval",    color: "bg-orange-100 text-orange-800" },
+  S1_APPROVED:         { label: "Stage 1 — Approved",             color: "bg-green-100 text-green-800" },
+  S1_REJECTED:         { label: "Stage 1 — Rejected",             color: "bg-red-100 text-red-800" },
+  S1_NO_DETAIL_COMP:   { label: "No Detail — Complete (Bypass)",  color: "bg-amber-100 text-amber-800" },
+  S1_NO_CHIEF_COMP:    { label: "No Chief — Complete (Bypass)",   color: "bg-amber-100 text-amber-800" },
+  S1_LTR_CERT_DONE:    { label: "Letter & Cert — Done (Bypass)",  color: "bg-amber-100 text-amber-800" },
+  S2_PENDING:          { label: "Stage 2 — Pending",              color: "bg-teal-100 text-teal-800" },
+  S2_PRINTING:         { label: "Stage 2 — Printing",             color: "bg-cyan-100 text-cyan-800" },
+  S2_PEND_APPROVAL:    { label: "Stage 2 — Awaiting Approval",    color: "bg-indigo-100 text-indigo-800" },
+  S2_APPROVED:         { label: "Stage 2 — Approved",             color: "bg-emerald-100 text-emerald-800" },
+  COMPLETED:           { label: "Completed",                      color: "bg-green-200 text-green-900" },
+  REJECTED:            { label: "Rejected (Final)",               color: "bg-red-200 text-red-900" },
+  TEMPORARY:           { label: "Temporary",                      color: "bg-slate-100 text-slate-600" },
+  PENDING:             { label: "Pending",                        color: "bg-yellow-100 text-yellow-800" },
+};
+
+function StatusBadge({ status }: { status?: string }) {
+  if (!status) return null;
+  const meta = STATUS_META[status];
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${
+      meta ? meta.color : "bg-slate-100 text-slate-700"
+    }`}>
+      {meta ? meta.label : status}
+    </span>
+  );
+}
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -238,6 +271,8 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     setLoading(true);
     try {
       const payload = buildFilterPayload(f);
+      
+      // Fetch regular viharas
       const response = await _manageVihara({
         action: "READ_ALL",
         payload,
@@ -246,22 +281,75 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       const apiData = pickRows<any>(response.data);
       const total = (response.data as any)?.totalRecords ?? apiData.length;
 
-      const cleaned: ViharaRow[] = apiData.map((row: any) => ({
-        vh_id: row?.vh_id ?? 0,
+      // Fetch temporary viharas
+      let tempViharas: any[] = [];
+      let tempTotal = 0;
+      try {
+        const tempPayload = {
+          page: f.page,
+          limit: f.limit,
+          search: f.searchKey ?? "",
+        };
+        
+        const tempResponse = await _manageTempTemple({
+          action: "READ_ALL",
+          payload: tempPayload,
+        });
+        
+        // Handle both response formats
+        const tempData = (tempResponse.data as any);
+        if (tempData?.data?.records) {
+          tempViharas = tempData.data.records;
+          tempTotal = tempData.data?.total ?? 0;
+        } else if (Array.isArray(tempData?.records)) {
+          tempViharas = tempData.records;
+          tempTotal = tempData?.total ?? 0;
+        } else if (Array.isArray(tempData?.data)) {
+          tempViharas = tempData.data;
+          tempTotal = tempData?.total ?? tempViharas.length;
+        }
+      } catch (tempError) {
+        console.warn("Warning: Could not fetch temporary viharas:", tempError);
+        // Continue without TEMP records if fetch fails
+      }
+
+      // Merge regular and temporary viharas
+      const allRecords = [
+        ...apiData,
+        ...tempViharas.map((temp: any) => ({
+          tv_id: temp?.tv_id,
+          vh_id: -Math.abs(temp?.tv_id || 0), // Use negative ID for TEMP records
+          vh_trn: `TEMP-${temp?.tv_id ?? ""}`,
+          name: String(temp?.tv_name ?? ""),
+          mobile: temp?.tv_mobile ?? "",
+          email: temp?.tv_email ?? "",
+          address: String(temp?.tv_address ?? ""),
+          province: temp?.tv_province ?? "",
+          district: temp?.tv_district ?? "",
+          nikaya: "",
+          workflow_status: "TEMPORARY",
+        }))
+      ];
+
+      const cleaned: ViharaRow[] = allRecords.map((row: any) => ({
+        vh_id: row?.vh_id ?? row?.tv_id ?? 0,
         vh_trn: String(row?.vh_trn ?? ""),
-        name: String(row?.vh_vname ?? ""),
-        mobile: row?.vh_mobile ?? "",
-        email: row?.vh_email ?? "",
-        address: row?.vh_addrs ?? "",
-        province: row?.vh_province ?? "",
-        district: row?.vh_district ?? "",
-        nikaya: row?.vh_nikaya ?? "",
-        workflow_status: row?.vh_workflow_status ?? "",
+        name: String(row?.vh_vname ?? row?.name ?? row?.tv_name ?? ""),
+        mobile: row?.vh_mobile ?? row?.mobile ?? row?.tv_mobile ?? "",
+        email: row?.vh_email ?? row?.email ?? row?.tv_email ?? "",
+        address: String(row?.vh_addrs ?? row?.address ?? row?.tv_address ?? ""),
+        province: row?.vh_province ?? row?.province ?? row?.tv_province ?? "",
+        district: row?.vh_district ?? row?.district ?? row?.tv_district ?? "",
+        nikaya: row?.vh_nikaya ?? row?.nikaya ?? "",
+        workflow_status: row?.vh_workflow_status ?? row?.workflow_status ?? "TEMPORARY",
       }));
 
+      // Total is sum of both regular and temp records
+      const combinedTotal = total + tempTotal;
+      
       setRecords(cleaned);
-      setTotalRecords(total);
-      setHasMoreResults((f.page * f.limit) < total);
+      setTotalRecords(combinedTotal);
+      setHasMoreResults((f.page * f.limit) < combinedTotal);
     } catch (error) {
       console.error("Error fetching vihara data:", error);
       setRecords([]);
@@ -424,7 +512,12 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       { key: "name", label: "Name", sortable: true },
       { key: "mobile", label: "Mobile" },
       { key: "address", label: "Address" },
-      { key: "workflow_status", label: "Status", sortable: true },
+      {
+        key: "workflow_status",
+        label: "Status",
+        sortable: true,
+        render: (item: ViharaRow) => <StatusBadge status={item.workflow_status} />,
+      },
       ...(isDivisionalSec
         ? []
         : [

@@ -130,7 +130,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     const maxBaseStepId = baseSteps.reduce((max, step) => Math.max(max, step.id), 0);
     const certTab: StepConfig<ViharaForm> = {
       id: maxBaseStepId + 1,
-      title: "Certificates",
+      title: "Letter",
       fields: [],
     };
     const scannedTab: StepConfig<ViharaForm> = {
@@ -208,6 +208,32 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   });
   const [errors, setErrors] = useState<Errors<ViharaForm>>({});
   const [saving, setSaving] = useState(false);
+  const [bypassConfirm, setBypassConfirm] = useState<{
+    field: keyof ViharaForm;
+    label: string;
+  } | null>(null);
+  const [unlockConfirm, setUnlockConfirm] = useState(false);
+  // Stage F bypass mutual exclusivity + tab locking
+  const BYPASS_FIELDS_CONFIG = [
+    { field: "vh_bypass_no_detail" as keyof ViharaForm, fromTabId: 3 },
+    { field: "vh_bypass_no_chief" as keyof ViharaForm, fromTabId: 4 },
+    { field: "vh_bypass_ltr_cert" as keyof ViharaForm, fromTabId: 5 },
+  ];
+  /** Maps bypass boolean field → dedicated CRUDAction that triggers status transition */
+  const BYPASS_ACTION_MAP: Record<string, string> = {
+    vh_bypass_no_detail: "BYPASS_NO_DETAIL",
+    vh_bypass_no_chief:  "BYPASS_NO_CHIEF",
+    vh_bypass_ltr_cert:  "BYPASS_LTR_CERT",
+  };
+  const BYPASS_STATUSES = new Set(["S1_NO_DETAIL_COMP", "S1_NO_CHIEF_COMP", "S1_LTR_CERT_DONE"]);
+  const activeBypassEntry = BYPASS_FIELDS_CONFIG.find((b) => (values[b.field] as boolean) === true) ?? null;
+  const lockedFromTabId: number | null = activeBypassEntry?.fromTabId ?? null;
+  const isTabLocked = (tabId: number): boolean => {
+    if (lockedFromTabId === null) return false;
+    if (canModerate) return false; // admins can always navigate
+    // Lock only SUBSEQUENT tabs — the tab that owns the active bypass toggle stays accessible
+    return tabId > lockedFromTabId;
+  };
   const [loading, setLoading] = useState(true);
   const sectionRef = useRef<HTMLDivElement | null>(null);
   const certificatePaperRef = useRef<HTMLDivElement | null>(null);
@@ -427,8 +453,9 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [letterHtml, defaultLetterHtml]);
   const current = steps.find((s) => s.id === activeTabId) ?? steps[0];
   const stepTitle = current?.title ?? "";
-  const isCertificatesTab = stepTitle === "Certificates";
+  const isCertificatesTab = stepTitle === "Letter";
   const isScannedFilesTab = stepTitle === "Upload Scanned Files";
+
   const stageApproved =
     (activeMajorStep === 1 && workflowStatus === "S1_APPROVED") ||
     (activeMajorStep === 2 && workflowStatus === "S2_APPROVED");
@@ -496,7 +523,20 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         // Step D: Leadership
         viharadhipathi_name: apiData.vh_viharadhipathi_name ?? "",
         viharadhipathi_regn: apiData.vh_viharadhipathi_regn ?? "",
+        viharadhipathi_date: toDisplayFormat(apiData.viharadhipathi_date) ?? "",
         period_established: toDisplayFormat(apiData.vh_period_established) ?? "",
+
+        // Stage F: bypass flags
+        vh_bypass_no_detail: apiData.vh_bypass_no_detail ?? false,
+        vh_bypass_no_chief:  apiData.vh_bypass_no_chief  ?? false,
+        vh_bypass_ltr_cert:  apiData.vh_bypass_ltr_cert  ?? false,
+
+        // Stage F: establishment period
+        vh_period_era:   apiData.vh_period_era   ?? "",
+        vh_period_year:  apiData.vh_period_year  ?? "",
+        vh_period_month: apiData.vh_period_month ?? "",
+        vh_period_day:   apiData.vh_period_day   ?? "",
+        vh_period_notes: apiData.vh_period_notes ?? "",
 
         // Step E: Mahanyake Information
         mahanayake_date: toDisplayFormat(apiData.vh_mahanayake_date) ?? "",
@@ -1032,6 +1072,60 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
     }
   };
 
+  const handleBypassSave = async () => {
+    if (!bypassConfirm) return;
+    const field = bypassConfirm.field as string;
+    setBypassConfirm(null);
+    try {
+      setSaving(true);
+      const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
+      const bypassAction = BYPASS_ACTION_MAP[field];
+      if (!bypassAction || !vhId) {
+        toast.error("Cannot save bypass: missing record ID or unknown bypass type.");
+        return;
+      }
+      await _manageVihara({
+        action: bypassAction,
+        payload: { vh_id: vhId },
+      } as any);
+      setValues((prev) => ({ ...prev, [field]: true }));
+      toast.success("Saved.", { autoClose: 800 });
+      setTimeout(() => router.push("/temple/vihara"), 950);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to save.";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUnlockBypass = async () => {
+    setUnlockConfirm(false);
+    try {
+      setSaving(true);
+      const vhId = viharaId && !isNaN(Number(viharaId)) ? Number(viharaId) : undefined;
+      if (!vhId) { toast.error("Cannot unlock: missing record ID."); return; }
+      await _manageVihara({
+        action: "UNLOCK_BYPASS",
+        payload: { vh_id: vhId },
+      } as any);
+      // Reset bypass flags locally and update status
+      setValues((prev) => ({
+        ...prev,
+        vh_bypass_no_detail: false,
+        vh_bypass_no_chief:  false,
+        vh_bypass_ltr_cert:  false,
+      }));
+      setWorkflowStatus("S1_PENDING");
+      toast.success("Record unlocked. Status reset to pending.", { autoClose: 1500 });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to unlock record.";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Helper function to map form fields to API field names (same as AddVihara)
   const mapFormToApiFields = (formData: Partial<ViharaForm>, parsedResidentBhikkhus: any[], parsedTempleOwnedLand: any[]) => {
     // Map temple_owned_land array fields - use camelCase as per API
@@ -1075,16 +1169,25 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       // Step C: Religious Affiliation
       vh_nikaya: formData.nikaya,
       vh_parshawa: formData.parshawaya,
+      vh_bypass_no_detail: formData.vh_bypass_no_detail,
       
       // Step D: Leadership - Convert dates to ISO format
       vh_viharadhipathi_name: formData.viharadhipathi_name,
       vh_viharadhipathi_regn: formData.viharadhipathi_regn,
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date) || null,
       vh_period_established: toISOFormat(formData.period_established) || null,
+      vh_period_era: formData.vh_period_era,
+      vh_period_year: formData.vh_period_year,
+      vh_period_month: formData.vh_period_month,
+      vh_period_day: formData.vh_period_day,
+      vh_period_notes: formData.vh_period_notes,
+      vh_bypass_no_chief: formData.vh_bypass_no_chief,
       vh_mahanayake_date: toISOFormat(formData.mahanayake_date) || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu,
       vh_mahanayake_remarks: formData.mahanayake_remarks,
+      vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert,
       
-      // Step F: Assets & Activities
+      // Step F: Temple Assets & Activities
       vh_buildings_description: formData.buildings_description,
       vh_dayaka_families_count: formData.dayaka_families_count,
       vh_kulangana_committee: formData.kulangana_committee,
@@ -1092,19 +1195,19 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_temple_working_committee: formData.temple_working_committee,
       vh_other_associations: formData.other_associations,
       
-      // Step F: Land Information
+      // Step G: Land Information
       temple_owned_land: mappedLand,
       vh_land_info_certified: formData.land_info_certified,
       
-      // Step G: Resident Bhikkhus
+      // Step H: Resident Bhikkhus
       resident_bhikkhus: mappedBhikkhus,
       vh_resident_bhikkhus_certified: formData.resident_bhikkhus_certified,
       
-      // Step H: Inspection
+      // Step I: Inspection
       vh_inspection_report: formData.inspection_report,
       vh_inspection_code: formData.inspection_code,
       
-      // Step I: Ownership
+      // Step J: Ownership
       vh_grama_niladhari_division_ownership: formData.grama_niladhari_division_ownership,
       vh_sanghika_donation_deed: formData.sanghika_donation_deed,
       vh_government_donation_deed: formData.government_donation_deed,
@@ -1113,7 +1216,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       vh_recommend_new_center: formData.recommend_new_center,
       vh_recommend_registered_temple: formData.recommend_registered_temple,
       
-      // Step J: Annex II
+      // Step K: Annex II
       vh_annex2_recommend_construction: formData.annex2_recommend_construction,
       vh_annex2_land_ownership_docs: formData.annex2_land_ownership_docs,
       vh_annex2_chief_incumbent_letter: formData.annex2_chief_incumbent_letter,
@@ -1892,9 +1995,11 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                   tabs={steps.map((s) => ({
                     id: String(s.id),
                     label: s.title,
+                    disabled: isTabLocked(s.id),
                   }))}
                   value={String(activeTabId)}
                   onChange={(id) => {
+                    if (isTabLocked(Number(id))) return;
                     setActiveTabId(Number(id));
                     scrollTop();
                   }}
@@ -2531,6 +2636,64 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                 );
                               }
 
+                              // Bypass toggle fields (Stage F)
+                              if (f.type === "checkbox") {
+                                const BYPASS_FIELDS = ["vh_bypass_no_detail", "vh_bypass_no_chief", "vh_bypass_ltr_cert"];
+                                if (BYPASS_FIELDS.includes(id)) {
+                                  const checked = (values[f.name] as boolean) || false;
+                                  const parts = f.label.split(" — ");
+                                  const otherBypassIsOn = !!activeBypassEntry && activeBypassEntry.field !== id;
+                                  const isLockedOn = checked && !canModerate;
+                                  const toggleDisabled = otherBypassIsOn || isLockedOn;
+                                  return (
+                                    <div key={id} className="md:col-span-2">
+                                      <div className={`flex items-center justify-between gap-4 p-4 rounded-xl border transition-colors ${checked ? "bg-amber-50 border-amber-300" : toggleDisabled ? "bg-slate-100 border-slate-200 opacity-60" : "bg-slate-50 border-slate-200"}`}>
+                                        <div className="min-w-0">
+                                          <p className="text-sm font-semibold text-slate-800">{parts[1] ?? parts[0]}</p>
+                                          <p className="text-xs text-slate-500 mt-0.5">{parts[0]}</p>
+                                          {isLockedOn && <p className="text-[10px] text-amber-600 mt-1 font-medium">Admin access required to disable</p>}
+                                          {otherBypassIsOn && <p className="text-[10px] text-slate-400 mt-1">Another bypass is already active</p>}
+                                        </div>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={checked}
+                                          disabled={toggleDisabled}
+                                          title={otherBypassIsOn ? "Another bypass is active for this record" : isLockedOn ? "Only administrators can disable this" : undefined}
+                                          onClick={() => {
+                                            if (toggleDisabled) return;
+                                            if (!checked) {
+                                              setBypassConfirm({ field: f.name as keyof ViharaForm, label: f.label });
+                                            } else {
+                                              handleInputChange(f.name, false);
+                                            }
+                                          }}
+                                          className={`relative shrink-0 inline-flex h-6 w-11 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 ${toggleDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${checked ? "bg-indigo-600" : "bg-slate-300"}`}
+                                        >
+                                          <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? "translate-x-5" : "translate-x-0"}`} />
+                                        </button>
+                                      </div>
+                                      {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                                    </div>
+                                  );
+                                }
+                                // Non-bypass checkbox
+                                return (
+                                  <div key={id} className="md:col-span-2">
+                                    <label className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50">
+                                      <input
+                                        type="checkbox"
+                                        checked={(values[f.name] as boolean) || false}
+                                        onChange={(e) => handleInputChange(f.name, e.target.checked)}
+                                        className="w-4 h-4 cursor-pointer"
+                                      />
+                                      <span className="text-sm font-medium text-slate-700">{f.label}</span>
+                                    </label>
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                                  </div>
+                                );
+                              }
+
                               // Checkbox fields (Step I)
                               if (id.includes("sanghika_donation_deed") || id.includes("government_donation_deed") || id.includes("authority_consent") || id.includes("recommend_")) {
                                 return (
@@ -2861,6 +3024,123 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                   </Dialog>
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
+
+      {/* ── Admin Unlock Bypass Banner ───────────────────────────────── */}
+      {canModerate && BYPASS_STATUSES.has(workflowStatus) && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            type="button"
+            onClick={() => setUnlockConfirm(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl shadow-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+            </svg>
+            Unlock Record
+          </button>
+        </div>
+      )}
+
+      {/* ── Unlock Bypass Confirm Modal ──────────────────────────────── */}
+      {unlockConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Unlock Bypass Record?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Admin action — resets status to pending</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This will <strong className="text-slate-800">clear the active bypass flag</strong> and reset the record status back to{" "}
+                <strong className="text-slate-800">S1_PENDING</strong>.
+              </p>
+              <p className="text-sm text-slate-500 mt-2">
+                The record will be fully editable again. This action is logged with your credentials. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setUnlockConfirm(false)}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUnlockBypass}
+                disabled={saving}
+                className="px-5 py-2 text-sm font-bold text-white bg-amber-500 rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Unlocking…</>
+                ) : "Unlock Record"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bypass Toggle Confirm Modal ─────────────────────────────── */}
+      {bypassConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Mark as Complete?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{bypassConfirm.label.split(" — ")[0]}</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                Enabling{" "}
+                <strong className="text-slate-800">
+                  {bypassConfirm.label.split(" — ")[1] ?? bypassConfirm.label}
+                </strong>{" "}
+                will mark this section as complete.
+              </p>
+              <p className="text-sm text-slate-500 mt-2">
+                Your record will be <strong>saved</strong> and you will return to the vihara list. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setBypassConfirm(null)}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBypassSave}
+                disabled={saving}
+                className="px-5 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Saving…</>
+                ) : "Save & Return"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
