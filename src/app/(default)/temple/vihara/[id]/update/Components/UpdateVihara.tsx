@@ -2587,7 +2587,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       label={f.label}
                                       required={!!f.rules?.required}
                                       initialDisplay={displayValue}
-                                      placeholder="Type a Bhikkhu name or registration number"
+                                      placeholder="Search by name, REGN, temple, or address"
                                       showAddButton={true}
                                       onPick={(picked) => {
                                         const regnValue = picked.regn || String(picked.data?.br_regn ?? "");

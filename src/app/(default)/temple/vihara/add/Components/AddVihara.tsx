@@ -1432,7 +1432,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                                 label={f.label}
                                 required={!!f.rules?.required}
                                 initialDisplay={displayValue}
-                                placeholder="Type a Bhikkhu name or registration number"
+                                placeholder="Search by name, REGN, temple, or address"
                                 showAddButton={true}
                                 onAddBhikkhu={async (payload) => {
                                   // When a new TEMP bhikkhu is created, auto-populate the fields

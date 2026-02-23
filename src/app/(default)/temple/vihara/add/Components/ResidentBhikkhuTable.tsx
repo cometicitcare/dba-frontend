@@ -100,7 +100,7 @@ export default function ResidentBhikkhuTable({ value, onChange, error }: Props) 
         <BhikkhuAutocomplete
           id="resident-bhikkhu-search"
           label="Search Bhikkhu to add"
-          placeholder="Type a name or registration number"
+          placeholder="Search by name, REGN, temple, or address"
           showAddButton={true}
           clearAfterPick={true}
           onPick={(picked) => {
