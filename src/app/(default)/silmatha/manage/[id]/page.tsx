@@ -17,7 +17,7 @@ import {
   _markPrintedSilmatha,
   _uploadScannedDocument,
 } from "@/services/silmatah";
-import { Errors, FieldConfig, StepConfig, toYYYYMMDD, validateField } from "@/components/silmatha/helpers";
+import { Errors, FieldConfig, StepConfig, toISOFormat, toYYYYMMDD, validateField } from "@/components/silmatha/helpers";
 import { SilmathaForm, silmathaInitialValues, silmathaSteps } from "@/components/silmatha/steps";
 import DateField from "@/components/silmatha/DateField";
 import LocationPicker, { LocationSelection } from "@/components/silmatha/LocationPicker";
@@ -173,7 +173,7 @@ type NormalizeResult = {
 };
 
 const normalizeSilmathaRecord = (api: any): NormalizeResult => {
-  const convertDate = (value: unknown) => toYYYYMMDD(toSafeString(value));
+  const convertDate = (value: unknown) => toISOFormat(toSafeString(value));
   const patch: SilmathaForm = {
     sm_form_number: toSafeString(api?.sil_form_id ?? api?.sm_form_number),
     sm_reqstdate: convertDate(api?.sil_reqstdate ?? api?.sm_reqstdate),
@@ -450,7 +450,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
       if (!apiKey) return;
       const raw = values[field.name] ?? "";
       if (field.type === "date") {
-        payload[apiKey] = toYYYYMMDD(raw);
+        payload[apiKey] = toISOFormat(raw);
       } else if (field.type === "checkbox") {
         payload[apiKey] = raw === "true";
       } else {
