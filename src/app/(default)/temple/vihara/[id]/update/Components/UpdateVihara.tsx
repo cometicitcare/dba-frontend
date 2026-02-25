@@ -723,7 +723,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         try {
           const response = await _manageBhikku({
             action: "READ_ALL",
-            payload: { skip: 0, limit: 1, search: values.viharadhipathi_regn },
+            payload: { skip: 0, limit: 1, search_key: values.viharadhipathi_regn },
           });
           const bhikkhus = (response as any)?.data?.data ?? [];
           if (bhikkhus.length > 0) {
@@ -1004,8 +1004,14 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       };
       
       const apiFieldName = fieldMapping[f.name] || f.name;
-      // Convert dates to ISO format (YYYY-MM-DD) for API; trim & collapse whitespace for strings
-      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v).trim()) : (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v));
+      // For date fields: send ISO string when valid, null when empty (avoids 422 from "" on Optional[date])
+      // For strings: trim & collapse internal whitespace
+      if (f.type === "date") {
+        const iso = toISOFormat(String(v).trim());
+        payload[apiFieldName] = iso || null;
+      } else {
+        payload[apiFieldName] = typeof v === "boolean" ? v : (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v);
+      }
     });
     
     // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
@@ -2622,7 +2628,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "viharadhipathi_name") {
                                 const displayValue =
                                   values.viharadhipathi_name && values.viharadhipathi_regn
-                                    ? `${values.viharadhipathi_name} - ${values.viharadhipathi_regn}`
+                                    ? `${values.viharadhipathi_name} — ${values.viharadhipathi_regn}`
                                     : (values.viharadhipathi_name as string) || "";
                                 return (
                                   <div key={id} className="md:col-span-2">

@@ -661,8 +661,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
-      vh_period_established: toISOFormat(periodRaw),
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? "") || null,
+      vh_period_established: toISOFormat(periodRaw) || null,
       vh_period_era: formData.vh_period_era ?? "",
       vh_period_year: formData.vh_period_year ?? "",
       vh_period_month: formData.vh_period_month ?? "",
@@ -671,7 +671,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
       
       // Step E: Mahanyake (with bypass)
-      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? "") || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
       vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
       vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
@@ -752,8 +752,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_ownercd: ownerCode,
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
-      vh_period_established: toISOFormat(formData.period_established ?? ""),
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? "") || null,
+      vh_period_established: toISOFormat(formData.period_established ?? "") || null,
       vh_period_era: formData.vh_period_era ?? "",
       vh_period_year: formData.vh_period_year ?? "",
       vh_period_month: formData.vh_period_month ?? "",
@@ -761,7 +761,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_period_notes: formData.vh_period_notes ?? "",
       vh_bypass_no_detail: formData.vh_bypass_no_detail ?? false,
       vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
-      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? "") || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
       vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
       vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
@@ -1483,7 +1483,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                         if (id === "viharadhipathi_name") {
                           const displayValue =
                             values.viharadhipathi_name && values.viharadhipathi_regn
-                              ? `${values.viharadhipathi_name} - ${values.viharadhipathi_regn}`
+                              ? `${values.viharadhipathi_name} — ${values.viharadhipathi_regn}`
                               : (values.viharadhipathi_name as string) || "";
                           return (
                             <div key={id} className="md:col-span-2">
