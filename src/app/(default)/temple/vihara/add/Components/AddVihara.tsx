@@ -534,11 +534,25 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
   };
 
   const handleSaveFlowOne = async (overrideValues?: Partial<ViharaForm>, bypassField?: keyof ViharaForm) => {
+    // Always enforce Step 1 mandatory fields regardless of which step triggers the save
+    const effectiveValues = overrideValues ? { ...values, ...overrideValues } : values;
+    if (!effectiveValues.temple_name?.trim()) {
+      toast.error("Temple Name is required. Please complete Step 1 before saving.", { autoClose: 5000 });
+      setCurrentStep(1);
+      scrollTop();
+      return;
+    }
+    if (!effectiveValues.temple_address?.trim()) {
+      toast.error("Temple Address is required. Please complete Step 1 before saving.", { autoClose: 5000 });
+      setCurrentStep(1);
+      scrollTop();
+      return;
+    }
     if (!validateStep(currentStep)) return;
 
     try {
       setSubmitting(true);
-      const stageOnePayload = mapFormToStageOneFields(overrideValues ? { ...values, ...overrideValues } : values);
+      const stageOnePayload = mapFormToStageOneFields(effectiveValues);
       const response = await _manageVihara({
         action: "SAVE_STAGE_ONE",
         payload: { data: stageOnePayload },
@@ -645,8 +659,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_gndiv: formData.grama_niladhari_division ?? "",
       vh_ownercd: ownerCode,
       vh_parshawa: formData.parshawaya ?? "",
-      vh_vname: formData.temple_name ?? "",
-      vh_addrs: formData.temple_address ?? "",
+      vh_vname: formData.temple_name?.trim() || null,
+      vh_addrs: formData.temple_address?.trim() || null,
       
       // Step B: Administrative Divisions
       vh_province: formData.province ?? "",
@@ -735,8 +749,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
 
     const _stageOnePayload: Record<string, any> = {
-      vh_vname: formData.temple_name ?? "",
-      vh_addrs: formData.temple_address ?? "",
+      vh_vname: formData.temple_name?.trim() || null,
+      vh_addrs: formData.temple_address?.trim() || null,
       vh_mobile: formData.telephone_number ?? "",
       vh_whtapp: formData.whatsapp_number ?? "",
       vh_email: formData.email_address ?? "",
