@@ -2680,6 +2680,15 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                           console.error("Error auto-adding viharadhipathi to resident bhikkhus:", e);
                                         }
                                       }}
+                                      onInputChange={(value) => {
+                                        // When user types/clears the name field, clear regn too
+                                        // so stale regn doesn't persist after the user removes the name.
+                                        // Regn gets re-populated only when user picks from the dropdown.
+                                        handleSetMany({
+                                          viharadhipathi_name: value,
+                                          viharadhipathi_regn: "",
+                                        });
+                                      }}
                                     />
                                     {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>

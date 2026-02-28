@@ -986,6 +986,43 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.grama_niladhari_division, lookupGnName]);
 
+  // When opening an existing record (?id=...), load Step 1 fields from DB so our
+  // mandatory-field guard does not fire against a blank in-memory form.
+  // This is a lightweight fetch — we only need temple_name and temple_address to
+  // avoid the false-positive "name required" error for users who saved Stage 1
+  // previously and are now continuing or editing.
+  useEffect(() => {
+    const existingId = parseId(viharaId);
+    if (!existingId) return; // fresh create — nothing to load
+    let cancelled = false;
+    (_manageVihara({
+      action: "READ_ONE",
+      payload: { vh_id: existingId },
+    } as any) as Promise<any>)
+      .then((response: any) => {
+        if (cancelled) return;
+        const apiData: any =
+          response?.data?.data ?? response?.data ?? {};
+        if (!apiData) return;
+        setValues((prev) => ({
+          ...prev,
+          // Only fill in if the form field is still blank (don't overwrite if user
+          // already typed something in this session).
+          temple_name:
+            prev.temple_name ? prev.temple_name : (apiData.vh_vname ?? ""),
+          temple_address:
+            prev.temple_address ? prev.temple_address : (apiData.vh_addrs ?? ""),
+        }));
+      })
+      .catch(() => {
+        // Non-fatal: if we cannot load the existing record the form is still usable.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viharaId]);
+
   const gridCols = currentStep === 6 ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
@@ -1550,9 +1587,12 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                                   }
                                 }}
                                 onInputChange={(value) => {
-                                  // Update name while typing - keep the regn if already set
+                                  // When user types/clears the name field, clear regn too
+                                  // so stale regn doesn't persist after the user removes the name.
+                                  // Regn gets re-populated only when user picks from the dropdown.
                                   handleSetMany({
                                     viharadhipathi_name: value,
+                                    viharadhipathi_regn: "",
                                   });
                                 }}
                               />
