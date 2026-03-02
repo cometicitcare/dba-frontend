@@ -36,6 +36,10 @@ export type ViharaForm = {
   vh_file_number: string;
   vh_vihara_code: string;
 
+  // Step A: Registration Status (default: registered)
+  vh_is_registered: boolean;       // true = registered, false = not registered
+  vh_unregistered_reason: string;  // Required when vh_is_registered = false
+
   // Step B: Administrative Divisions
   province: string;
   district: string;
@@ -118,6 +122,8 @@ export const viharaSteps = (): StepConfig<ViharaForm>[] => [
       { name: "temple_address", label: "Temple Address", type: "textarea", rows: 3, rules: { required: true } },
       { name: "vh_file_number", label: "File Number", type: "text", rules: { required: false } },
       { name: "vh_vihara_code", label: "Vihara Code", type: "text", rules: { required: false } },
+      { name: "vh_is_registered", label: "ලියාපදිංචි විහාරයකි — Registered Temple", type: "checkbox", rules: { required: false } },
+      { name: "vh_unregistered_reason", label: "ලියාපදිංචි නොවීමේ හේතුව — Reason for Not Registered", type: "textarea", rows: 2, rules: { required: false } },
       {
         name: "telephone_number",
         label: "Telephone Number",
@@ -266,6 +272,8 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   email_address: "",
   vh_file_number: "",
   vh_vihara_code: "",
+  vh_is_registered: true,
+  vh_unregistered_reason: "",
   province: "",
   district: "",
   divisional_secretariat: "",
