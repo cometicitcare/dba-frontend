@@ -531,6 +531,10 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         vh_bypass_no_chief:  apiData.vh_bypass_no_chief  ?? false,
         vh_bypass_ltr_cert:  apiData.vh_bypass_ltr_cert  ?? false,
 
+        // Registration status
+        vh_is_registered: apiData.vh_is_registered !== false, // default true if null/undefined
+        vh_unregistered_reason: apiData.vh_unregistered_reason ?? "",
+
         // Stage F: establishment period
         vh_period_era:   apiData.vh_period_era   ?? "",
         vh_period_year:  apiData.vh_period_year  ?? "",
@@ -723,7 +727,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         try {
           const response = await _manageBhikku({
             action: "READ_ALL",
-            payload: { skip: 0, limit: 1, search: values.viharadhipathi_regn },
+            payload: { skip: 0, limit: 1, search_key: values.viharadhipathi_regn },
           });
           const bhikkhus = (response as any)?.data?.data ?? [];
           if (bhikkhus.length > 0) {
@@ -1001,13 +1005,27 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         annex2_divisional_secretary_recommendation: "vh_annex2_divisional_secretary_recommendation",
         annex2_approval_construction: "vh_annex2_approval_construction",
         annex2_referral_resubmission: "vh_annex2_referral_resubmission",
+        // Registration status (Step A)
+        vh_is_registered: "vh_is_registered",
+        vh_unregistered_reason: "vh_unregistered_reason",
       };
       
       const apiFieldName = fieldMapping[f.name] || f.name;
-      // Convert dates to ISO format (YYYY-MM-DD) for API; trim & collapse whitespace for strings
-      payload[apiFieldName] = typeof v === "boolean" ? v : (f.type === "date" ? toISOFormat(String(v).trim()) : (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v));
+      // For date fields: send ISO string when valid, null when empty (avoids 422 from "" on Optional[date])
+      // For strings: trim & collapse internal whitespace
+      if (f.type === "date") {
+        const iso = toISOFormat(String(v).trim());
+        payload[apiFieldName] = iso || null;
+      } else {
+        payload[apiFieldName] = typeof v === "boolean" ? v : (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v);
+      }
     });
     
+    // When vh_is_registered is true, clear vh_unregistered_reason to avoid stale data
+    if (tabId === 1 && payload.vh_is_registered === true) {
+      payload.vh_unregistered_reason = null;
+    }
+
     // IMPORTANT: For Step 2 (Administrative Divisions), ensure province is included with district
     // If user provided district but forgot province, auto-detect it from district code
     if (tabId === 2 && (payload.vh_district || payload.vh_divisional_secretariat || payload.vh_gndiv)) {
@@ -1943,7 +1961,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
       <Sidebar isOpen={sidebarOpen} />
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
-        <main className="p-2 mb-20">
+        <main className="p-2 pb-36">
           <div className="w-full">
             <div className="bg-white shadow-xl overflow-hidden">
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
@@ -2622,7 +2640,7 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                               if (id === "viharadhipathi_name") {
                                 const displayValue =
                                   values.viharadhipathi_name && values.viharadhipathi_regn
-                                    ? `${values.viharadhipathi_name} - ${values.viharadhipathi_regn}`
+                                    ? `${values.viharadhipathi_name} — ${values.viharadhipathi_regn}`
                                     : (values.viharadhipathi_name as string) || "";
                                 return (
                                   <div key={id} className="md:col-span-2">
@@ -2674,14 +2692,23 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                           console.error("Error auto-adding viharadhipathi to resident bhikkhus:", e);
                                         }
                                       }}
+                                      onInputChange={(value) => {
+                                        // When user types/clears the name field, clear regn too
+                                        // so stale regn doesn't persist after the user removes the name.
+                                        // Regn gets re-populated only when user picks from the dropdown.
+                                        handleSetMany({
+                                          viharadhipathi_name: value,
+                                          viharadhipathi_regn: "",
+                                        });
+                                      }}
                                     />
                                     {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
 
-                              // Bypass toggle fields (Stage F)
-                              if (f.type === "checkbox") {
+                              // Bypass toggle fields (Stage F) — vh_is_registered has its own custom renderer below
+                              if (f.type === "checkbox" && id !== "vh_is_registered") {
                                 const BYPASS_FIELDS = ["vh_bypass_no_detail", "vh_bypass_no_chief", "vh_bypass_ltr_cert"];
                                 if (BYPASS_FIELDS.includes(id)) {
                                   const checked = (values[f.name] as boolean) || false;
@@ -2827,6 +2854,65 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
                                       placeholder="YYYY/MM/DD"
                                       error={err}
                                     />
+                                  </div>
+                                );
+                              }
+
+                              // Registration status toggle (Step A)
+                              if (id === "vh_is_registered") {
+                                const isRegistered = (values.vh_is_registered as boolean) !== false;
+                                return (
+                                  <div key={id} className="md:col-span-2">
+                                    <h3 className="text-sm font-semibold text-slate-700 mb-2">Registration Status</h3>
+                                    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                      <div>
+                                        <p className="text-sm font-semibold text-slate-800">Registered Temple</p>
+                                        <p className="text-xs text-slate-500">ලියාපදිංචි විහාරයකි</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={isRegistered}
+                                        onClick={() => {
+                                          handleSetMany({
+                                            vh_is_registered: !isRegistered,
+                                            vh_unregistered_reason: isRegistered ? (values.vh_unregistered_reason as string ?? "") : "",
+                                          });
+                                        }}
+                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                                          isRegistered ? "bg-slate-700" : "bg-slate-300"
+                                        }`}
+                                      >
+                                        <span
+                                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                                            isRegistered ? "translate-x-5" : "translate-x-0"
+                                          }`}
+                                        />
+                                      </button>
+                                    </div>
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                                  </div>
+                                );
+                              }
+
+                              // Reason for not registered — only shown when vh_is_registered is false
+                              if (id === "vh_unregistered_reason") {
+                                const isRegistered = (values.vh_is_registered as boolean) !== false;
+                                if (isRegistered) return null;
+                                return (
+                                  <div key={id} className="md:col-span-2">
+                                    <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
+                                      {f.label} <span className="text-red-500">*</span>
+                                    </label>
+                                    <textarea
+                                      id={id}
+                                      value={(values.vh_unregistered_reason as string) ?? ""}
+                                      rows={f.rows ?? 2}
+                                      onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
+                                      placeholder="Describe the reason this temple is not yet registered..."
+                                    />
+                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }

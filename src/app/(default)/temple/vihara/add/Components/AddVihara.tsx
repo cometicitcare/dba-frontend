@@ -534,11 +534,25 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
   };
 
   const handleSaveFlowOne = async (overrideValues?: Partial<ViharaForm>, bypassField?: keyof ViharaForm) => {
+    // Always enforce Step 1 mandatory fields regardless of which step triggers the save
+    const effectiveValues = overrideValues ? { ...values, ...overrideValues } : values;
+    if (!effectiveValues.temple_name?.trim()) {
+      toast.error("Temple Name is required. Please complete Step 1 before saving.", { autoClose: 5000 });
+      setCurrentStep(1);
+      scrollTop();
+      return;
+    }
+    if (!effectiveValues.temple_address?.trim()) {
+      toast.error("Temple Address is required. Please complete Step 1 before saving.", { autoClose: 5000 });
+      setCurrentStep(1);
+      scrollTop();
+      return;
+    }
     if (!validateStep(currentStep)) return;
 
     try {
       setSubmitting(true);
-      const stageOnePayload = mapFormToStageOneFields(overrideValues ? { ...values, ...overrideValues } : values);
+      const stageOnePayload = mapFormToStageOneFields(effectiveValues);
       const response = await _manageVihara({
         action: "SAVE_STAGE_ONE",
         payload: { data: stageOnePayload },
@@ -645,8 +659,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_gndiv: formData.grama_niladhari_division ?? "",
       vh_ownercd: ownerCode,
       vh_parshawa: formData.parshawaya ?? "",
-      vh_vname: formData.temple_name ?? "",
-      vh_addrs: formData.temple_address ?? "",
+      vh_vname: formData.temple_name?.trim() || null,
+      vh_addrs: formData.temple_address?.trim() || null,
       
       // Step B: Administrative Divisions
       vh_province: formData.province ?? "",
@@ -661,8 +675,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       // Step D: Leadership
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
-      vh_period_established: toISOFormat(periodRaw),
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? "") || null,
+      vh_period_established: toISOFormat(periodRaw) || null,
       vh_period_era: formData.vh_period_era ?? "",
       vh_period_year: formData.vh_period_year ?? "",
       vh_period_month: formData.vh_period_month ?? "",
@@ -671,7 +685,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
       
       // Step E: Mahanyake (with bypass)
-      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? "") || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
       vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
       vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
@@ -714,6 +728,10 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_annex2_divisional_secretary_recommendation: formData.annex2_divisional_secretary_recommendation ?? false,
       vh_annex2_approval_construction: formData.annex2_approval_construction ?? false,
       vh_annex2_referral_resubmission: formData.annex2_referral_resubmission ?? false,
+
+      // Registration Status (Step A)
+      vh_is_registered: formData.vh_is_registered !== false,
+      vh_unregistered_reason: formData.vh_is_registered !== false ? null : (formData.vh_unregistered_reason ?? ""),
     };
 
     // Only include vh_bgndate if we have a valid date value
@@ -735,8 +753,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     const ownerCode = formData.viharadhipathi_regn || "BH2025000001";
 
     const _stageOnePayload: Record<string, any> = {
-      vh_vname: formData.temple_name ?? "",
-      vh_addrs: formData.temple_address ?? "",
+      vh_vname: formData.temple_name?.trim() || null,
+      vh_addrs: formData.temple_address?.trim() || null,
       vh_mobile: formData.telephone_number ?? "",
       vh_whtapp: formData.whatsapp_number ?? "",
       vh_email: formData.email_address ?? "",
@@ -752,8 +770,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_ownercd: ownerCode,
       vh_viharadhipathi_name: formData.viharadhipathi_name ?? "",
       vh_viharadhipathi_regn: formData.viharadhipathi_regn ?? "",
-      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? ""),
-      vh_period_established: toISOFormat(formData.period_established ?? ""),
+      viharadhipathi_date: toISOFormat(formData.viharadhipathi_date ?? "") || null,
+      vh_period_established: toISOFormat(formData.period_established ?? "") || null,
       vh_period_era: formData.vh_period_era ?? "",
       vh_period_year: formData.vh_period_year ?? "",
       vh_period_month: formData.vh_period_month ?? "",
@@ -761,10 +779,15 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       vh_period_notes: formData.vh_period_notes ?? "",
       vh_bypass_no_detail: formData.vh_bypass_no_detail ?? false,
       vh_bypass_no_chief: formData.vh_bypass_no_chief ?? false,
-      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? ""),
+      vh_mahanayake_date: toISOFormat(formData.mahanayake_date ?? "") || null,
       vh_mahanayake_letter_nu: formData.mahanayake_letter_nu ?? "",
       vh_mahanayake_remarks: formData.mahanayake_remarks ?? "",
       vh_bypass_ltr_cert: formData.vh_bypass_ltr_cert ?? false,
+
+      // Registration Status (Step A)
+      vh_is_registered: formData.vh_is_registered !== false,
+      vh_unregistered_reason: formData.vh_is_registered !== false ? null : (formData.vh_unregistered_reason ?? ""),
+
       ...(establishmentDate ? { vh_bgndate: establishmentDate } : {}),
     };
     // Normalize all string values: trim leading/trailing whitespace and collapse internal spaces
@@ -972,6 +995,43 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, values.grama_niladhari_division, lookupGnName]);
 
+  // When opening an existing record (?id=...), load Step 1 fields from DB so our
+  // mandatory-field guard does not fire against a blank in-memory form.
+  // This is a lightweight fetch — we only need temple_name and temple_address to
+  // avoid the false-positive "name required" error for users who saved Stage 1
+  // previously and are now continuing or editing.
+  useEffect(() => {
+    const existingId = parseId(viharaId);
+    if (!existingId) return; // fresh create — nothing to load
+    let cancelled = false;
+    (_manageVihara({
+      action: "READ_ONE",
+      payload: { vh_id: existingId },
+    } as any) as Promise<any>)
+      .then((response: any) => {
+        if (cancelled) return;
+        const apiData: any =
+          response?.data?.data ?? response?.data ?? {};
+        if (!apiData) return;
+        setValues((prev) => ({
+          ...prev,
+          // Only fill in if the form field is still blank (don't overwrite if user
+          // already typed something in this session).
+          temple_name:
+            prev.temple_name ? prev.temple_name : (apiData.vh_vname ?? ""),
+          temple_address:
+            prev.temple_address ? prev.temple_address : (apiData.vh_addrs ?? ""),
+        }));
+      })
+      .catch(() => {
+        // Non-fatal: if we cannot load the existing record the form is still usable.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viharaId]);
+
   const gridCols = currentStep === 6 ? "md:grid-cols-3" : "md:grid-cols-2";
 
   return (
@@ -979,7 +1039,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
       <TopBar onMenuClick={() => setSidebarOpen((v) => !v)} />
       <Sidebar isOpen={sidebarOpen} />
       <div className={`transition-all duration-300 pt-16 ${sidebarOpen ? "ml-64" : "ml-0"}`}>
-        <main className="p-2 mb-20">
+        <main className="p-2 pb-36">
           <div className="w-full">
             <div className="bg-white shadow-xl overflow-hidden">
               <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-6 md:px-10 py-6">
@@ -1207,8 +1267,8 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                           );
                         }
 
-                        // Handle checkboxes
-                        if (f.type === "checkbox") {
+                        // Handle checkboxes (vh_is_registered has its own custom renderer below)
+                        if (f.type === "checkbox" && id !== "vh_is_registered") {
                           const BYPASS_FIELDS = ["vh_bypass_no_detail", "vh_bypass_no_chief", "vh_bypass_ltr_cert"];
                           if (BYPASS_FIELDS.includes(id)) {
                             const checked = (values[f.name] as boolean) || false;
@@ -1483,7 +1543,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                         if (id === "viharadhipathi_name") {
                           const displayValue =
                             values.viharadhipathi_name && values.viharadhipathi_regn
-                              ? `${values.viharadhipathi_name} - ${values.viharadhipathi_regn}`
+                              ? `${values.viharadhipathi_name} — ${values.viharadhipathi_regn}`
                               : (values.viharadhipathi_name as string) || "";
                           return (
                             <div key={id} className="md:col-span-2">
@@ -1536,9 +1596,12 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                                   }
                                 }}
                                 onInputChange={(value) => {
-                                  // Update name while typing - keep the regn if already set
+                                  // When user types/clears the name field, clear regn too
+                                  // so stale regn doesn't persist after the user removes the name.
+                                  // Regn gets re-populated only when user picks from the dropdown.
                                   handleSetMany({
                                     viharadhipathi_name: value,
+                                    viharadhipathi_regn: "",
                                   });
                                 }}
                               />
@@ -1619,6 +1682,65 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
                                 error={err}
                                 placeholder="Select existing temple buildings/structures"
                               />
+                            </div>
+                          );
+                        }
+
+                        // Registration status toggle (Step A)
+                        if (id === "vh_is_registered") {
+                          const isRegistered = (values.vh_is_registered as boolean) !== false;
+                          return (
+                            <div key={id} className="md:col-span-2">
+                              <h3 className="text-sm font-semibold text-slate-700 mb-2">Registration Status</h3>
+                              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-800">Registered Temple</p>
+                                  <p className="text-xs text-slate-500">ලියාපදිංචි විහාරයකි</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={isRegistered}
+                                  onClick={() => {
+                                    handleSetMany({
+                                      vh_is_registered: !isRegistered,
+                                      vh_unregistered_reason: isRegistered ? (values.vh_unregistered_reason as string ?? "") : "",
+                                    });
+                                  }}
+                                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                                    isRegistered ? "bg-slate-700" : "bg-slate-300"
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                                      isRegistered ? "translate-x-5" : "translate-x-0"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                              {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
+                            </div>
+                          );
+                        }
+
+                        // Reason for not registered — only shown when vh_is_registered is false
+                        if (id === "vh_unregistered_reason") {
+                          const isRegistered = (values.vh_is_registered as boolean) !== false;
+                          if (isRegistered) return null;
+                          return (
+                            <div key={id} className="md:col-span-2">
+                              <label htmlFor={id} className="block text-xs font-medium text-slate-700 mb-1.5">
+                                {f.label} <span className="text-red-500">*</span>
+                              </label>
+                              <textarea
+                                id={id}
+                                value={(values.vh_unregistered_reason as string) ?? ""}
+                                rows={f.rows ?? 2}
+                                onChange={(e) => handleInputChange(f.name, e.target.value)}
+                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all resize-none"
+                                placeholder="Describe the reason this temple is not yet registered..."
+                              />
+                              {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                             </div>
                           );
                         }
