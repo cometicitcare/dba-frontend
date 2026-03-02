@@ -16,6 +16,7 @@ import { FooterBar } from "@/components/FooterBar";
 import { _manageVihara } from "@/services/vihara";
 import { _manageTempTemple } from "@/services/temple";
 import LocationPickerCompact from "@/components/Bhikku/Filter/LocationPickerCompact";
+import SmartLocationFilter from "@/components/Filters/SmartLocationFilter";
 import NikayaParshawaCompact from "@/components/Bhikku/Filter/NikayaParshawaCompact";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerCompact";
@@ -66,6 +67,50 @@ function TempBadge() {
     </span>
   );
 }
+
+// NEW: Sortable Column Header Component
+function SortableHeader({
+  label,
+  columnKey,
+  currentSortBy,
+  currentSortDir,
+  onSort,
+}: {
+  label: string;
+  columnKey: string;
+  currentSortBy?: string;
+  currentSortDir?: "asc" | "desc";
+  onSort: (columnKey: string) => void;
+}) {
+  const isActive = currentSortBy === columnKey;
+  // 3-state cycle: default → asc (⬆) → desc (⬇) → reset (click to clear)
+  const icon = isActive
+    ? currentSortDir === "asc"
+      ? "⬆️"
+      : "⬇️"
+    : "↕️";
+  const titleHint = isActive
+    ? currentSortDir === "asc"
+      ? `Sort by ${label} descending`
+      : `Clear sort`
+    : `Sort by ${label} ascending`;
+
+  return (
+    <button
+      onClick={() => onSort(columnKey)}
+      className={`flex items-center gap-1 font-semibold whitespace-nowrap transition-colors ${
+        isActive ? "text-blue-600" : "hover:text-blue-600"
+      }`}
+      title={titleHint}
+    >
+      <span>{label}</span>
+      <span className={`text-xs ${isActive ? "opacity-100" : "opacity-25"}`}>
+        {icon}
+      </span>
+    </button>
+  );
+}
+
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -134,6 +179,7 @@ type FilterState = {
   parchawa: string;
   divisionSecretariat: string;
   gn: string;
+  ssbmcode: string; // NEW: Sasanarakshaka Bala Mandala code
   vhTrn: string;
   status: string;
   category: string;
@@ -141,6 +187,9 @@ type FilterState = {
   dateFrom: string; // yyyy-mm-dd
   dateTo: string; // yyyy-mm-dd
   searchKey: string;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  recordType: "all" | "live" | "temp";
   page: number;
   limit: number;
 };
@@ -178,6 +227,7 @@ const DEFAULT_FILTERS: FilterState = {
   parchawa: "",
   divisionSecretariat: "",
   gn: "",
+  ssbmcode: "",
   vhTrn: "",
   status: "",
   category: "",
@@ -185,6 +235,9 @@ const DEFAULT_FILTERS: FilterState = {
   dateFrom: "",
   dateTo: "",
   searchKey: "",
+  sortBy: "",
+  sortDir: "asc",
+  recordType: "all",
   page: 1,
   limit: 5,
 };
@@ -205,6 +258,7 @@ function buildFilterPayload(f: FilterState) {
   if (f.divisionSecretariat)
     payload.divisional_secretariat = f.divisionSecretariat;
   if (f.gn) payload.gn_division = f.gn;
+  if (f.ssbmcode) payload.ssbmcode = f.ssbmcode;
   if (f.templeTrn) payload.temple = f.templeTrn;
   if (f.childTempleTrn) payload.child_temple = f.childTempleTrn;
   if (f.nikaya) payload.nikaya = f.nikaya;
@@ -216,6 +270,17 @@ function buildFilterPayload(f: FilterState) {
   if (from) payload.date_from = from;
   const to = toYYYYMMDD(f.dateTo);
   if (to) payload.date_to = to;
+  
+  // Sorting
+  if (f.sortBy) payload.sort_by = f.sortBy;
+  if (f.sortDir) payload.sort_dir = f.sortDir;
+  
+  // Record type filter
+  if (f.recordType && f.recordType !== "all") {
+    payload.record_type = f.recordType;
+  } else {
+    payload.record_type = "all";
+  }
 
   return payload;
 }
@@ -229,6 +294,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [hasMoreResults, setHasMoreResults] = useState(false);
   const [totalRecords, setTotalRecords] = useState(0);
+  const [filterKey, setFilterKey] = useState(0); // bump to remount SmartLocationFilter
   const prevFiltersRef = useRef<FilterState>(DEFAULT_FILTERS);
   const searchDebounceRef = useRef<number | null>(null);
   const nikayaData = STATIC_NIKAYAS;
@@ -276,6 +342,55 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     }));
   }, []);
 
+  // NEW: Handle SmartLocationFilter changes (cascading with SSBM support)
+  const handleResetFilters = useCallback(() => {
+    setFilters({ ...DEFAULT_FILTERS });
+    setFilterKey((k) => k + 1); // remount SmartLocationFilter to clear its internal state
+  }, []);
+
+  const hasActiveFilters =
+    filters.searchKey !== DEFAULT_FILTERS.searchKey ||
+    filters.nikaya !== DEFAULT_FILTERS.nikaya ||
+    filters.parchawa !== DEFAULT_FILTERS.parchawa ||
+    filters.province !== DEFAULT_FILTERS.province ||
+    filters.district !== DEFAULT_FILTERS.district ||
+    filters.divisionSecretariat !== DEFAULT_FILTERS.divisionSecretariat ||
+    filters.gn !== DEFAULT_FILTERS.gn ||
+    filters.ssbmcode !== DEFAULT_FILTERS.ssbmcode ||
+    filters.workflow_status !== DEFAULT_FILTERS.workflow_status ||
+    filters.recordType !== DEFAULT_FILTERS.recordType ||
+    filters.dateFrom !== DEFAULT_FILTERS.dateFrom ||
+    filters.dateTo !== DEFAULT_FILTERS.dateTo ||
+    filters.sortBy !== DEFAULT_FILTERS.sortBy;
+
+  const handleSmartLocationChange = useCallback((selection: any) => {
+    setFilters((prev) => ({
+      ...prev,
+      province: selection.province ?? "",
+      district: selection.district ?? "",
+      divisionSecretariat: selection.divisional_secretariat ?? "",
+      gn: selection.gn_division ?? "",
+      ssbmcode: selection.ssbmcode ?? "",
+    }));
+  }, []);
+
+  const handleSort = useCallback((columnKey: string) => {
+    setFilters((prev) => {
+      if (prev.sortBy === columnKey) {
+        if (prev.sortDir === "asc") {
+          // asc → desc
+          return { ...prev, sortDir: "desc", page: 1 };
+        } else {
+          // desc → reset (back to server-default ordering)
+          return { ...prev, sortBy: "", sortDir: "asc", page: 1 };
+        }
+      } else {
+        // New column → start ascending
+        return { ...prev, sortBy: columnKey, sortDir: "asc", page: 1 };
+      }
+    });
+  }, []);
+
  const fetchData = useCallback(
   async (signal?: AbortSignal, f: FilterState = filters) => {
     setLoading(true);
@@ -291,36 +406,38 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       const apiData = pickRows<any>(response.data);
       const total = (response.data as any)?.totalRecords ?? apiData.length;
 
-      // Fetch temporary viharas
+      // Fetch temporary viharas — only when record_type is "all" or "temp"
       let tempViharas: any[] = [];
       let tempTotal = 0;
-      try {
-        const tempPayload = {
-          page: f.page,
-          limit: f.limit,
-          search: f.searchKey ?? "",
-        };
-        
-        const tempResponse = await _manageTempTemple({
-          action: "READ_ALL",
-          payload: tempPayload,
-        });
-        
-        // Handle both response formats
-        const tempData = (tempResponse.data as any);
-        if (tempData?.data?.records) {
-          tempViharas = tempData.data.records;
-          tempTotal = tempData.data?.total ?? 0;
-        } else if (Array.isArray(tempData?.records)) {
-          tempViharas = tempData.records;
-          tempTotal = tempData?.total ?? 0;
-        } else if (Array.isArray(tempData?.data)) {
-          tempViharas = tempData.data;
-          tempTotal = tempData?.total ?? tempViharas.length;
+      if (f.recordType !== "live") {
+        try {
+          const tempPayload = {
+            page: f.page,
+            limit: f.limit,
+            search: f.searchKey ?? "",
+          };
+          
+          const tempResponse = await _manageTempTemple({
+            action: "READ_ALL",
+            payload: tempPayload,
+          });
+          
+          // Handle both response formats
+          const tempData = (tempResponse.data as any);
+          if (tempData?.data?.records) {
+            tempViharas = tempData.data.records;
+            tempTotal = tempData.data?.total ?? 0;
+          } else if (Array.isArray(tempData?.records)) {
+            tempViharas = tempData.records;
+            tempTotal = tempData?.total ?? 0;
+          } else if (Array.isArray(tempData?.data)) {
+            tempViharas = tempData.data;
+            tempTotal = tempData?.total ?? tempViharas.length;
+          }
+        } catch (tempError) {
+          console.warn("Warning: Could not fetch temporary viharas:", tempError);
+          // Continue without TEMP records if fetch fails
         }
-      } catch (tempError) {
-        console.warn("Warning: Could not fetch temporary viharas:", tempError);
-        // Continue without TEMP records if fetch fails
       }
 
       // Merge regular and temporary viharas
@@ -338,6 +455,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
           district: temp?.tv_district ?? "",
           nikaya: "",
           workflow_status: "TEMPORARY",
+          vh_is_temporary_record: true,  // Mark as temporary record
         }))
       ];
 
@@ -352,6 +470,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
         district: row?.vh_district ?? row?.district ?? row?.tv_district ?? "",
         nikaya: row?.vh_nikaya ?? row?.nikaya ?? "",
         workflow_status: row?.vh_workflow_status ?? row?.workflow_status ?? "TEMPORARY",
+        vh_is_temporary_record: Boolean(row?.vh_is_temporary_record),  // Map from API response
       }));
 
       // Total is sum of both regular and temp records
@@ -475,7 +594,14 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       prev.province !== filters.province ||
       prev.district !== filters.district ||
       prev.divisionSecretariat !== filters.divisionSecretariat ||
-      prev.gn !== filters.gn;
+      prev.gn !== filters.gn ||
+      prev.ssbmcode !== filters.ssbmcode ||
+      prev.dateFrom !== filters.dateFrom ||
+      prev.dateTo !== filters.dateTo ||
+      prev.workflow_status !== filters.workflow_status ||
+      prev.recordType !== filters.recordType ||
+      prev.sortBy !== filters.sortBy ||
+      prev.sortDir !== filters.sortDir;
 
     if (searchDebounceRef.current) {
       window.clearTimeout(searchDebounceRef.current);
@@ -514,15 +640,42 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
     filters.district,
     filters.divisionSecretariat,
     filters.gn,
+    filters.ssbmcode,
+    filters.dateFrom,
+    filters.dateTo,
+    filters.workflow_status,
+    filters.recordType,
+    filters.sortBy,
+    filters.sortDir,
   ]);
 
   const columns: Column[] = useMemo(
     () => [
-      { key: "vh_trn", label: "TRN", sortable: true },
+      { 
+        key: "vh_trn", 
+        label: (
+          <SortableHeader
+            label="TRN"
+            columnKey="vh_trn"
+            currentSortBy={filters.sortBy}
+            currentSortDir={filters.sortDir}
+            onSort={handleSort}
+          />
+        ) as any,
+        sortable: false 
+      },
       { 
         key: "name", 
-        label: "Name", 
-        sortable: true,
+        label: (
+          <SortableHeader
+            label="Name"
+            columnKey="vh_vname"
+            currentSortBy={filters.sortBy}
+            currentSortDir={filters.sortDir}
+            onSort={handleSort}
+          />
+        ) as any,
+        sortable: false,
         render: (item: ViharaRow) => (
           <div className="flex items-center gap-1">
             <span>{item.name}</span>
@@ -534,8 +687,16 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
       { key: "address", label: "Address" },
       {
         key: "workflow_status",
-        label: "Status",
-        sortable: true,
+        label: (
+          <SortableHeader
+            label="Status"
+            columnKey="vh_workflow_status"
+            currentSortBy={filters.sortBy}
+            currentSortDir={filters.sortDir}
+            onSort={handleSort}
+          />
+        ) as any,
+        sortable: false,
         render: (item: ViharaRow) => <StatusBadge status={item.workflow_status} />,
       },
       ...(isDivisionalSec
@@ -563,7 +724,7 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
             },
           ]),
     ],
-    [handleFillStageTwo, isDivisionalSec]
+    [handleFillStageTwo, isDivisionalSec, handleSort, filters.sortBy, filters.sortDir]
   );
 
   return (
@@ -629,16 +790,109 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
                 onRetry={loadNikayaHierarchy}
               />
 
-              <div className="md:col-span-3 lg:col-span-4">
-                <LocationPickerCompact
-                  value={locationSelection}
-                  onChange={(sel) => handleLocationChange(sel)}
-                  className="w-full"
+              <div className="md:col-span-3 lg:col-span-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+                <SmartLocationFilter
+                  key={filterKey}
+                  onFilterChange={handleSmartLocationChange}
+                />
+              </div>
+
+              {/* Workflow Status Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Workflow Status
+                </label>
+                <select
+                  value={filters.workflow_status}
+                  onChange={(e) =>
+                    setFilters((s) => ({
+                      ...s,
+                      workflow_status: e.target.value,
+                    }))
+                  }
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Statuses</option>
+                  <option value="S1_PENDING">Stage 1 - Pending</option>
+                  <option value="S1_PRINTING">Stage 1 - Printing</option>
+                  <option value="S1_PEND_APPROVAL">Stage 1 - Awaiting Approval</option>
+                  <option value="S1_APPROVED">Stage 1 - Approved</option>
+                  <option value="S1_REJECTED">Stage 1 - Rejected</option>
+                  <option value="S1_NO_DETAIL_COMP">Stage 1 - No Detail (Bypass)</option>
+                  <option value="S1_NO_CHIEF_COMP">Stage 1 - No Chief (Bypass)</option>
+                  <option value="S1_LTR_CERT_DONE">Stage 1 - Letter & Cert (Bypass)</option>
+                  <option value="S2_PENDING">Stage 2 - Pending</option>
+                  <option value="S2_PRINTING">Stage 2 - Printing</option>
+                  <option value="S2_PEND_APPROVAL">Stage 2 - Awaiting Approval</option>
+                  <option value="S2_APPROVED">Stage 2 - Approved</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="REJECTED">Rejected (Final)</option>
+                </select>
+              </div>
+
+              {/* Record Type Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Record Type
+                </label>
+                <select
+                  value={filters.recordType}
+                  onChange={(e) =>
+                    setFilters((s) => ({
+                      ...s,
+                      recordType: e.target.value as "all" | "live" | "temp",
+                    }))
+                  }
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Records</option>
+                  <option value="live">Live Records Only</option>
+                  <option value="temp">Temporary Records Only</option>
+                </select>
+              </div>
+
+              {/* Date Range Filter */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Date From
+                </label>
+                <input
+                  type="date"
+                  value={filters.dateFrom}
+                  onChange={(e) =>
+                    setFilters((s) => ({ ...s, dateFrom: e.target.value }))
+                  }
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Date To
+                </label>
+                <input
+                  type="date"
+                  value={filters.dateTo}
+                  onChange={(e) =>
+                    setFilters((s) => ({ ...s, dateTo: e.target.value }))
+                  }
+                  className="w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
-            <div className="mt-2" />
+            {/* Clear all filters — only visible when something is active */}
+            {hasActiveFilters && (
+              <div className="mt-2 flex items-center justify-end border-t border-slate-100 pt-2">
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100 hover:border-red-300 transition-colors"
+                >
+                  <span>✕</span>
+                  Clear all filters
+                </button>
+              </div>
+            )}
           </div>
 
 <div className="relative overflow-y-auto max-h-[240px]">

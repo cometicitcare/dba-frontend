@@ -90,7 +90,7 @@ function SilmathaAddPageInner() {
         const key = rawKey as keyof SilmathaForm;
         const cfg = fieldConfigMap.get(key);
         if (cfg) {
-          const raw = nextValues[cfg.name] ?? "";
+          const raw = String(nextValues[cfg.name] ?? "");
           updated[cfg.name] = validateField(cfg, raw, nextValues, today);
         }
       });
@@ -104,7 +104,7 @@ function SilmathaAddPageInner() {
     const nextErrors: Errors<SilmathaForm> = { ...errors };
     let valid = true;
     for (const field of step.fields) {
-      const raw = values[field.name] ?? "";
+      const raw = String(values[field.name] ?? "");
       const msg = validateField(field, raw, values, today);
       nextErrors[field.name] = msg;
       if (msg) valid = false;
@@ -120,7 +120,7 @@ function SilmathaAddPageInner() {
     for (const step of silmathaSteps) {
       let stepValid = true;
       for (const field of step.fields) {
-        const raw = values[field.name] ?? "";
+        const raw = String(values[field.name] ?? "");
         const msg = validateField(field, raw, values, today);
         aggregated[field.name] = msg;
         if (msg) stepValid = false;
@@ -325,7 +325,7 @@ function SilmathaAddPageInner() {
                             );
                           }
                           const id = String(field.name);
-                          const value = values[field.name] ?? "";
+                          const value = String(values[field.name] ?? "");
                           const error = errors[field.name];
                           const isBirthLocationStep = stepTitle === "Birth Location";
                           if (field.name === "sm_viharadhipathi") {
@@ -524,7 +524,7 @@ function SilmathaAddPageInner() {
                             </div>
                           );
                         }
-                        const raw = values[field.name] ?? "";
+                        const raw = String(values[field.name] ?? "");
                         const disp = display[field.name];
                         const shown =
                           disp ??

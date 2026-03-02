@@ -187,7 +187,8 @@ function ManageBhikkhuInner({ params }: PageProps) {
   const [accessChecked, setAccessChecked] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [canAdminActions, setCanAdminActions] = useState(false);
-  
+  const [tempPromoteConfirm, setTempPromoteConfirm] = useState(false);
+  const [promotingTemp, setPromotingTemp] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const getStepById = (tabId: number) =>
@@ -216,6 +217,38 @@ function ManageBhikkhuInner({ params }: PageProps) {
       behavior: "smooth",
       block: "start",
     });
+
+  const handlePromoteTemp = async () => {
+    if (!editId) {
+      toast.error("Missing bhikkhu ID.");
+      return;
+    }
+    try {
+      setPromotingTemp(true);
+      const res = await _manageBhikku({
+        action: "UPDATE",
+        payload: {
+          br_regn: editId,
+          is_temporary_record: false,
+        },
+      } as any);
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const msg = (payload as any)?.message || "Failed to promote record.";
+        toast.error(msg);
+        return;
+      }
+      setTempPromoteConfirm(false);
+      handleSetMany({ br_is_temporary_record: false });
+      toast.success("Record promoted to permanent. Changes saved.", { autoClose: 1200 });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to promote record. Please try again.";
+      toast.error(msg);
+    } finally {
+      setPromotingTemp(false);
+    }
+  };
 
   const handleInputChange = (name: keyof BhikkhuForm, value: string) => {
     setValues((prev) => {
@@ -1628,6 +1661,29 @@ function ManageBhikkhuInner({ params }: PageProps) {
                                     </div>
                                   );
                                 })}
+
+                                {values.br_is_temporary_record && (
+                                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mt-6">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="font-semibold text-amber-900">
+                                          Temporary Record
+                                        </p>
+                                        <p className="text-xs text-amber-700 mt-1">
+                                          This is an incomplete record. You can promote it to a permanent record.
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setTempPromoteConfirm(true)}
+                                        disabled={promotingTemp}
+                                        className="flex-shrink-0 px-4 py-2 bg-amber-500 text-white rounded-lg font-medium text-sm hover:bg-amber-600 transition-all disabled:opacity-70"
+                                      >
+                                        {promotingTemp ? "Promoting…" : "Promote"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
 
                               <div className="flex justify-end mt-8 pt-6 border-t border-slate-200">
@@ -1817,6 +1873,55 @@ function ManageBhikkhuInner({ params }: PageProps) {
           </MuiButton>
         </DialogActions>
       </Dialog>
+
+      {/* ── TEMP Record Promotion Confirm Modal ───────────────────────── */}
+      {tempPromoteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Make Record Permanent?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Promote from temporary to permanent status</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This record is currently marked as <strong className="text-amber-600">temporary</strong>. Making it permanent means you have completed all required information and it will be treated as a regular record in the system.
+              </p>
+              <p className="text-sm text-slate-500 mt-3">
+                This action can be undone later if needed. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setTempPromoteConfirm(false)}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePromoteTemp}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {promotingTemp ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Promoting…</>
+                ) : "Make Permanent"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ToastContainer
         position="top-right"

@@ -33,6 +33,7 @@ type AramaRow = {
   nikaya?: string;
   workflow_status?: string;
   workflowStatusCode?: string;
+  ar_is_temporary_record?: boolean;
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -272,11 +273,17 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
       { key: "mobile", label: "Mobile" },
       { key: "email", label: "Email" },
       {
-        key: "workflow_status",
+        key: "ar_is_temporary_record",
         label: "Status",
-        sortable: true,
-        render: (row: AramaRow) =>
-          renderWorkflowStatusBadge(row.workflowStatusCode, row.workflow_status),
+        sortable: false,
+        render: (row: AramaRow) => (
+          <div className="flex items-center gap-2">
+            {row.ar_is_temporary_record ? (
+              <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800">TEMP</span>
+            ) : null}
+            {renderWorkflowStatusBadge(row.workflowStatusCode, row.workflow_status)}
+          </div>
+        ),
       },
     ],
     []
@@ -334,6 +341,7 @@ export default function RecordList({canDelete}: {canDelete: boolean}) {
           nikaya: row?.ar_nikaya ?? "",
           workflow_status,
           workflowStatusCode,
+          ar_is_temporary_record: Boolean(row?.ar_is_temporary_record),
         };
       });
 
