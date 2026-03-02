@@ -40,6 +40,7 @@ export type BhikkhuForm = {
 
   br_mahanatemple: string; // TRN
   br_robing_after_residence_temple: string; // TRN
+  br_is_temporary_record: boolean;
 };
 
 export const bhikkhuSteps = (): StepConfig<BhikkhuForm>[] => [
@@ -148,6 +149,7 @@ export const bhikkhuInitialValues: Partial<BhikkhuForm> = {
   br_viharadhipathi: "",
   br_nikaya: "",
   br_parshawaya: "",
+  br_is_temporary_record: false,
   br_mahanayaka_name: "",
   br_mahanayaka_address: "",
 

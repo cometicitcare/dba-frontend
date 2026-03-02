@@ -39,6 +39,7 @@ export type ViharaForm = {
   // Step A: Registration Status (default: registered)
   vh_is_registered: boolean;       // true = registered, false = not registered
   vh_unregistered_reason: string;  // Required when vh_is_registered = false
+  vh_is_temporary_record: boolean; // true = temporary, false = permanent
 
   // Step B: Administrative Divisions
   province: string;
@@ -274,6 +275,7 @@ export const viharaInitialValues: Partial<ViharaForm> = {
   vh_vihara_code: "",
   vh_is_registered: true,
   vh_unregistered_reason: "",
+  vh_is_temporary_record: false,
   province: "",
   district: "",
   divisional_secretariat: "",

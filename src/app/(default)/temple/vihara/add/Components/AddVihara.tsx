@@ -30,7 +30,6 @@ import {
   type ResidentBhikkhuRow,
 } from "./";
 import BhikkhuAutocomplete from "@/components/Bhikku/Add/AutocompleteBhikkhu";
-import SasanarakshakaAutocomplete from "@/components/sasanarakshaka/AutoComplete";
 import ViharaAngaMultipleSelector from "../../Components/ViharaAngaMultipleSelector";
 
 // Toasts
@@ -1375,28 +1374,7 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
 
                         if (id === "divisional_secretariat" || id === "grama_niladhari_division") return null; // Handled by LocationPicker
 
-                        // Pradeshya Sabha field
-                        if (id === "pradeshya_sabha") {
-                          return (
-                            <div key={id}>
-                              <SasanarakshakaAutocomplete
-                                id={id}
-                                label={f.label}
-                                placeholder="Type SSB name or code"
-                                initialDisplay={val}
-                                onPick={(picked) => {
-                                  handleSetMany({
-                                    pradeshya_sabha: picked.code ?? "",
-                                  });
-                                }}
-                                onInputChange={() => {
-                                  handleInputChange(f.name, "");
-                                }}
-                              />
-                              {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
-                            </div>
-                          );
-                        }
+                        // Note: pradeshya_sabha falls through to default text input below
 
                         // Step C: Nikaya & Parshawa
                         if (id === "nikaya") {

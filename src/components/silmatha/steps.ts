@@ -28,6 +28,7 @@ export type SilmathaForm = {
   sil_acharya_signature: string;
   sil_aramadhipathi_signature: string;
   sil_district_secretary_signature: string;
+  sil_is_temporary_record: boolean;
 };
 
 export const silmathaSteps: StepConfig<SilmathaForm>[] = [
@@ -128,4 +129,5 @@ export const silmathaInitialValues: SilmathaForm = {
   sil_acharya_signature: "false",
   sil_aramadhipathi_signature: "false",
   sil_district_secretary_signature: "false",
+  sil_is_temporary_record: false,
 };

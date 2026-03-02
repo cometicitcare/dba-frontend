@@ -32,6 +32,7 @@ export type AramaForm = {
   telephone_number: string;
   whatsapp_number: string;
   email_address: string;
+  ar_is_temporary_record: boolean; // true = temporary, false = permanent
 
   // Step 2: Location Details
   province: string;
@@ -232,6 +233,7 @@ export const aramaInitialValues: Partial<AramaForm> = {
   telephone_number: "",
   whatsapp_number: "",
   email_address: "",
+  ar_is_temporary_record: false,
   province: "",
   district: "",
   divisional_secretariat: "",
