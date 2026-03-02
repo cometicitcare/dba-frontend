@@ -48,7 +48,7 @@ const API_BASE_URL = "https://api.dbagovlk.com";
 const FALLBACK_PDF_URL =
   "https://api.dbagovlk.com/storage/bhikku_regist/2025/11/23/BH2025000051/scanned_document_20251123_191251_5aa366eb.pdf";
 
-const FIELD_TO_API_MAP: Record<keyof SilmathaForm, string> = {
+const FIELD_TO_API_MAP: Record<string, string> = {
   sm_form_number: "sil_form_id",
   sm_reqstdate: "sil_reqstdate",
   sm_gihiname: "sil_gihiname",
@@ -232,6 +232,7 @@ const normalizeSilmathaRecord = (api: any): NormalizeResult => {
     sil_district_secretary_signature: toCheckboxString(
       api?.sil_district_secretary_signature
     ),
+    sil_is_temporary_record: api?.sil_is_temporary_record === true,
   };
 
   const display: Partial<Record<keyof SilmathaForm, string>> = {};
@@ -321,6 +322,8 @@ export default function ManageSilmathaPage({ params }: PageProps) {
   const [uploadingScan, setUploadingScan] = useState(false);
   const [scannedDocumentPath, setScannedDocumentPath] = useState<string>("");
   const [recordRegn, setRecordRegn] = useState<string>("");
+  const [tempPromoteConfirm, setTempPromoteConfirm] = useState(false);
+  const [promotingTemp, setPromotingTemp] = useState(false);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const fieldConfigMap = useMemo(() => {
     const map = new Map<keyof SilmathaForm, FieldConfig<SilmathaForm>>();
@@ -419,7 +422,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
         const key = rawKey as keyof SilmathaForm;
         const cfg = fieldConfigMap.get(key);
         if (cfg) {
-          const rawValue = nextValues[cfg.name] ?? "";
+          const rawValue = String(nextValues[cfg.name] ?? "");
           updated[cfg.name] = validateField(cfg, rawValue, nextValues, today);
         }
       });
@@ -433,7 +436,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
     const nextErrors: Errors<SilmathaForm> = { ...errors };
     let valid = true;
     for (const field of step.fields) {
-      const raw = values[field.name] ?? "";
+      const raw = String(values[field.name] ?? "");
       const msg = validateField(field, raw, values, today);
       nextErrors[field.name] = msg;
       if (msg) valid = false;
@@ -448,7 +451,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
     step.fields.forEach((field) => {
       const apiKey = FIELD_TO_API_MAP[field.name];
       if (!apiKey) return;
-      const raw = values[field.name] ?? "";
+      const raw = String(values[field.name] ?? "");
       if (field.type === "date") {
         payload[apiKey] = toISOFormat(raw);
       } else if (field.type === "checkbox") {
@@ -637,6 +640,45 @@ export default function ManageSilmathaPage({ params }: PageProps) {
     }
   };
 
+  const handlePromoteTemp = async () => {
+    if (!recordIdentifier) {
+      toast.error("Missing silmatha ID.");
+      return;
+    }
+    try {
+      setPromotingTemp(true);
+      const res = await _manageSilmatha({
+        action: "UPDATE",
+        payload: {
+          sil_regn: recordIdentifier,
+          is_temporary_record: false,
+        },
+      } as any);
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+      setTempPromoteConfirm(false);
+      handleSetMany({ sil_is_temporary_record: false });
+      toast.success("Record promoted to permanent. Changes saved.", { autoClose: 1200 });
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to promote record. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setPromotingTemp(false);
+    }
+  };
+
   const collectApprovalErrors = (source: any) => {
     const container = source?.data ?? source;
     const rawErrors =
@@ -675,7 +717,27 @@ export default function ManageSilmathaPage({ params }: PageProps) {
     const anyLocationError = LOCATION_FIELDS.map((key) => errors[key]).find(Boolean);
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="space-y-6">
+        {/* TEMP record promotion toggle (Step 1 only) */}
+        {step.id === 1 && values.sil_is_temporary_record && (
+          <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">Temporary Record</p>
+              <p className="text-xs text-amber-600">This record is incomplete and marked as temporary</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!values.sil_is_temporary_record}
+              onClick={() => setTempPromoteConfirm(true)}
+              className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none bg-amber-300 hover:bg-amber-400"
+            >
+              <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 translate-x-0" />
+            </button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {step.fields.map((field) => {
           if (SIGNATURE_FIELDS.includes(field.name)) {
             if (signatureRendered) return null;
@@ -744,7 +806,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
           }
 
           const id = String(field.name);
-          const value = values[field.name] ?? "";
+          const value = String(values[field.name] ?? "");
           const error = errors[field.name];
 
           if (field.name === "sm_viharadhipathi") {
@@ -882,6 +944,7 @@ export default function ManageSilmathaPage({ params }: PageProps) {
             </div>
           );
         })}
+        </div>
       </div>
     );
   };
@@ -1259,6 +1322,56 @@ export default function ManageSilmathaPage({ params }: PageProps) {
           </MuiButton>
         </DialogActions>
       </Dialog>
+
+      {/* ── TEMP Record Promotion Confirm Modal ───────────────────────── */}
+      {tempPromoteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Make Record Permanent?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Promote from temporary to permanent status</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This record is currently marked as <strong className="text-amber-600">temporary</strong>. Making it permanent means you have completed all required information and it will be treated as a regular record in the system.
+              </p>
+              <p className="text-sm text-slate-500 mt-3">
+                This action can be undone later if needed. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setTempPromoteConfirm(false)}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePromoteTemp}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {promotingTemp ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Promoting…</>
+                ) : "Make Permanent"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
   );
