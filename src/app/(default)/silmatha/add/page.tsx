@@ -8,7 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { Errors, FieldConfig, toYYYYMMDD, validateField } from "@/components/silmatha/helpers";
+import { Errors, FieldConfig, toISOFormat, toYYYYMMDD, validateField } from "@/components/silmatha/helpers";
 import DateField from "@/components/silmatha/DateField";
 import LocationPicker, { LocationSelection } from "@/components/silmatha/LocationPicker";
 import SilmathaAutocomplete from "@/components/silmatha/AutocompleteSilmatha";
@@ -152,10 +152,10 @@ function SilmathaAddPageInner() {
     try {
       setSubmitting(true);
       const apiPayload = {
-        sil_reqstdate: toYYYYMMDD(values.sm_reqstdate),
+        sil_reqstdate: toISOFormat(values.sm_reqstdate),
         sil_form_id: values.sm_form_number,
         sil_gihiname: values.sm_gihiname,
-        sil_dofb: toYYYYMMDD(values.sm_dofb),
+        sil_dofb: toISOFormat(values.sm_dofb),
         sil_fathrname: values.sm_fathername,
         sil_birthpls: values.sm_birthplace,
         sil_province: values.sm_province,
@@ -167,12 +167,12 @@ function SilmathaAddPageInner() {
         sil_vilage: values.sm_village,
         sil_aramadhipathi: values.sm_viharadhipathi,
         sil_mahananame: values.sm_robing_name,
-        sil_mahanadate: toYYYYMMDD(values.sm_robing_date),
+        sil_mahanadate: toISOFormat(values.sm_robing_date),
         sil_mahanaacharyacd: values.sm_robing_tutor,
         sil_robing_tutor_residence: values.sm_robing_tutor_residence,
         sil_mahanatemple: values.sm_robing_temple,
         sil_robing_after_residence_temple: values.sm_post_robing_temple,
-        sil_declaration_date: toYYYYMMDD(values.sil_declaration_date),
+        sil_declaration_date: toISOFormat(values.sil_declaration_date),
         sil_remarks: values.sil_remarks,
         sil_currstat: values.sil_currstat,
         sil_cat: "CAT01",
