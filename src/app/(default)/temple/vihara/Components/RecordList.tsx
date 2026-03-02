@@ -57,6 +57,15 @@ function StatusBadge({ status }: { status?: string }) {
     </span>
   );
 }
+
+// NEW: TEMP Record Badge Component
+function TempBadge() {
+  return (
+    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-100 text-orange-800 ml-1">
+      TEMP
+    </span>
+  );
+}
 type ViharaRow = {
   vh_id: number;
   vh_trn: string;
@@ -68,6 +77,7 @@ type ViharaRow = {
   district?: string;
   nikaya?: string;
   workflow_status?: string;
+  vh_is_temporary_record?: boolean;  // NEW: Flag for TEMP records
 };
 
 type ApiResponse<T> = { data?: { data?: T; rows?: T } | T };
@@ -509,7 +519,17 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const columns: Column[] = useMemo(
     () => [
       { key: "vh_trn", label: "TRN", sortable: true },
-      { key: "name", label: "Name", sortable: true },
+      { 
+        key: "name", 
+        label: "Name", 
+        sortable: true,
+        render: (item: ViharaRow) => (
+          <div className="flex items-center gap-1">
+            <span>{item.name}</span>
+            {item.vh_is_temporary_record && <TempBadge />}
+          </div>
+        )
+      },
       { key: "mobile", label: "Mobile" },
       { key: "address", label: "Address" },
       {
