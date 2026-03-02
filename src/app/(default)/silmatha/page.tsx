@@ -119,6 +119,7 @@ type SilmathaRecord = {
   sil_mahananame?: string | null
   sil_reqstdate?: string | null
   sil_workflow_status?: string | null
+  sil_is_temporary_record?: boolean
   sil_currstat?: {
     st_code?: string | null
     st_descr?: string | null
@@ -149,6 +150,7 @@ type SilmathaRow = {
   province: string
   district: string
   division: string
+  isTemporaryRecord?: boolean
 }
 
 const DEFAULT_FILTERS: FilterState = {
@@ -573,6 +575,7 @@ function SilmathaDashboard() {
               <tr>
                 <th className="px-4 py-3">Reg. No</th>
                 <th className="px-4 py-3">Mahananame</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Workflow Status</th>
                 <th className="px-4 py-3">Current Status</th>
                 <th className="px-4 py-3">Province</th>
@@ -585,6 +588,11 @@ function SilmathaDashboard() {
               <tr key={row.regn} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-800">{row.regn}</td>
                 <td className="px-4 py-3 text-sm text-gray-700">{row.mahananame}</td>
+                <td className="px-4 py-3 text-sm text-gray-700">
+                  {row.isTemporaryRecord ? (
+                    <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800">TEMP</span>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-700">
                   {renderWorkflowStatusBadge(row.workflowStatusCode, row.workflowStatus)}
                 </td>
@@ -615,7 +623,7 @@ function SilmathaDashboard() {
               {records.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-8 text-center text-sm font-medium text-gray-500"
                   >
                     {loading ? 'Loading records...' : 'No records matched the current filters.'}
@@ -759,6 +767,7 @@ function normalizeRecord(record: SilmathaRecord): SilmathaRow {
     province: record.sil_province?.pr_name ?? record.sil_province?.pr_code ?? 'N/A',
     district: record.sil_district?.ds_name ?? record.sil_district?.ds_code ?? 'N/A',
     division: record.sil_division?.dv_name ?? record.sil_division?.dv_code ?? 'N/A',
+    isTemporaryRecord: Boolean(record.sil_is_temporary_record),
   }
 }
 

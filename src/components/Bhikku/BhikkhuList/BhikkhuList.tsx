@@ -32,6 +32,7 @@ type BhikkuRow = {
   status?: string;
   workflowStatus?: string;
   workflowStatusCode?: string;
+  br_is_temporary_record?: boolean;  // NEW: Flag for TEMP records
 };
 
 type BhikkhuListProps = {
@@ -76,6 +77,15 @@ function Spinner() {
         fill="none"
       />
     </svg>
+  );
+}
+
+// NEW: TEMP Record Badge Component
+function TempBadge() {
+  return (
+    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-orange-100 text-orange-800 ml-1">
+      TEMP
+    </span>
   );
 }
 
@@ -294,7 +304,17 @@ export default function BhikkhuList({
   const columns: Column<BhikkuRow>[] = useMemo(
     () => [
       { key: "regNo", label: "REG.NO", sortable: true },
-      { key: "name", label: "SAMANERA NAME", sortable: true },
+      { 
+        key: "name", 
+        label: "SAMANERA NAME", 
+        sortable: true,
+        render: (row) => (
+          <div className="flex items-center gap-1">
+            <span>{row.name}</span>
+            {row.br_is_temporary_record && <TempBadge />}
+          </div>
+        )
+      },
       {
         key: "workflowStatus",
         label: "Workflow Status",
@@ -354,6 +374,7 @@ export default function BhikkhuList({
             remarks: row?.br_remarks ?? "",
             category: row?.br_cat ?? "",
             status: row?.br_currstat?.st_descr ?? "",
+            br_is_temporary_record: row?.br_is_temporary_record ?? false,  // NEW: TEMP flag
           };
         });
         setRecords(cleaned);

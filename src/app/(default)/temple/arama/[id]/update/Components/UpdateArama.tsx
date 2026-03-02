@@ -94,6 +94,8 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
   const [printingMarking, setPrintingMarking] = useState(false);
   const [workflowStatus, setWorkflowStatus] = useState<string>("");
   const [printingActive, setPrintingActive] = useState(false);
+  const [tempPromoteConfirm, setTempPromoteConfirm] = useState(false);
+  const [promotingTemp, setPromotingTemp] = useState(false);
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const current = steps[activeTab - 1];
@@ -1016,6 +1018,45 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
       }
     };
 
+  const handlePromoteTemp = async () => {
+    if (!aramaId) {
+      toast.error("Missing arama ID.");
+      return;
+    }
+    try {
+      setPromotingTemp(true);
+      const res = await _manageArama({
+        action: "UPDATE",
+        payload: {
+          ar_id: aramaId,
+          is_temporary_record: false,
+        },
+      } as any);
+      const payload = (res as any)?.data ?? res;
+      const success = (payload as any)?.success ?? true;
+      if (!success) {
+        const { messages, fallback } = collectApprovalErrors(payload);
+        toast.error(messages.join("\n") || fallback);
+        return;
+      }
+      setTempPromoteConfirm(false);
+      handleSetMany({ ar_is_temporary_record: false });
+      toast.success("Record promoted to permanent. Changes saved.", { autoClose: 1200 });
+    } catch (e: unknown) {
+      const data = (e as any)?.response?.data ?? (e as any)?.data;
+      const { messages, fallback } = collectApprovalErrors(data);
+      const errMsg =
+        messages.join("\n") ||
+        fallback ||
+        (e instanceof Error
+          ? e.message
+          : "Failed to promote record. Please try again.");
+      toast.error(errMsg);
+    } finally {
+      setPromotingTemp(false);
+    }
+  };
+
   const collectApprovalErrors = (source: any) => {
     const container = source?.data ?? source;
     const rawErrors =
@@ -1365,6 +1406,29 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                         </div>
                       )}
 
+                      {/* TEMP record promotion toggle (Step 1) */}
+                      {activeTab === 1 && (
+                        <div className="md:col-span-2">
+                          {values.ar_is_temporary_record && (
+                            <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                              <div>
+                                <p className="text-sm font-semibold text-amber-900">Temporary Record</p>
+                                <p className="text-xs text-amber-600">This record is incomplete and marked as temporary</p>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={!values.ar_is_temporary_record}
+                                onClick={() => setTempPromoteConfirm(true)}
+                                className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none bg-amber-300 hover:bg-amber-400"
+                              >
+                                <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 translate-x-0" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Other form fields - similar to AddArama */}
                       {activeTab !== 2 && activeTab !== 5 && activeTab !== 6 && current.fields.map((f) => {
                         const id = String(f.name);
@@ -1596,6 +1660,55 @@ function UpdateAramaPageInner({ isAdmin }: { isAdmin: boolean }) {
                 </MuiButton>
               </DialogActions>
             </Dialog>
+
+      {/* ── TEMP Record Promotion Confirm Modal ───────────────────────── */}
+      {tempPromoteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-green-50 to-slate-50 px-6 py-5 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">Make Record Permanent?</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Promote from temporary to permanent status</p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600">
+                This record is currently marked as <strong className="text-amber-600">temporary</strong>. Making it permanent means you have completed all required information and it will be treated as a regular record in the system.
+              </p>
+              <p className="text-sm text-slate-500 mt-3">
+                This action can be undone later if needed. Continue?
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setTempPromoteConfirm(false)}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePromoteTemp}
+                disabled={promotingTemp}
+                className="px-5 py-2 text-sm font-bold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {promotingTemp ? (
+                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>Promoting…</>
+                ) : "Make Permanent"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ToastContainer position="top-right" newestOnTop closeOnClick pauseOnHover />
     </div>
