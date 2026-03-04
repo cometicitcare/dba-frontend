@@ -10,6 +10,7 @@ import {
   _rejectStage,
 } from "@/services/vihara";
 import { _manageBhikku } from "@/services/bhikku";
+import { _getNikayaAndParshawa } from "@/services/nikaya";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -37,7 +38,7 @@ import {
   type ResidentBhikkhuRow,
 } from "../../../add/Components";
 import ViharaAngaMultipleSelector from "../../../Components/ViharaAngaMultipleSelector";
-import SasanarakshakaAutocomplete from "@/components/sasanarakshaka/AutoComplete";
+import SbmSelect from "@/components/sasanarakshaka/SbmSelect";
 
 import { Tabs } from "@/components/ui/Tabs";
 
@@ -268,6 +269,27 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   const [nikayaData, setNikayaData] = useState<NikayaAPIItem[]>(STATIC_NIKAYA_DATA);
   const [nikayaLoading, setNikayaLoading] = useState(false);
   const [nikayaError, setNikayaError] = useState<string | null>(null);
+
+  // Fetch Nikaya hierarchy from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    setNikayaLoading(true);
+    setNikayaError(null);
+    _getNikayaAndParshawa()
+      .then((res: any) => {
+        if (!cancelled) {
+          const data = res?.data?.data ?? [];
+          setNikayaData(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNikayaError("Failed to load Nikaya list.");
+      })
+      .finally(() => {
+        if (!cancelled) setNikayaLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
   const [display, setDisplay] = useState<Record<string, string>>({
     nikaya: "",
     parshawaya: "",
@@ -647,27 +669,8 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
         };
         setValues(filledValues);
 
-        const mainBhikkuInfo = apiData?.nikaya_info?.main_bhikku_info;
-        setNikayaLetterInfo({
-          br_mahananame: mainBhikkuInfo?.br_mahananame ?? "",
-          nk_nname: apiData?.nikaya_info?.nk_nname ?? "",
-          br_fathrsaddrs: mainBhikkuInfo?.br_fathrsaddrs ?? "",
-        });
-        
-        // Update display state for nikaya and parshawaya
-        if (filledValues.nikaya) {
-          const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
-          if (nikayaItem) {
-            setDisplay((d) => ({ ...d, nikaya: `${nikayaItem.nikaya.name} — ${nikayaItem.nikaya.code}` }));
-          }
-        }
-        if (filledValues.parshawaya && filledValues.nikaya) {
-          const nikayaItem = STATIC_NIKAYA_DATA.find((n) => n.nikaya.code === filledValues.nikaya);
-          const parshawaItem = nikayaItem?.parshawayas.find((p) => p.code === filledValues.parshawaya);
-          if (parshawaItem) {
-            setDisplay((d) => ({ ...d, parshawaya: `${parshawaItem.name} - ${parshawaItem.code}` }));
-          }
-        }
+        // nikayaLetterInfo and display labels are derived reactively from nikayaData state
+        // via the useEffect below — no stale look-ups here.
 
         setWorkflowStatus(apiData?.vh_workflow_status ?? apiData?.workflow_status ?? "");
 
@@ -833,11 +836,12 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
   }, [findNikayaByCode]);
 
   // Handler for picking nikaya
-  const onPickNikaya = useCallback((nikayaCode: string) => {
-    handleInputChange("nikaya", nikayaCode);
+  const onPickNikaya = (nikayaCode: string) => {
+    // Clear parshawaya whenever Nikaya changes — old parshawa belongs to a different nikaya
+    handleSetMany({ nikaya: nikayaCode, parshawaya: "" });
     const item = findNikayaByCode(nikayaCode);
-    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : nikayaCode }));
-  }, [findNikayaByCode]);
+    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : nikayaCode, parshawaya: "" }));
+  };
 
   // Handler for picking parshawaya
   const onPickParshawa = useCallback((parshawaCode: string) => {
@@ -866,6 +870,32 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
           parshawaya: `${p.name} - ${p.code}`,
         }));
       }
+    }
+  }, [values.nikaya, values.parshawaya, findNikayaByCode]);
+
+  // Derive nikayaLetterInfo reactively from nikayaData + selected nikaya/parshawa.
+  // If a parshawaya is selected → use parshawa nayaka; otherwise → use nikaya mahanayaka.
+  useEffect(() => {
+    const nikayaItem = findNikayaByCode(values.nikaya);
+    if (!nikayaItem) {
+      setNikayaLetterInfo({ br_mahananame: "", nk_nname: "", br_fathrsaddrs: "" });
+      return;
+    }
+    if (values.parshawaya) {
+      const parshawaItem = nikayaItem.parshawayas.find((p) => p.code === values.parshawaya);
+      const nayaka = parshawaItem?.nayaka;
+      setNikayaLetterInfo({
+        br_mahananame: nayaka?.mahananame ?? "",
+        nk_nname: nikayaItem.nikaya.name,
+        br_fathrsaddrs: nayaka?.address ?? "",
+      });
+    } else {
+      const mainBhikku = nikayaItem.main_bhikku;
+      setNikayaLetterInfo({
+        br_mahananame: mainBhikku?.mahananame ?? "",
+        nk_nname: nikayaItem.nikaya.name,
+        br_fathrsaddrs: mainBhikku?.address ?? "",
+      });
     }
   }, [values.nikaya, values.parshawaya, findNikayaByCode]);
 
@@ -2590,25 +2620,20 @@ function UpdateViharaPageInner({ role, department }: { role: string | undefined;
 
                               if (id === "divisional_secretariat" || id === "grama_niladhari_division") return null; // Handled by LocationPicker
 
-                              // Pradeshya Sabha field
+                              // Pradeshīya Shāsanarakshaka Bala Mandalaya — local-data cascade select
                               if (id === "pradeshya_sabha") {
                                 return (
                                   <div key={id}>
-                                    <SasanarakshakaAutocomplete
+                                    <SbmSelect
                                       id={id}
                                       label={f.label}
-                                      placeholder="Type SSB name or code"
-                                      initialDisplay={val}
-                                      onPick={(picked) => {
-                                        handleSetMany({
-                                          pradeshya_sabha: picked.code ?? "",
-                                        });
-                                      }}
-                                      onInputChange={() => {
-                                        handleInputChange(f.name, "");
-                                      }}
+                                      value={values.pradeshya_sabha as string ?? ""}
+                                      districtCode={values.district as string || undefined}
+                                      dvCode={values.divisional_secretariat as string || undefined}
+                                      onChange={(code) => handleSetMany({ pradeshya_sabha: code })}
+                                      error={err}
+                                      required={!!f.rules?.required}
                                     />
-                                    {err ? <p className="mt-1 text-xs text-red-600">{err}</p> : null}
                                   </div>
                                 );
                               }
