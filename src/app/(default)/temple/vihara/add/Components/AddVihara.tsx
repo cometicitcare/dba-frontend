@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState, useCallback, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { _manageVihara } from "@/services/vihara";
+import { _getNikayaAndParshawa } from "@/services/nikaya";
 import request from "@/services/backendClient";
 import { FooterBar } from "@/components/FooterBar";
 import { TopBar } from "@/components/TopBar";
@@ -31,6 +32,7 @@ import {
 } from "./";
 import BhikkhuAutocomplete from "@/components/Bhikku/Add/AutocompleteBhikkhu";
 import ViharaAngaMultipleSelector from "../../Components/ViharaAngaMultipleSelector";
+import SbmSelect from "@/components/sasanarakshaka/SbmSelect";
 
 // Toasts
 import { ToastContainer, toast } from "react-toastify";
@@ -916,17 +918,39 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
   }>({});
 
   // Nikaya & Parshawa
-  const nikayaData = STATIC_NIKAYA_DATA;
-  const nikayaLoading = false;
-  const nikayaError: string | null = null;
+  const [nikayaData, setNikayaData] = useState<NikayaAPIItem[]>(STATIC_NIKAYA_DATA);
+  const [nikayaLoading, setNikayaLoading] = useState(false);
+  const [nikayaError, setNikayaError] = useState<string | null>(null);
+
+  // Fetch Nikaya hierarchy from API on mount
+  useEffect(() => {
+    let cancelled = false;
+    setNikayaLoading(true);
+    setNikayaError(null);
+    _getNikayaAndParshawa()
+      .then((res: any) => {
+        if (!cancelled) {
+          const data = res?.data?.data ?? [];
+          setNikayaData(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNikayaError("Failed to load Nikaya list.");
+      })
+      .finally(() => {
+        if (!cancelled) setNikayaLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const findNikayaByCode = useCallback((code?: string | null) => nikayaData.find((n) => n.nikaya.code === (code ?? "")), [nikayaData]);
   const parshawaOptions = useCallback((nikayaCode?: string | null) => findNikayaByCode(nikayaCode)?.parshawayas ?? [], [findNikayaByCode]);
 
   const onPickNikaya = (code: string) => {
     const item = findNikayaByCode(code);
-    handleInputChange("nikaya", code);
-    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : code }));
+    // Clear parshawaya whenever Nikaya changes — old parshawa belongs to a different nikaya
+    handleSetMany({ nikaya: code, parshawaya: "" });
+    setDisplay((d) => ({ ...d, nikaya: item ? `${item.nikaya.name} — ${item.nikaya.code}` : code, parshawaya: "" }));
   };
 
   const onPickParshawa = (code: string) => {
@@ -1374,7 +1398,23 @@ function AddViharaPageInner({ department, role }: { department?: string; role?: 
 
                         if (id === "divisional_secretariat" || id === "grama_niladhari_division") return null; // Handled by LocationPicker
 
-                        // Note: pradeshya_sabha falls through to default text input below
+                        // Pradeshīya Shāsanarakshaka Bala Mandalaya — local-data cascade select
+                        if (id === "pradeshya_sabha") {
+                          return (
+                            <div key={id}>
+                              <SbmSelect
+                                id={id}
+                                label={f.label}
+                                value={values.pradeshya_sabha as string ?? ""}
+                                districtCode={values.district as string || undefined}
+                                dvCode={values.divisional_secretariat as string || undefined}
+                                onChange={(code) => handleSetMany({ pradeshya_sabha: code })}
+                                error={errors.pradeshya_sabha}
+                                required={!!f.rules?.required}
+                              />
+                            </div>
+                          );
+                        }
 
                         // Step C: Nikaya & Parshawa
                         if (id === "nikaya") {

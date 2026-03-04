@@ -15,12 +15,12 @@ import { PlusIcon, XIcon } from "lucide-react";
 import { FooterBar } from "@/components/FooterBar";
 import { _manageVihara } from "@/services/vihara";
 import { _manageTempTemple } from "@/services/temple";
+import { _getNikayaAndParshawa } from "@/services/nikaya";
 import LocationPickerCompact from "@/components/Bhikku/Filter/LocationPickerCompact";
 import SmartLocationFilter from "@/components/Filters/SmartLocationFilter";
 import NikayaParshawaCompact from "@/components/Bhikku/Filter/NikayaParshawaCompact";
 import { toYYYYMMDD } from "@/components/Bhikku/Add";
 import type { LocationSelection } from "@/components/Bhikku/Filter/LocationPickerCompact";
-import selectionsData from "@/utils/selectionsData.json";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { VIHARA } from "../../constants";
@@ -199,23 +199,6 @@ type NikayaHierarchy = {
   parshawayas: Array<{ code: string; name: string }>;
 };
 
-type RawNikayaEntry = {
-  nikaya: { code: string; name: string };
-  parshawayas?: Array<{ code: string; name: string }>;
-};
-
-const STATIC_NIKAYAS: NikayaHierarchy[] = Array.isArray(
-  (selectionsData as any)?.nikayas
-)
-  ? ((selectionsData as any).nikayas as RawNikayaEntry[]).map((entry) => ({
-      nikaya: entry.nikaya,
-      parshawayas: (entry.parshawayas ?? []).map((p) => ({
-        code: p.code,
-        name: p.name,
-      })),
-    }))
-  : [];
-
 const DEFAULT_FILTERS: FilterState = {
   province: "",
   district: "",
@@ -297,13 +280,32 @@ export default function RecordList({ canDelete }: { canDelete: boolean }) {
   const [filterKey, setFilterKey] = useState(0); // bump to remount SmartLocationFilter
   const prevFiltersRef = useRef<FilterState>(DEFAULT_FILTERS);
   const searchDebounceRef = useRef<number | null>(null);
-  const nikayaData = STATIC_NIKAYAS;
-  const nikayaLoading = false;
-  const nikayaError: string | null = null;
+  const [nikayaData, setNikayaData] = useState<NikayaHierarchy[]>([]);
+  const [nikayaLoading, setNikayaLoading] = useState(false);
+  const [nikayaError, setNikayaError] = useState<string | null>(null);
 
   const loadNikayaHierarchy = useCallback(() => {
-    // Static data currently; hook left for future dynamic loads
+    setNikayaLoading(true);
+    setNikayaError(null);
+    _getNikayaAndParshawa()
+      .then((res: any) => {
+        const raw: any[] = Array.isArray(res?.data) ? res.data
+          : Array.isArray(res?.data?.data) ? res.data.data
+          : Array.isArray(res) ? res : [];
+        setNikayaData(
+          raw.map((entry: any) => ({
+            nikaya: { code: entry.nikaya?.code ?? "", name: entry.nikaya?.name ?? "" },
+            parshawayas: (entry.parshawayas ?? []).map((p: any) => ({
+              code: p.code ?? "", name: p.name ?? "",
+            })),
+          }))
+        );
+      })
+      .catch(() => setNikayaError("Failed to load Nikaya list"))
+      .finally(() => setNikayaLoading(false));
   }, []);
+
+  useEffect(() => { loadNikayaHierarchy(); }, [loadNikayaHierarchy]);
 
   const locationSelection = useMemo<LocationSelection>(
     () => ({
